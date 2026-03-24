@@ -12,47 +12,49 @@
     <body class="ubuntu-font">
     <script src="rng.js"></script>
     <script src="frontend_scripts.js"></script>
+    <script src="i18n.js"></script>
 
-    <h1>KSS RNG Manipulation RTA</h1>
+    <h1 data-i18n="title">KSS RNG Manipulation RTA</h1>
 
     <div class="links">
-        <span>Main Page</span><br>
-        <a href="rta_tools.html">Tools</a><br>
-        <a href="rta_manual.html">Manual</a>
+        <span data-i18n="nav.mainPage">Main Page</span><br>
+        <a href="rta_tools.html" data-i18n="nav.tools">Tools</a><br>
+        <a href="rta_manual.html" data-i18n="nav.manual">Manual</a><br>
+        <button id="lang-toggle" onclick="i18n.toggle()">日本語</button>
     </div>
 
-    <label for="subgame">Subgame: </label>
+    <label for="subgame" data-i18n="subgame">Subgame: </label>
         <select id = "subgame" onchange = "subgameToggle(value)">
-            <option value="gco">Great Cave Offensive</option>
-            <option value="mww">Milky Way Wishes</option>
+            <option value="gco" data-i18n="gco">Great Cave Offensive</option>
+            <option value="mww" data-i18n="mww">Milky Way Wishes</option>
         </select>
         <br>
     <br>
 
-    <label>Min: </label>
+    <label data-i18n="min">Min: </label>
     <input style="width: 40px" maxlength="5" type="text" id="min">
-    <label>Max: </label>
+    <label data-i18n="max">Max: </label>
     <input style="width: 40px" maxlength="5" type="text" id="max">
-    <button id="findButton" onClick="fillMinAndMaxDefaults()">Fill Defaults</button>
+    <button id="fillButton" onClick="fillMinAndMaxDefaults()" data-i18n="fillDefaults">Fill Defaults</button>
     <br>
     <br>
 
     <div id="difficulty-selector" style="line-height:150%">
-        <label id="enemy-label1" for="slimeDifficulty">Slime: </label>
+        <label id="enemy-label1" for="slimeDifficulty" data-i18n="enemy.slime">Slime: </label>
         <select id = "enemy-difficulty1">
             <option value="true">Easy</option>
             <option value="false">Fast</option>
         </select>
         <br>
 
-        <label id="enemy-label2" for="puppetDifficulty">Puppet: </label>
+        <label id="enemy-label2" for="puppetDifficulty" data-i18n="enemy.puppet">Puppet: </label>
         <select id = "enemy-difficulty2">
             <option value="true">Easy</option>
             <option value="false">Fast</option>
         </select>
         <br>
 
-        <label id="enemy-label3" for="magicianDifficulty">Magician: </label>
+        <label id="enemy-label3" for="magicianDifficulty" data-i18n="enemy.magician">Magician: </label>
         <select id = "enemy-difficulty3">
             <option value="true">Easy</option>
             <option value="false">Fast</option>
@@ -62,7 +64,7 @@
     <br>
 
 
-    <label>Stars: </label>
+    <label data-i18n="stars">Stars: </label>
         <select id = "inputAmount" onChange="changeInputs(value)">
             <option value="1">1</option>
             <option value="2">2</option>
@@ -80,10 +82,10 @@
         <td id="box5" style="display:none">5</td>
         <td id="box6" style="display:none">6</td>
     </table>
-    <span style="font-size:18px">numpad: input - enter: reset - backspace: go back</span>
+    <span style="font-size:18px" data-i18n="numpadHint">numpad: input - enter: reset - backspace: go back</span>
     <br>
 
-    <div id="directions">Press on Numpad to start</div>
+    <div id="directions" data-i18n="pressNumpad">Press on Numpad to start</div>
 
     <div id="multiple-warning">-</div>
     <div id="multiple-warning-details">-</div>
@@ -99,15 +101,15 @@
     <br>
 
     <details class="settings-box">
-        <summary>Settings:</summary>
+        <summary data-i18n="settings">Settings:</summary>
         <ul>
-            <li>Lowest dash number for:</li>
+            <li data-i18n="lowestDash">Lowest dash number for:</li>
             <ul>
-                <li><label for="fast-dash-toggle">General manipulation:</label> <input onclick="initializePage()" type="radio" name="fast-dash-toggle" value="1" /><label>1</label> <input checked="checked" onchange="initializePage()" type="radio" name="fast-dash-toggle" value="2" /><label>2</label></li>
-                <li><label for="two-dash-on-hammer-throw">Knight hammer throw:</label> <input checked="checked" onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=0 /><label>0</label> <input onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=1 /><label>1</label> <input checked="checked" onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=2 /><label>2</label></li>
+                <li><label for="fast-dash-toggle" data-i18n="generalManip">General manipulation:</label> <input onclick="initializePage()" type="radio" name="fast-dash-toggle" value="1" /><label>1</label> <input checked="checked" onchange="initializePage()" type="radio" name="fast-dash-toggle" value="2" /><label>2</label></li>
+                <li><label for="two-dash-on-hammer-throw" data-i18n="knightHammer">Knight hammer throw:</label> <input checked="checked" onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=0 /><label>0</label> <input onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=1 /><label>1</label> <input checked="checked" onchange="initializePage()" type="radio" name="two-dash-on-hammer-throw" value=2 /><label>2</label></li>
             </ul>
-            <li><label>No Numpad:</label><input type="checkbox" id="numpad-toggle" onChange="initializePage()"></li>
-            <li><label>Technical Information:</label><input type="checkbox" id="advanced-toggle" onChange="advancedInfo(this)"></li>
+            <li><label data-i18n="noNumpad">No Numpad:</label><input type="checkbox" id="numpad-toggle" onChange="initializePage()"></li>
+            <li><label data-i18n="techInfo">Technical Information:</label><input type="checkbox" id="advanced-toggle" onChange="advancedInfo(this)"></li>
         </ul>
     </details>
 
@@ -174,6 +176,7 @@
 
     //On page load
     window.onload = function() {
+        i18n.init();
         subgameToggle(document.querySelector("#subgame").value);
         changeInputs(inputAmount.value, "maxInputs");
         advancedInfo(document.querySelector('#advanced-toggle'));
@@ -235,7 +238,7 @@
 
             while (sendKeys) {
                 initializeText();
-                allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> All possible counts:";
+                allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t('allPossibleCounts');
                 rngSearch();
                 //Leave function when done (important, or else this will be a while loop
                 sendKeys = false;
@@ -251,7 +254,7 @@
 
         if ((min.length == 0) || (max.length == 0)) {
             initializeText();
-            directions.innerHTML = "Please input values into the min and max boxes.";
+            directions.innerHTML = t('inputMinMax');
             return;
         }
 
@@ -261,7 +264,7 @@
 
         if ((min !== min) || (max !== max)) {
             initializeText();
-            directions.innerHTML = "Please only input integers.";
+            directions.innerHTML = t('inputIntegers');
             return;
         }
 
@@ -284,27 +287,27 @@
 
         if (hits == 0) {
             initializeText();
-            directions.innerText = "Results:";
-            multipleWarning.innerText = "Not in Range."
-            allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> All possible counts:";
+            directions.innerText = t('results');
+            multipleWarning.innerText = t('notInRange');
+            allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t('allPossibleCounts');
         }
         else if (hits > 1) {
-            directions.innerText = "Results:";
-            multipleWarning.innerHTML = "<span style='color:red;'>Warning: </span>" + hits + " possible RNG points in this range!";
-            multipleWarningDetails.innerHTML = "Viewing count " + (selectedCount + 1);
+            directions.innerText = t('results');
+            multipleWarning.innerHTML = "<span style='color:red;'>" + t('warning') + "</span>" + hits + t('possibleRng');
+            multipleWarningDetails.innerHTML = t('viewingCount') + (selectedCount + 1);
             await displayResults(currentHexValue);
         }
         else {
-            directions.innerText = "Results:";
-            multipleWarning.innerHTML = "Predicted RNG count: " + value[1][0];
+            directions.innerText = t('results');
+            multipleWarning.innerHTML = t('predictedCount') + value[1][0];
             await displayResults(currentHexValue);
         }
 
         allPossibleCounts.innerHTML = await printAllValues();
 
         function printAllValues() {
-            //Print all possible values outside of the range the user gave
-            var output = "<details><summary>All possible counts:</summary><ul>"
+            // ユーザー指定範囲外の全候補を表示
+            var output = "<details><summary>" + t('allPossibleCounts') + "</summary><ul>"
             var countAll = "";
             var allValue = compareSixNumbers(convertedKeys[0], convertedKeys[1], convertedKeys[2], convertedKeys[3], convertedKeys[4], convertedKeys[5]);
             for (i = 0; i < hits; i++) {
@@ -320,7 +323,7 @@
 
 
     function initializeText() {
-        directions.innerHTML = "Press on Numpad to start";   
+        directions.innerHTML = t('pressNumpad');
         multipleWarning.innerHTML = "-";
         multipleWarningDetails.innerHTML = "-";
         enemyOutput1.innerHTML = "-";
@@ -378,22 +381,22 @@
         switch (value) {
             case "gco":
                 enemy1Image.src = "images/slime.png";
-                enemyLabel1.innerText = "Slime: ";
+                enemyLabel1.textContent = t('enemy.slime');
                 enemy2Image.src = "images/puppet.png";
-                enemyLabel2.innerText = "Puppet: ";
+                enemyLabel2.textContent = t('enemy.puppet');
                 enemy3Image.src = "images/magician.png";
-                enemyLabel3.innerText = "Magician: ";
+                enemyLabel3.textContent = t('enemy.magician');
                 infoContainer4.style.display = 'none';
                 subgame = 0;
                 initializePage();
                 break;
             case "mww":
                 enemy1Image.src = "images/magician.png";
-                enemyLabel1.innerText = "Magician: ";
+                enemyLabel1.textContent = t('enemy.magician.mww');
                 enemy2Image.src = "images/knight.png";
-                enemyLabel2.innerText = "Knight: ";
+                enemyLabel2.textContent = t('enemy.knight');
                 enemy3Image.src = "images/dragon.png";
-                enemyLabel3.innerText = "Dragon: ";
+                enemyLabel3.textContent = t('enemy.dragon');
                 infoContainer4.style.display = 'revert';
                 subgame = 1;
                 initializePage();
@@ -416,7 +419,7 @@
             var enemyOutput1Text = await slimePredictionRTA(currentHexValue, minDashes);
 
         enemyOutput1.innerHTML = (enemyOutput1Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput1Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput1Text[3].toLowerCase() + ".png'>");
-        enemyOutput1Advanced.innerHTML = ("Advances: " + enemyOutput1Text[1] + "&emsp;Ending Value: " + advanceRngAndSlice(enemyOutput1Text[4], 0));
+        enemyOutput1Advanced.innerHTML = (t('advances') + enemyOutput1Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput1Text[4], 0));
         
 
         var enemyDifficulty2 = stringToBool(difficultySelector2.value);
@@ -427,7 +430,7 @@
             var enemyOutput2Text = await hardPredictionRTA(enemyOutput1Text[4], 1, subgame, twoDashOnHammerThrow), minDashes;
 
         enemyOutput2.innerHTML = (enemyOutput2Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput2Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput2Text[3].toLowerCase() + ".png'>");
-        enemyOutput2Advanced.innerHTML = ("Advances: " + enemyOutput2Text[1] + "&emsp;Ending Value: " + advanceRngAndSlice(enemyOutput2Text[4], 0));
+        enemyOutput2Advanced.innerHTML = (t('advances') + enemyOutput2Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput2Text[4], 0));
 
         var enemyDifficulty3 = stringToBool(difficultySelector3.value);
 
@@ -438,7 +441,7 @@
 
         if (subgame == 1) {
             enemyOutput3.innerHTML = (enemyOutput3Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput3Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput3Text[3].toLowerCase() + ".png'>");
-            enemyOutput3Advanced.innerHTML = ("Advances: " + enemyOutput3Text[1] + "&emsp;Ending Value: " + advanceRngAndSlice(enemyOutput3Text[4], 0));
+            enemyOutput3Advanced.innerHTML = (t('advances') + enemyOutput3Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput3Text[4], 0));
 
             var enemyOutput4Text = await dragonSecondTurn(enemyOutput3Text[4], minDashes);
             enemyOutput4.innerHTML = (enemyOutput4Text[0]);

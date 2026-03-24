@@ -54,11 +54,12 @@
     <body class="ubuntu-font">
     <script src="rng.js"></script>
     <script src="frontend_scripts.js"></script>
+    <script src="i18n.js"></script>
 
     <h1>RTA RNG Manipulator Manual</h1>
 
     <div class="TOC">
-        <ul class="TOC-text">
+        <ul class="TOC-text lang-en">
             <li><a href="#what-is-this">What is this?</a></li>
             <ul>
                 <li><a href="#bug">Report a Bug</a></li>
@@ -73,15 +74,21 @@
             </ul>
             <li><a href="#日本語">日本語ガイド</a></li>
         </ul>
+        <ul class="TOC-text lang-ja" style="display:none">
+        </ul>
     </div>
 
     <div class="links">
-        <a href="rta_manipulator.html">Main Page</a><br>
-        <a href="rta_tools.html">Tools</a><br>
-        <span>Manual</span>
+        <a href="rta_manipulator.html" data-i18n="nav.mainPage">Main Page</a><br>
+        <a href="rta_tools.html" data-i18n="nav.tools">Tools</a><br>
+        <span data-i18n="nav.manual">Manual</span><br>
+        <button id="lang-toggle" onclick="i18n.toggle()">日本語</button>
     </div>
     
     <div class="content">
+
+        <!-- 英語セクション -->
+        <div class="lang-en">
         <a href="#日本語">日本語ガイド</a>
         <h2 id="what-is-this">What is this?</h2>
         <p>This is a calculator that can predict the random actions of the entire Battle Windows fight sequence. This is done by first inputting a number of star directions, which gives the program the information required to find the player's specific RNG point. From this information, the program then simulates the entire Battle Windows sequence to predict every single Battle Windows attack, giving the player the actions needed to manipulate "good" RNG.</p>
@@ -303,5 +310,17 @@
             <li>複数の可能性がある場合はWarningが表示される。キーボードの矢印キーで別の乱数へ切り替える</li>
             <li>説明が至らないところがあれば随時更新します。</li>
         </ul>
+        </div>
+
+        <!-- 日本語セクション -->
+        <div class="lang-ja" style="display:none">
+        </div>
 
     </div>
+
+    <script>
+    // ページ読み込み時の初期化
+    window.onload = function() {
+        i18n.init();
+    }
+    </script>

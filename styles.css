@@ -124,3 +124,20 @@ iframe {
 .settings-box li {
     line-height: 50px;
 }
+
+/* 言語切り替えボタン */
+#lang-toggle {
+    cursor: pointer;
+    background-color: #4a7ab5;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 16px;
+    font-family: 'Ubuntu', sans-serif;
+    transition: background-color 0.2s;
+}
+
+#lang-toggle:hover {
+    background-color: #3a6a9f;
+}

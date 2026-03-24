@@ -12,16 +12,18 @@
     <body class="ubuntu-font">
     <script src="rng.js"></script>
     <script src="frontend_scripts.js"></script>
+    <script src="i18n.js"></script>
 
-    <h1>KSS RNG Tools</h1>
+    <h1 data-i18n="toolsTitle">KSS RNG Tools</h1>
 
     <div class="links">
-        <a href="rta_manipulator.html">Main Page</a><br>
-        <span>Tools</span><br>
-        <a href="rta_manual.html">Manual</a>
+        <a href="rta_manipulator.html" data-i18n="nav.mainPage">Main Page</a><br>
+        <span data-i18n="nav.tools">Tools</span><br>
+        <a href="rta_manual.html" data-i18n="nav.manual">Manual</a><br>
+        <button id="lang-toggle" onclick="i18n.toggle()">日本語</button>
     </div>
 
-    <h2 style="font-size: 25px">Find RNG Count:</h2>
+    <h2 style="font-size: 25px" data-i18n="findCount">Find RNG Count:</h2>
     <table class="input-display-div" id="input-display">
         <td id="box1">1</td>
         <td id="box2">2</td>
@@ -30,22 +32,22 @@
         <td id="box5">5</td>
         <td id="box6">6</td>
     </table>
-    <span style="font-size:18px">numpad: input - enter: reset - backspace: go back</span>
+    <span style="font-size:18px" data-i18n="numpadHint">numpad: input - enter: reset - backspace: go back</span>
     <br>
 
-    <div id="directions">Press on Numpad to start</div>
+    <div id="directions" data-i18n="pressNumpad">Press on Numpad to start</div>
     <div id="count-results1">-</div>
     <div id="count-results2">-</div>
     <div id="hex-results">-</div>
     <div id="dec-results">-</div>
 
     <br>
-    <label>No Numpad:</label><input type="checkbox" id="numpad-toggle" onChange="initializePage()">
+    <label data-i18n="noNumpad">No Numpad:</label><input type="checkbox" id="numpad-toggle" onChange="initializePage()">
 
     <br>
-    <h2 style="font-size: 25px">Find duplicate RNG points in range:</h2>
-    <p style="font-size: 18px">Note: Large ranges and star amounts may take a long time.</p>
-    <label>Stars: </label>
+    <h2 style="font-size: 25px" data-i18n="findDuplicate">Find duplicate RNG points in range:</h2>
+    <p style="font-size: 18px" data-i18n="largeRangeNote">Note: Large ranges and star amounts may take a long time.</p>
+    <label data-i18n="stars">Stars: </label>
         <select id = "findBox" onChange="changeInputs(value)">
             <option value="1">1</option>
             <option value="2">2</option>
@@ -54,11 +56,11 @@
             <option value="5">5</option>
             <option value="6">6</option>
         </select>
-    <label>Min: </label>
+    <label data-i18n="min">Min: </label>
     <input style="width: 40px" maxlength="5" type="text" id="findMin">
-    <label>Max: </label>
+    <label data-i18n="max">Max: </label>
     <input style="width: 40px" maxlength="5" type="text" id="findMax">
-    <button id="findButton">Find</button><span id="find-load-icon"></span>
+    <button id="findButton" data-i18n="find">Find</button><span id="find-load-icon"></span>
     <div class="find-rng-box">
         <div id="find-table"></div>
     </div>
@@ -84,6 +86,11 @@
 
     /*Settings*/
     const noNumpad = document.querySelector("#numpad-toggle");
+
+    // ページ読み込み時の初期化
+    window.onload = function() {
+        i18n.init();
+    }
 
     window.addEventListener(
         "keydown",
@@ -131,7 +138,7 @@
 
             while (sendKeys) {
 
-                directions.innerHTML = "Results:";  
+                directions.innerHTML = t('results');
 
                 for (var i = 0; i < 6; i++) {
                     convertedKeys[i] = NumpadToStarDirection(keys[i]);
@@ -140,7 +147,7 @@
                 var value = compareSixNumbers(convertedKeys[0], convertedKeys[1], convertedKeys[2], convertedKeys[3], convertedKeys[4], convertedKeys[5]);
 
                 if (typeof value[1][0] === "undefined") {
-                    countResults1.innerText = "Not a valid star combination.";
+                    countResults1.innerText = t('notValidCombo');
                     countResults2.innerText = "-";
                     hexResults.innerText = "-";
                     decResults.innerText = "-";
@@ -151,8 +158,8 @@
                         valueBeforeJumps = 65534 + valueBeforeJumps;
                     }
 
-                    countResults1.innerText = "- Predicted RNG Count: " + value[1][0];
-                    countResults2.innerText = "- Count Before Jumping: " + valueBeforeJumps;
+                    countResults1.innerText = t('predictedRngCount') + value[1][0];
+                    countResults2.innerText = t('countBeforeJumping') + valueBeforeJumps;
 
                     var hex1 = value[0][0].slice(0, 2);
                     var hex2 = value[0][0].slice(2);
@@ -160,11 +167,11 @@
                     var dec1 = hexToDecimal(hex1);
                     var dec2 = hexToDecimal(hex2);
 
-                    hexResults.innerText = "- Hex (After Jumps): " + hex1 + " " + hex2;
-                    decResults.innerText = "- Decimal (After Jumps): " + dec1 + " " + dec2;
+                    hexResults.innerText = t('hexAfterJumps') + hex1 + " " + hex2;
+                    decResults.innerText = t('decimalAfterJumps') + dec1 + " " + dec2;
                 }
 
-                //Leave function when done (important, or else this will be a while loop)
+                // 完了後にループを抜ける
                 sendKeys = false;
             }
         },
@@ -179,14 +186,14 @@
         const findBoxInputs = parseInt(findBox.value, 10);
 
         if ((min.length == 0) || (max.length == 0)) {
-            return "Please input values into the min and max boxes.";
+            return t('inputMinMax');
         }
 
         min = parseInt(min, 10) - 7;
         max = parseInt(max, 10) + 4;
 
         if ((min !== min) || (max !== max)) {
-            return "Please only input integers.";
+            return t('inputIntegers');
         }
 
         if (min < 0)
@@ -195,7 +202,7 @@
         if (max > 65536)
             max = 65536;
 
-        var table = "<table style='margin: 30px 0px 30px 0px;'><tr><th>Amount</th><th>Directions</th><th style='width:40%'>Hexes</th><th style='width:40%'>Decimals</th><th style='width:20%'>Counts</th></tr>";
+        var table = "<table style='margin: 30px 0px 30px 0px;'><tr><th>" + t('amount') + "</th><th>" + t('directions') + "</th><th style='width:40%'>" + t('hexes') + "</th><th style='width:40%'>" + t('decimals') + "</th><th style='width:20%'>" + t('counts') + "</th></tr>";
         var totalOutcomes = 0;
         var totalOutcomeChance = 0;
         var totalOutcomesPercent = 0;
@@ -274,10 +281,10 @@
             totalOutcomesPercent = (Math.round(totalOutcomesPercent * 100) / 100).toFixed(2);
         }
         else
-            return "No repeating values!";
+            return t('noRepeating');
 
         table += "</table>";
-        table = "Duplicate sets: " + totalOutcomes + "<br>" + "Chance of duplicate: " + totalOutcomeChance + "/" + (max - min) + " - " + totalOutcomesPercent + "% chance<br>" + table;
+        table = t('duplicateSets') + totalOutcomes + "<br>" + t('chanceOfDuplicate') + totalOutcomeChance + "/" + (max - min) + " - " + totalOutcomesPercent + "%<br>" + table;
         return new Promise(resolve => setTimeout(resolve, 0, table));
 
         function applyTable(hits) {
@@ -317,7 +324,7 @@
     }
 
     function initializePage() {
-        directions.innerHTML = "Press on Numpad to start";   
+        directions.innerHTML = t('pressNumpad');
         countResults1.innerHTML = "-";
         countResults2.innerHTML = "-";
         hexResults.innerHTML = "-";
