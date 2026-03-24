@@ -20,7 +20,10 @@
         <span data-i18n="nav.mainPage">Main Page</span><br>
         <a href="rta_tools.html" data-i18n="nav.tools">Tools</a><br>
         <a href="rta_manual.html" data-i18n="nav.manual">Manual</a><br>
-        <button id="lang-toggle" onclick="i18n.toggle()">日本語</button>
+        <select id="lang-select" onchange="i18n.setLanguage(value)">
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+        </select>
     </div>
 
     <label for="subgame" data-i18n="subgame">Subgame: </label>
@@ -238,7 +241,7 @@
 
             while (sendKeys) {
                 initializeText();
-                allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t('allPossibleCounts');
+                allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t.allPossibleCounts;
                 rngSearch();
                 //Leave function when done (important, or else this will be a while loop
                 sendKeys = false;
@@ -254,7 +257,7 @@
 
         if ((min.length == 0) || (max.length == 0)) {
             initializeText();
-            directions.innerHTML = t('inputMinMax');
+            directions.innerHTML = t.inputMinMax;
             return;
         }
 
@@ -264,7 +267,7 @@
 
         if ((min !== min) || (max !== max)) {
             initializeText();
-            directions.innerHTML = t('inputIntegers');
+            directions.innerHTML = t.inputIntegers;
             return;
         }
 
@@ -287,27 +290,27 @@
 
         if (hits == 0) {
             initializeText();
-            directions.innerText = t('results');
-            multipleWarning.innerText = t('notInRange');
-            allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t('allPossibleCounts');
+            directions.innerText = t.results;
+            multipleWarning.innerText = t.notInRange;
+            allPossibleCounts.innerHTML = "<img class='loading' src='images/kirby-running.gif'> " + t.allPossibleCounts;
         }
         else if (hits > 1) {
-            directions.innerText = t('results');
-            multipleWarning.innerHTML = "<span style='color:red;'>" + t('warning') + "</span>" + hits + t('possibleRng');
-            multipleWarningDetails.innerHTML = t('viewingCount') + (selectedCount + 1);
+            directions.innerText = t.results;
+            multipleWarning.innerHTML = "<span style='color:red;'>" + t.warning + "</span>" + hits + t.possibleRng;
+            multipleWarningDetails.innerHTML = t.viewingCount + (selectedCount + 1);
             await displayResults(currentHexValue);
         }
         else {
-            directions.innerText = t('results');
-            multipleWarning.innerHTML = t('predictedCount') + value[1][0];
+            directions.innerText = t.results;
+            multipleWarning.innerHTML = t.predictedCount + value[1][0];
             await displayResults(currentHexValue);
         }
 
         allPossibleCounts.innerHTML = await printAllValues();
 
         function printAllValues() {
-            // ユーザー指定範囲外の全候補を表示
-            var output = "<details><summary>" + t('allPossibleCounts') + "</summary><ul>"
+            //Print all possible values outside of the range the user gave
+            var output = "<details><summary>" + t.allPossibleCounts + "</summary><ul>"
             var countAll = "";
             var allValue = compareSixNumbers(convertedKeys[0], convertedKeys[1], convertedKeys[2], convertedKeys[3], convertedKeys[4], convertedKeys[5]);
             for (i = 0; i < hits; i++) {
@@ -323,7 +326,7 @@
 
 
     function initializeText() {
-        directions.innerHTML = t('pressNumpad');
+        directions.innerHTML = t.pressNumpad;
         multipleWarning.innerHTML = "-";
         multipleWarningDetails.innerHTML = "-";
         enemyOutput1.innerHTML = "-";
@@ -381,22 +384,22 @@
         switch (value) {
             case "gco":
                 enemy1Image.src = "images/slime.png";
-                enemyLabel1.textContent = t('enemy.slime');
+                enemyLabel1.textContent = t.enemy.slime;
                 enemy2Image.src = "images/puppet.png";
-                enemyLabel2.textContent = t('enemy.puppet');
+                enemyLabel2.textContent = t.enemy.puppet;
                 enemy3Image.src = "images/magician.png";
-                enemyLabel3.textContent = t('enemy.magician');
+                enemyLabel3.textContent = t.enemy.magician;
                 infoContainer4.style.display = 'none';
                 subgame = 0;
                 initializePage();
                 break;
             case "mww":
                 enemy1Image.src = "images/magician.png";
-                enemyLabel1.textContent = t('enemy.magician.mww');
+                enemyLabel1.textContent = t.enemy.magicianMww;
                 enemy2Image.src = "images/knight.png";
-                enemyLabel2.textContent = t('enemy.knight');
+                enemyLabel2.textContent = t.enemy.knight;
                 enemy3Image.src = "images/dragon.png";
-                enemyLabel3.textContent = t('enemy.dragon');
+                enemyLabel3.textContent = t.enemy.dragon;
                 infoContainer4.style.display = 'revert';
                 subgame = 1;
                 initializePage();
@@ -419,7 +422,7 @@
             var enemyOutput1Text = await slimePredictionRTA(currentHexValue, minDashes);
 
         enemyOutput1.innerHTML = (enemyOutput1Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput1Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput1Text[3].toLowerCase() + ".png'>");
-        enemyOutput1Advanced.innerHTML = (t('advances') + enemyOutput1Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput1Text[4], 0));
+        enemyOutput1Advanced.innerHTML = (t.advances + enemyOutput1Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput1Text[4], 0));
         
 
         var enemyDifficulty2 = stringToBool(difficultySelector2.value);
@@ -430,7 +433,7 @@
             var enemyOutput2Text = await hardPredictionRTA(enemyOutput1Text[4], 1, subgame, twoDashOnHammerThrow), minDashes;
 
         enemyOutput2.innerHTML = (enemyOutput2Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput2Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput2Text[3].toLowerCase() + ".png'>");
-        enemyOutput2Advanced.innerHTML = (t('advances') + enemyOutput2Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput2Text[4], 0));
+        enemyOutput2Advanced.innerHTML = (t.advances + enemyOutput2Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput2Text[4], 0));
 
         var enemyDifficulty3 = stringToBool(difficultySelector3.value);
 
@@ -441,7 +444,7 @@
 
         if (subgame == 1) {
             enemyOutput3.innerHTML = (enemyOutput3Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput3Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput3Text[3].toLowerCase() + ".png'>");
-            enemyOutput3Advanced.innerHTML = (t('advances') + enemyOutput3Text[1] + "&emsp;" + t('endingValue') + advanceRngAndSlice(enemyOutput3Text[4], 0));
+            enemyOutput3Advanced.innerHTML = (t.advances + enemyOutput3Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput3Text[4], 0));
 
             var enemyOutput4Text = await dragonSecondTurn(enemyOutput3Text[4], minDashes);
             enemyOutput4.innerHTML = (enemyOutput4Text[0]);

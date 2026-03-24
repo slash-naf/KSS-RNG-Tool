@@ -125,8 +125,8 @@ iframe {
     line-height: 50px;
 }
 
-/* 言語切り替えボタン */
-#lang-toggle {
+/* Language selector */
+#lang-select {
     cursor: pointer;
     background-color: #4a7ab5;
     color: white;
@@ -135,9 +135,9 @@ iframe {
     padding: 4px 12px;
     font-size: 16px;
     font-family: 'Ubuntu', sans-serif;
-    transition: background-color 0.2s;
 }
 
-#lang-toggle:hover {
-    background-color: #3a6a9f;
+#lang-select option {
+    background-color: white;
+    color: black;
 }

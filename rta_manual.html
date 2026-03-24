@@ -56,25 +56,23 @@
     <script src="frontend_scripts.js"></script>
     <script src="i18n.js"></script>
 
-    <h1>RTA RNG Manipulator Manual</h1>
+    <h1 data-i18n="manual.title">RTA RNG Manipulator Manual</h1>
 
     <div class="TOC">
-        <ul class="TOC-text lang-en">
-            <li><a href="#what-is-this">What is this?</a></li>
+        <ul class="TOC-text">
+            <li><a href="#what-is-this" data-i18n="manual.whatIsThis">What is this?</a></li>
             <ul>
-                <li><a href="#bug">Report a Bug</a></li>
+                <li><a href="#bug" data-i18n="manual.reportBug">Report a Bug</a></li>
             </ul>
-            <li><a href="#about-rng">About RNG</a></li>
+            <li><a href="#about-rng" data-i18n="manual.aboutRng">About RNG</a></li>
             <ul>
-                <li><a href="#rng-intro">Introduction</a></li>
+                <li><a href="#rng-intro" data-i18n="manual.introduction">Introduction</a></li>
             </ul>
-            <li><a href="#fast-mode">Fast Mode</a></li>
+            <li><a href="#fast-mode" data-i18n="manual.fastMode">Fast Mode</a></li>
             <ul>
-                <li><a href="#executing-fast-mode">Execution</a></li>
+                <li><a href="#executing-fast-mode" data-i18n="manual.execution">Execution</a></li>
             </ul>
-            <li><a href="#日本語">日本語ガイド</a></li>
-        </ul>
-        <ul class="TOC-text lang-ja" style="display:none">
+            <li><a href="#日本語" data-i18n="manual.jpGuide">日本語ガイド</a></li>
         </ul>
     </div>
 
@@ -82,15 +80,16 @@
         <a href="rta_manipulator.html" data-i18n="nav.mainPage">Main Page</a><br>
         <a href="rta_tools.html" data-i18n="nav.tools">Tools</a><br>
         <span data-i18n="nav.manual">Manual</span><br>
-        <button id="lang-toggle" onclick="i18n.toggle()">日本語</button>
+        <select id="lang-select" onchange="i18n.setLanguage(value)">
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+        </select>
     </div>
     
     <div class="content">
-
-        <!-- 英語セクション -->
-        <div class="lang-en">
         <a href="#日本語">日本語ガイド</a>
-        <h2 id="what-is-this">What is this?</h2>
+        <h2 id="what-is-this" data-i18n="manual.whatIsThis">What is this?</h2>
+        <div class="lang-en">
         <p>This is a calculator that can predict the random actions of the entire Battle Windows fight sequence. This is done by first inputting a number of star directions, which gives the program the information required to find the player's specific RNG point. From this information, the program then simulates the entire Battle Windows sequence to predict every single Battle Windows attack, giving the player the actions needed to manipulate "good" RNG.</p>
 
         <p>With building this calculator, there were these goals in mind:</p>
@@ -103,9 +102,14 @@
         </ul>
 
         <p>I am happy to say that I think I accomplished most, if not all, of these goals. Hopefully this documentation makes it easier to understand how to use this calculator and what it takes to master it.</p>
+        </div>
 
-        <h3 id="bug">Report a Bug</h3>
+        <div class="lang-ja" style="display:none">
+        <p>バトルウインドウズ戦全体のランダムな行動を予測できる計算ツールです。最初に星の向きを入力することで現在の乱数位置を特定し、良い乱数を引くために必要なアクションを提示します。</p>
+        </div>
 
+        <h3 id="bug" data-i18n="manual.reportBug">Report a Bug</h3>
+        <div class="lang-en">
         <p><span title="that doesn't surprise me">If you found a bug</span>, please provide me the following:</p>
         <ul>
             <li>A screenshot of the bug in the program.</li>
@@ -116,10 +120,16 @@
         </ul>
 
         <p>You can contact me through Discord: minchino, or contact me through any one of my <a href="https://nippoverse.xyz/socials.html">socials</a>.</p>
+        </div>
+        <div class="lang-ja" style="display:none">
+        <p>バグを見つけた場合は、プログラムのスクリーンショットと、必要に応じてゲームプレイの動画を添えて報告してください。</p>
+        <p>Discord: minchino、または<a href="https://nippoverse.xyz/socials.html">ソーシャル</a>から連絡できます。</p>
+        </div>
 
 
-        <h2 id="about-rng">About RNG</h2>
-        <h3 id="rng-intro">Introduction</h3>
+        <h2 id="about-rng" data-i18n="manual.aboutRng">About RNG</h2>
+        <h3 id="rng-intro" data-i18n="manual.introduction">Introduction</h3>
+        <div class="lang-en">
         <p>Kirby Super Star is a game with several random elements that can slow down the player during speedruns. These elements seem to be out of the users control, as they are "random". In reality, these outcomes are not random, and are in fact completely predictable with the proper foresight.</p>
 
         <p>When the game is started, random numbers are procedurally generated through an arbitrary equation. This essentially pre-generates a set list of numbers, and this is the list that will be used to determine random actions. Knowing what every single number is in the list is not important, as that is the program's purpose. What is important to know is that every number is, and will always be, the exact same.</p>
@@ -182,8 +192,10 @@
         </div>
 
         <p>When Kirby jumps, the game takes the number 217 and uses it in a very simple algorithm. The majority of RNG calculations determine actions if the number is in between two specific numbers in the range of 0 and 255. In this specific example, the star went left because the number is in between 192 and 223.</p>
+        </div>
 
-        <h3 id="rng-count">RNG "Count"</h3>
+        <h3 id="rng-count" data-i18n="manual.rngCount">RNG "Count"</h3>
+        <div class="lang-en">
         <p>"Count" is a metric that represents a given point for the number of times RNG was advanced since the game was started.</p>
 
         <img src="images/file-select-still-image.png">
@@ -193,17 +205,20 @@
         <p>Count will reach a maximum value of 65535 and will loop back to 0.</p>
 
         <p>The count value is basically giving us the answer for "how many times have we advanced RNG". This becomes important when we want to manipulate RNG. Rather than trying to find a specific RNG spot out of 65535 numbers, it can be narrowed down to a range of around 300 or so.</p>
+        </div>
 
-        <h3 id="finding-count">Finding Count</h3>
+        <h3 id="finding-count" data-i18n="manual.findingCount">Finding Count</h3>
+        <div class="lang-en">
         <p>Because RNG is entirely predictable, it is very easy to find your current RNG point when provided with enough data.</p>
 
         <p>Our best target is using the previously mentioned stars that Kirby emits when he lands on the ground, or bumps into a wall or ceiling. Because of its predictability, the directions that stars will go are also entirely predictable. By using software, we can find exactly where we are in the RNG list by inputting sequential star directions.</p>
 
         <p>With all of this in mind, we can continue to setting up the RNG tool.</p>
+        </div>
 
-        <h2>Setup</h2>
-        <h3>RNG Program Overview</h3>
-
+        <h2 data-i18n="manual.setup">Setup</h2>
+        <h3 data-i18n="manual.rngOverview">RNG Program Overview</h3>
+        <div class="lang-en">
         <div>
             <div style="float:left; height:300px;">
                 <img style="height: 300px; border: 1px solid black" src="images/rng-tool-screenshot.png">
@@ -220,11 +235,15 @@
         <br>
 
         <p>In order to use the main RNG manipulation tool, we need to find an average range of count values to be put into the Min and Max boxes. This is crucial because, like stated before, we do not want to look through a range of 65535 numbers.</p>
+        </div>
 
-        <h4>Why do we need to find our own range?</h4>
+        <h4 data-i18n="manual.whyRange">Why do we need to find our own range?</h4>
+        <div class="lang-en">
         <p>Every person plays differently, and how much RNG you advance is dependent on the actions that you take in-game. More RNG advancements ≠ slower movement. The faster you play <i>could</i> be an influence, but it is not definite. Regardless, it is best to find your own range and it doesn't take too long.</p>
+        </div>
 
-        <h3>Finding Count Range</h3>
+        <h3 data-i18n="manual.findingRange">Finding Count Range</h3>
+        <div class="lang-en">
         <p>The best way to calculate range is by using the "Find RNG Count" tool in <a href="rta_tools.html">Tools</a>.</p>
 
         <p>In order to find an approximate range of numbers to choose from, it is best to play through GCO / Halfmoon a few times up to Battle Windows, then calculate what RNG point you end on. Doing this multiple times allows you to find an approximate average that you end up on.</p>
@@ -234,22 +253,28 @@
         <p>After this, start either Great Cave Offensive or Halfmoon, and play up until Battle Windows. Once there, jump 6 times and input the star directions into the Find RNG Count tool. Keep note of what Count appears and do this a few more times until you are satisfied with an average Count number (the more times you do this the merrier).</p>
 
         <p>From this average, you can then determine what your RNG range should be. Note the "Find duplicate RNG points in range" table. You can input a minimum and maximum count, along with how many stars you would like to input in RTA, to see how many duplicate RNG points you have in that range. The less duplicates the better, as having less makes the calculator more accurate.</p>
+        </div>
 
-        <h3>Using the Calculator</h3>
+        <h3 data-i18n="manual.usingCalc">Using the Calculator</h3>
+        <div class="lang-en">
         <p>WIP</p>
 
         <!--
         <p>While the "Kirby Super Star" logo is displayed, the game will advance RNG once every frame (this is to make the starting point seem random when the game is started). However, there is an oversight in the Japanese version that lets us skip this title screen in one frame, allowing us to only advance one RNG number and making the start more consistent.</p>
         -->
+        </div>
 
-        <h2 id="fast-mode">"Fast" Mode Information</h2>
+        <h2 id="fast-mode" data-i18n="manual.fastMode">"Fast" Mode Information</h2>
+        <div class="lang-en">
         <p>Choosing Fast from the difficulty selector means that you are able to attack right away, but are limited to a 4 frame window, or else the manipulation will fail. This is because the Hammer dust from an up+y attack advances RNG, and using this attack before the enemy lands will create inconsistencies. The timing needs to be precise as to match the calculator's RNG predictions.</p>
 
         <p>In addition to the strict timing, the calculator will be accounting for two instances of a first turn RNG roll instead of one. This is because accounting for only one would make this a two-frame window, which is very tight and not worth doing 30 minutes into a speedrun. The calculator makes sure that if either are landed on, it will give good RNG regardless of which RNG value the user gets.</p>
 
         <p>This, consequently, may cause good RNG to appear less, and thus may require more player input in between each turn. It is highly risk-reward.</p>
+        </div>
 
-        <h3 id="executing-fast-mode">Execution</h3>
+        <h3 id="executing-fast-mode" data-i18n="manual.execution">Execution</h3>
+        <div class="lang-en">
         <p>The Hammer attack needs to start on the first four frames the attack will hit the target. This varies across Battle Windows enemies, but ensures that it will be as fast and consistent as possible.</p>
         
         <p>4 frames is the highest this threshold will be because going any higher than this will cause inconsistencies with how abilities spawn once the enemy lands, which can advance none or several random numbers. This is due to the Hammer dust that spawns while charging the attack. It would be very complicated to determine this on the fly and is prone to error, so making the trick tight, but consistent, is the best option.</p>
@@ -259,19 +284,24 @@
         <p>For the sake of completeness, the entire gameplay window will be shown, but it is recommended to zoom in to get a better look.</p>
 
         <p>(The rest of the enemies still need to be completed.)</p>
+        </div>
 
-        <h4>Dark Knight</h4>
+        <h4 data-i18n="manual.darkKnight">Dark Knight</h4>
+        <div class="lang-en">
         <p>Starts at around in between the E and the N, and ends near the middle of the E.</p>
         <img class="fastmodeimages" src="images/knighttimingstart.png"/>
         <img class="fastmodeimages" src="images/knighttimingend.png"/>
+        </div>
 
-        <h4>Red Dragon</h4>
+        <h4 data-i18n="manual.redDragon">Red Dragon</h4>
+        <div class="lang-en">
         <p>Starts right after the E, and ends in the middle of the white border and the single green pixel.</p>
         <p>Dragon is a special exception, as the timing gives 5 frames of leniency instead of 4.</p>
         <img class="fastmodeimages" src="images/dragontimingstart.png"/>
         <img class="fastmodeimages" src="images/dragontimingend.png"/>
+        </div>
 
-        <h2 id="日本語">日本語ガイド</h2>
+        <h2 id="日本語" data-i18n="manual.jpGuide">日本語ガイド</h2>
             <p style="font-size:12px">Nippoからのメモ:</p>
             <p style="font-size:12px">この電卓が英語であることを混乱させて申し訳ない。いつか日本語訳を作ります。</p>
             <p style="font-size:12px">わみちゃんこのガイドを書いてくれてありがとう。</p>
@@ -310,12 +340,6 @@
             <li>複数の可能性がある場合はWarningが表示される。キーボードの矢印キーで別の乱数へ切り替える</li>
             <li>説明が至らないところがあれば随時更新します。</li>
         </ul>
-        </div>
-
-        <!-- 日本語セクション -->
-        <div class="lang-ja" style="display:none">
-        </div>
-
     </div>
 
     <script>
