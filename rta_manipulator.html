@@ -419,7 +419,7 @@
         if (enemyDifficulty1) 
             var enemyOutput1Text = await easyPredictionRTA(currentHexValue, 0, subgame, twoDashOnHammerThrow, minDashes);
         else
-            var enemyOutput1Text = await slimePredictionRTA(currentHexValue, minDashes);
+            var enemyOutput1Text = await slimePredictionRTA(currentHexValue, minDashes);    // Is it a bug that this function runs in MWW as well?
 
         enemyOutput1.innerHTML = (i18n.translateAction(enemyOutput1Text[0]) + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput1Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput1Text[3].toLowerCase() + ".png'>");
         enemyOutput1Advanced.innerHTML = (t.advances + enemyOutput1Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput1Text[4], 0));
