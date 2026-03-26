@@ -38,8 +38,9 @@ const translations = {
         advances: 'Advances: ',
         endingValue: 'Ending Value: ',
 
-        // Enemy names (GCO)
+        // Enemy names
         enemy: {
+            // GCO
             slime: 'Slime: ',
             puppet: 'Puppet: ',
             magician: 'Magician: ',
@@ -93,9 +94,9 @@ const translations = {
     ja: {
         // Common navigation
         nav: {
-            mainPage: 'メインページ',
-            tools: 'ツール',
-            manual: 'マニュアル',
+            mainPage: 'Main Page',
+            tools: 'Tools',
+            manual: 'Manual',
         },
 
         // rta_manipulator.html
@@ -127,8 +128,9 @@ const translations = {
         advances: '消費回数: ',
         endingValue: '終了値: ',
 
-        // Enemy names (GCO)
+        // Enemy names
         enemy: {
+            // GCO
             slime: 'スライム: ',
             puppet: 'おどりにんぎょう: ',
             magician: 'まほうつかい: ',
@@ -160,19 +162,19 @@ const translations = {
 
         // rta_manual.html
         manual: {
-            title: 'RTA 乱数調整マニュアル',
+            title: 'RTA RNG Manipulator Manual',
             whatIsThis: 'このツールについて',
             reportBug: 'バグ報告',
             aboutRng: '乱数について',
             introduction: 'はじめに',
-            rngCount: '乱数の「カウント」',
-            findingCount: 'カウントの特定',
+            rngCount: '乱数位置',
+            findingCount: '乱数位置の特定',
             setup: 'セットアップ',
-            rngOverview: 'RNGプログラムの概要',
-            whyRange: '自分の範囲を見つける理由',
-            findingRange: 'カウント範囲の特定',
-            usingCalc: '計算ツールの使い方',
-            fastMode: 'Fastモード情報',
+            rngOverview: '乱数調整ツールの概要',
+            whyRange: 'なぜ自分専用の範囲を調べる必要があるのか',
+            findingRange: '乱数範囲の探し方',
+            usingCalc: '乱数調整ツールの使い方',
+            fastMode: 'Fastモードについて',
             execution: '実行方法',
             darkKnight: 'あくまのきし',
             redDragon: 'レッドドラゴン',

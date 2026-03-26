@@ -105,7 +105,18 @@
         </div>
 
         <div class="lang-ja" style="display:none">
-        <p>バトルウインドウズ戦全体のランダムな行動を予測できる計算ツールです。最初に星の向きを入力することで現在の乱数位置を特定し、良い乱数を引くために必要なアクションを提示します。</p>
+        <p>バトルウインドウズ戦全体のランダムな行動を予測できるツールです。最初に星の向きを入力することで、現在の乱数位置を特定するために必要な情報をツールに与えます。この情報をもとにバトルウィンドウズ戦全体をシミュレートし、敵の全ての攻撃を予測することで、良い」乱数を引くために必要な行動を提示します。</p>
+
+        <p>このツールを作成するにあたり、以下の目標を念頭に置いていました：</p>
+        <ul>
+            <li>使いやすく、読みやすいデザインにすること。</li>
+            <li>RTAのプレイ中に無駄な時間を発生させないこと。</li>
+            <li>ツールの使用に際して制限や注意事項がなく、プレイの妨げにならないこと。</li>
+            <li>セットアップを可能な限り簡単にし、それを達成するための適切なツールを提供すること。</li>
+            <li>乱数の仕組みやこのツールの使い方についてのチュートリアルを書くこと（今読んでいるこれ）</li>
+        </ul>
+
+        <p>これらの目標はほぼすべて達成できたと自負しています。このマニュアルが、ツールの使うための手助けとなれば幸いです。</p>
         </div>
 
         <h3 id="bug" data-i18n="manual.reportBug">Report a Bug</h3>
@@ -122,8 +133,16 @@
         <p>You can contact me through Discord: minchino, or contact me through any one of my <a href="https://nippoverse.xyz/socials.html">socials</a>.</p>
         </div>
         <div class="lang-ja" style="display:none">
-        <p>バグを見つけた場合は、プログラムのスクリーンショットと、必要に応じてゲームプレイの動画を添えて報告してください。</p>
-        <p>Discord: minchino、または<a href="https://nippoverse.xyz/socials.html">ソーシャル</a>から連絡できます。</p>
+        <p><span title="that doesn't surprise me">バグを発見した場合は</span>、以下の情報を提供してください：</p>
+        <ul>
+            <li>ツール上のバグのスクリーンショット。</li>
+            <li>可能であれば、バグ発生時のゲームプレイ動画。</li>
+            <ul>
+                <li>スクリーンショットでも構いませんが、動画の方が望ましいです。</li>
+            </ul>
+        </ul>
+
+        <p>Discord（minchino）または、<a href="https://nippoverse.xyz/socials.html">ソーシャルメディアリンク</a>のいずれかからご連絡ください。</p>
         </div>
 
 
@@ -194,6 +213,71 @@
         <p>When Kirby jumps, the game takes the number 217 and uses it in a very simple algorithm. The majority of RNG calculations determine actions if the number is in between two specific numbers in the range of 0 and 255. In this specific example, the star went left because the number is in between 192 and 223.</p>
         </div>
 
+        <div class="lang-ja" style="display:none">
+        <p>星のカービィスーパーデラックスには、RTAにおいてタイムに影響する運要素がいくつか存在します。これらの要素は一見すると制御不可能に見えますが、適切な事前知識があれば完全に予測可能です。</p>
+
+        <p>ゲームを起動すると、特定の計算式によって乱数が自動生成されます。これは実質的に「あらかじめ決められた数値のリスト」作るようなもので、ゲーム内のランダムな挙動はこのリストを元に決定されます。ツールがその役割を担うため、リストの数値を把握する必要はありません。重要なのは、「生成される数値のリストは毎回必ず同じになる」ということです。</p>
+
+        <p>本作のメモリ上には、乱数用の値が2つ存在します。どちらも0〜255の値をとる8ビットの符号なし整数です。1つ目は実際のランダム行動の決定に使われ、2つ目はリストの生成のみに使われます。ここで注目するのは1つ目の値です。</p>
+
+        <p>ランダムな行動が発生すると、リスト内の数値が1つ消費されます。基本的には1アクションにつき1つの数値が使われますが、予測を難しくするために複数の数値を一度にスキップするアクションや、複雑な計算のために複数の数値を同時に消費するアクションもあります。</p>
+
+        <p>WaddleDX氏が作成した<a href="https://tasvideos.org/UserFiles/Info/72200361585279856">便利なRNG tool</a>を使うことで、乱数の動きを正確に可視化できます。このツールでは、数値のリスト全体をリアルタイムで確認できます。</p>
+
+        <img id="file-select-gif" src="images/file-select-rng.gif">
+
+        <p>例えばゲーム起動時を見てみましょう。右側にはゲームが実際に使用する乱数が、下側にはその数値がグラフ化されて表示されています。ここでは主に右側のリストに注目します。</p>
+
+        <p>ゲームをリセットすると、初期乱数は常に青色でハイライトされている「119」になります。もちろん、リスト全体の並び順も常に同じです。（ファイル選択画面が表示される際に乱数が1つ進みますが、今は重要ではないので後述します）</p>
+
+        <img src="images/jump-demonstration.gif">
+
+        <p>カービィの着地の例を見ると、乱数がどのように取得されるかがよくわかります。カービィが地面に着地して星が出ると、乱数リストは2つ進みます。</p>
+
+        <p>ダッシュの土煙や、バトルウィンドウズの攻撃パターン決定など、基本的には乱数を1つだけ進めるアクションが多いです。しかし、着地星の方向決定は「乱数を複数回進める」特殊なアクションの1つです（ゲーム内部では、最初の数値をスキップしているだけで何もしていないように見えます）。</p>
+            
+        <p>ランダムな行動は、最終的に「行き着いた先の数値」を使って決定されます。先ほどのジャンプの例を手順に沿って見てみましょう。</p>
+
+        <p>カービィがジャンプする前：</p>
+
+        <div>
+            <div style="float:left; height:150px; position:relative;">
+                <img class="vertical-center" src="images/jump-demonstration-before.png">
+            </div>
+            <div style="margin-left: 120px;">
+                <ul>
+                    <li>...</li>
+                    <li>97</li>
+                    <li style="color:blue">11</li>
+                    <li>137&emsp;&lt;-- アクションがジャンプでなければ、通常リストはここで止まります。</li>
+                    <li>217&emsp;&lt;-- カービィが星を出しているため、代わりに乱数リストはここに行き着きます。</li>
+                    <li>58</li>
+                    <li>...</li>
+                </ul>
+            </div>
+        </div>
+
+        <p>カービィがジャンプした後：</p>
+        <div>
+            <div style="float:left; height:150px; position:relative;">
+                <img class="vertical-center" src="images/jump-demonstration-after.png">
+            </div>
+            <div style="margin-left: 120px;">
+                <ul>
+                    <li>...</li>
+                    <li>137&emsp;&lt;-- 数値がスキップされました。</li>
+                    <li style="color:blue">217<span style="color:black">&emsp;&lt;-- 数値が計算に使用されました。</span></li>
+                    <li>58</li>
+                    <li>136</li>
+                    <li>217</li>
+                    <li>...</li>
+                </ul>
+            </div>
+        </div>
+
+        <p>カービィがジャンプして着地した際、ゲームは「217」という数値を取り出し、非常にシンプルな計算式に当てはめます。本作の乱数計算の多くは、取り出した数値が0〜255のうち、どの範囲にあるかで結果が決まります。この例の場合、217という数値が192〜223の範囲に収まっていたため、星は左に飛びました。</p>
+        </div>
+
         <h3 id="rng-count" data-i18n="manual.rngCount">RNG "Count"</h3>
         <div class="lang-en">
         <p>"Count" is a metric that represents a given point for the number of times RNG was advanced since the game was started.</p>
@@ -207,6 +291,18 @@
         <p>The count value is basically giving us the answer for "how many times have we advanced RNG". This becomes important when we want to manipulate RNG. Rather than trying to find a specific RNG spot out of 65535 numbers, it can be narrowed down to a range of around 300 or so.</p>
         </div>
 
+        <div class="lang-ja" style="display:none">
+        <p>「乱数位置」とは、ゲーム起動時から乱数が何回進んだかを示す指標です。</p>
+
+        <img src="images/file-select-still-image.png">
+
+        <p>例えば、ゲーム起動時の乱数値の場合、起動時から乱数が0回進んでいるため、119の乱数位置は0になります。221は1、193は2、という具合です。</p>
+
+        <p>乱数位置は最終的に、0にループして戻ります。</p>
+
+        <p>乱数位置は、乱数調整を行いたい時に重要になります。全ての乱数位置を探そうとするのではなく、自分のプレイによるおおよその範囲（300程度）に絞り込むことができるからです。</p>
+        </div>
+
         <h3 id="finding-count" data-i18n="manual.findingCount">Finding Count</h3>
         <div class="lang-en">
         <p>Because RNG is entirely predictable, it is very easy to find your current RNG point when provided with enough data.</p>
@@ -214,6 +310,14 @@
         <p>Our best target is using the previously mentioned stars that Kirby emits when he lands on the ground, or bumps into a wall or ceiling. Because of its predictability, the directions that stars will go are also entirely predictable. By using software, we can find exactly where we are in the RNG list by inputting sequential star directions.</p>
 
         <p>With all of this in mind, we can continue to setting up the RNG tool.</p>
+        </div>
+
+        <div class="lang-ja" style="display:none">
+        <p>乱数は完全に予測可能であるため、十分なデータがあれば現在の乱数位置を特定するのは非常に簡単です。</p>
+
+        <p>位置特定に最も適しているのが、前述した「カービィが着地や壁・天井への衝突時に出す星」です。星の飛ぶ方向も完全に乱数で決まるため、飛んだ方向をツールに連続で入力することで、乱数リストの正確な現在位置を特定できます。</p>
+
+        <p>以上の仕組みを踏まえた上で、乱数調整ツールのセットアップに進みましょう。</p>
         </div>
 
         <h2 data-i18n="manual.setup">Setup</h2>
@@ -237,9 +341,32 @@
         <p>In order to use the main RNG manipulation tool, we need to find an average range of count values to be put into the Min and Max boxes. This is crucial because, like stated before, we do not want to look through a range of 65535 numbers.</p>
         </div>
 
+        <div class="lang-ja" style="display:none">
+        <div>
+            <div style="float:left; height:300px;">
+                <img style="height: 300px; border: 1px solid black" src="images/rng-tool-screenshot.png">
+            </div>
+            <div style="margin-left: 160px; height: 270px; position: relative; line-height: 200%;">
+                <ul class="vertical-center">
+                    <li><b>ゲームモード:</b> ゲームモードを選択</li>
+                    <li><b>最小値</b> / <b>最大値:</b> 乱数位置の最小値と最大値を入力</li>
+                    <li><b>スライム / おどりにんぎょう / まほうつかい</b>（または、<b>まほうつかい / あくまのきし / レッドドラゴン</b>）: 難易度設定</li>
+                    <li><b>星の回数:</b> 星の入力をする回数</li>
+                </ul>
+            </div>
+        </div>
+        <br>
+
+        <p>乱数調整ツールを使用するためには、最小値と最大値のボックスに入力する乱数位置の平均的な範囲を見つける必要があります。前述の通り、全ての範囲全体を調べたくはないため、これは非常に重要です。</p>
+        </div>
+
         <h4 data-i18n="manual.whyRange">Why do we need to find our own range?</h4>
         <div class="lang-en">
         <p>Every person plays differently, and how much RNG you advance is dependent on the actions that you take in-game. More RNG advancements ≠ slower movement. The faster you play <i>could</i> be an influence, but it is not definite. Regardless, it is best to find your own range and it doesn't take too long.</p>
+        </div>
+
+        <div class="lang-ja" style="display:none">
+        <p>人によってプレイスタイルは異なり、道中での行動によって乱数の進み具合も変わるからです。「乱数が多く進んでいる＝プレイが遅い」というわけではありません。プレイが速いことが影響する可能性もありますが、一概には言えません。いずれにせよ、自分の適正範囲を調べるのが最も確実であり、時間もそこまでかかりません。</p>
         </div>
 
         <h3 data-i18n="manual.findingRange">Finding Count Range</h3>
@@ -255,6 +382,18 @@
         <p>From this average, you can then determine what your RNG range should be. Note the "Find duplicate RNG points in range" table. You can input a minimum and maximum count, along with how many stars you would like to input in RTA, to see how many duplicate RNG points you have in that range. The less duplicates the better, as having less makes the calculator more accurate.</p>
         </div>
 
+        <div class="lang-ja" style="display:none">
+        <p>範囲を調べるには、<a href="rta_tools.html">Tools</a>ページにある「乱数位置を検索」機能を使うのが最適です。</p>
+
+        <p>まず、洞窟大作戦かハーフムーンをバトルウィンドウズ戦まで数回通しプレイし、到着時にどの乱数位置に着地しているかを計算します。これを複数回繰り返すことで、自分の平均的な乱数位置範囲が見えてきます。</p>
+
+        <p>タイトル画面で余計な乱数を消費しないようにする必要があることに注意してください。HAL研究所のロゴでBボタンを押し、すぐにYボタンを押し続けることで、タイトル画面をスキップ可能な最初のフレームでスキップされます（日本語版でのみ可能）。これを行わないと、タイトルロゴが画面に表示されているフレームごとに乱数が進んでしまいます。</p>
+
+        <p>この後、洞窟大作戦かハーフムーンを開始し、バトルウィンドウズまでプレイします。そこに着いたら、6回ジャンプし、星の向きを「乱数位置を検索」のところに入力します。どの乱数位置が出たかをメモし、平均的な乱数位置を把握できるまで繰り返します（回数が多いほど良いです）</p>
+
+        <p>この平均値から、自分の乱数範囲がどうあるべきかを決定できます。「範囲内の重複乱数位置を検索」の表に注目してください。最小と最大、および乱数調整時に入力したい星の回数を入力すると、その範囲内に重複する乱数位置がいくつあるかを確認できます。重複が少ないほど、ツールの予測精度が上がります。</p>
+        </div>
+
         <h3 data-i18n="manual.usingCalc">Using the Calculator</h3>
         <div class="lang-en">
         <p>WIP</p>
@@ -262,6 +401,9 @@
         <!--
         <p>While the "Kirby Super Star" logo is displayed, the game will advance RNG once every frame (this is to make the starting point seem random when the game is started). However, there is an oversight in the Japanese version that lets us skip this title screen in one frame, allowing us to only advance one RNG number and making the start more consistent.</p>
         -->
+        </div>
+        <div class="lang-ja">
+        <p>WIP</p>
         </div>
 
         <h2 id="fast-mode" data-i18n="manual.fastMode">"Fast" Mode Information</h2>
@@ -271,6 +413,14 @@
         <p>In addition to the strict timing, the calculator will be accounting for two instances of a first turn RNG roll instead of one. This is because accounting for only one would make this a two-frame window, which is very tight and not worth doing 30 minutes into a speedrun. The calculator makes sure that if either are landed on, it will give good RNG regardless of which RNG value the user gets.</p>
 
         <p>This, consequently, may cause good RNG to appear less, and thus may require more player input in between each turn. It is highly risk-reward.</p>
+        </div>
+
+        <div class="lang-ja" style="display:none">
+        <p>難易度選択で「Fast」を選ぶと、最速で攻撃できるようになりますが、猶予は4フレームに限られます。そうでないと調整は失敗します。これは、鬼殺し火炎ハンマーの土煙が乱数を進めるため、ツールの乱数予測と一致させるためには、タイミングを正確にする必要があるからです。</p>
+
+        <p>シビアなタイミングに加え、Fastモードでは2つの乱数パターンを同時に考慮して計算を行います。1つのパターンしか考慮しないと猶予が2フレームになってしまい、RTA開始から30分経過した場面で狙うにはリスクが高すぎるためです。ツールは、どちらの乱数を引いたとしても「良い」結果になるように行動を提示してくれます。</p>
+
+        <p>ただしその代償として、良い乱数が出現する確率が下がるため、ターン間にプレイヤーが自分で乱数を調整するための操作（ダッシュなど）が多く要求される場合があります。完全なハイリスク・ハイリターンなモードです。</p>
         </div>
 
         <h3 id="executing-fast-mode" data-i18n="manual.execution">Execution</h3>
@@ -286,9 +436,25 @@
         <p>(The rest of the enemies still need to be completed.)</p>
         </div>
 
+        <div class="lang-ja" style="display:none">
+        <p>鬼殺し火炎ハンマーは、敵の当たり判定が出た最初の4フレーム以内に当てる必要があります。タイミングは敵によって異なりますが、これが最も速く、かつ安定する条件です。</p>
+        
+        <p>この猶予が最大4フレームである理由は、これ以上増やすと、敵が着地した際に出現するコピーのもとによって、乱数が進まなかったり余分に進んだりして計算が狂うからです。これは鬼殺し火炎ハンマーの土煙が原因です。これをその場で判断するのは非常に困難なため、タイミングを極限まで絞り込んで固定化するのが最良です。</p>
+
+        <p>攻撃のタイミングを測るには、ボスのHPゲージ（「ENEMY」の文字など）や画面上のUIを目印にするのがおすすめです。以下は、最初の4フレームで攻撃を当てるための目安となるHPゲージの位置です。左の画像が猶予フレームの開始時、右の画像が終了時です。（※細部を確認するため、画像の拡大推奨）</p>
+
+        <p>（残りの敵についてはまだ作成中です。）</p>
+        </div>
+
         <h4 data-i18n="manual.darkKnight">Dark Knight</h4>
         <div class="lang-en">
         <p>Starts at around in between the E and the N, and ends near the middle of the E.</p>
+        <img class="fastmodeimages" src="images/knighttimingstart.png"/>
+        <img class="fastmodeimages" src="images/knighttimingend.png"/>
+        </div>
+
+        <div class="lang-ja" style="display:none">
+        <p>ボスのHPゲージ「ENEMY」の「E」と「N」の間あたりから始まり、「E」の中央付近で終わります。</p>
         <img class="fastmodeimages" src="images/knighttimingstart.png"/>
         <img class="fastmodeimages" src="images/knighttimingend.png"/>
         </div>
@@ -297,6 +463,13 @@
         <div class="lang-en">
         <p>Starts right after the E, and ends in the middle of the white border and the single green pixel.</p>
         <p>Dragon is a special exception, as the timing gives 5 frames of leniency instead of 4.</p>
+        <img class="fastmodeimages" src="images/dragontimingstart.png"/>
+        <img class="fastmodeimages" src="images/dragontimingend.png"/>
+        </div>
+
+        <div class="lang-ja" style="display:none">
+        <p>「E」の直後から始まり、白い枠線と緑色のピクセルの間あたりで終わります。</p>
+        <p>レッドドラゴンは例外的に、猶予が4フレームではなく5フレームあります。</p>
         <img class="fastmodeimages" src="images/dragontimingstart.png"/>
         <img class="fastmodeimages" src="images/dragontimingend.png"/>
         </div>
