@@ -744,7 +744,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                         case 2: 
                             /*
                             For Puppet and Magician, we now have the time to perform actions other than dashing.
-                            However, Wheelie makes this problematic, so we only include the up+b hammer attack.
+                            However, Wheelie makes this problematic, so we only include the up+y hammer attack.
                             */
                            /*
                             if (battleWindowsAttackFirst(advanceRNG(startHex, 9), enemy) == false) {
@@ -771,7 +771,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                 }
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) {
                                     console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
-                                    return ["up+b & " + ((i - 13)) + " dash", i + 1];
+                                    return ["up+y & " + ((i - 13)) + " dash", i + 1];
                                 }
                             }
                             for (var i = 3; i < 7; i++) { 
@@ -807,7 +807,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                         case 2:
                             /*
                             For Puppet and Magician, we now have the time to perform actions other than dashing.
-                            However, Wheelie makes this problematic, so we only include the up+b hammer attack.
+                            However, Wheelie makes this problematic, so we only include the up+y hammer attack.
                             */
                             for (var i = 1; i < 3; i++) { 
                                 if (minDashes == '2' && i == 1) {
