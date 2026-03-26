@@ -185,6 +185,17 @@ const translations = {
 var t = translations.en;
 
 const i18n = {
+    translateAction(text) {
+        if (!text) return text;
+        if (this.getCurrentLanguage() === 'en') return text;
+        let res = String(text);
+        res = res.replace("Do Nothing", "何もしない");
+        res = res.replace("Slide", "スライディング");
+        res = res.replace("up+y", "鬼殺し");
+        res = res.replace(/(\d+) dash/g, "ダッシュ$1回");
+        return res;
+    },
+
     getCurrentLanguage() {
         return localStorage.getItem('kss-rng-lang') || 'en';
     },

@@ -421,7 +421,7 @@
         else
             var enemyOutput1Text = await slimePredictionRTA(currentHexValue, minDashes);
 
-        enemyOutput1.innerHTML = (enemyOutput1Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput1Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput1Text[3].toLowerCase() + ".png'>");
+        enemyOutput1.innerHTML = (i18n.translateAction(enemyOutput1Text[0]) + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput1Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput1Text[3].toLowerCase() + ".png'>");
         enemyOutput1Advanced.innerHTML = (t.advances + enemyOutput1Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput1Text[4], 0));
         
 
@@ -432,7 +432,7 @@
         else
             var enemyOutput2Text = await hardPredictionRTA(enemyOutput1Text[4], 1, subgame, twoDashOnHammerThrow, minDashes);
 
-        enemyOutput2.innerHTML = (enemyOutput2Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput2Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput2Text[3].toLowerCase() + ".png'>");
+        enemyOutput2.innerHTML = (i18n.translateAction(enemyOutput2Text[0]) + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput2Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput2Text[3].toLowerCase() + ".png'>");
         enemyOutput2Advanced.innerHTML = (t.advances + enemyOutput2Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput2Text[4], 0));
 
         var enemyDifficulty3 = stringToBool(difficultySelector3.value);
@@ -443,17 +443,17 @@
             var enemyOutput3Text = await hardPredictionRTA(enemyOutput2Text[4], 2, subgame, twoDashOnHammerThrow, minDashes);
 
         if (subgame == 1) {
-            enemyOutput3.innerHTML = (enemyOutput3Text[0] + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput3Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput3Text[3].toLowerCase() + ".png'>");
+            enemyOutput3.innerHTML = (i18n.translateAction(enemyOutput3Text[0]) + " - <img style='transform:scaleX(-1)' src='images/abilities/" + enemyOutput3Text[2].toLowerCase() + ".png'>" + " - " + "<img src='images/abilities/" + enemyOutput3Text[3].toLowerCase() + ".png'>");
             enemyOutput3Advanced.innerHTML = (t.advances + enemyOutput3Text[1] + "&emsp;" + t.endingValue + advanceRngAndSlice(enemyOutput3Text[4], 0));
 
             var enemyOutput4Text = await dragonSecondTurn(enemyOutput3Text[4], minDashes);
-            enemyOutput4.innerHTML = (enemyOutput4Text[0]);
+            enemyOutput4.innerHTML = (i18n.translateAction(enemyOutput4Text[0]));
             if (enemyOutput4Text[1] > 0) {
                 enemy4Image.src = "images/dragonstars.png";
             }
         }
         else {
-            enemyOutput3.innerHTML = (enemyOutput3Text[0]);
+            enemyOutput3.innerHTML = (i18n.translateAction(enemyOutput3Text[0]));
         }
     }
 
