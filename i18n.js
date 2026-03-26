@@ -111,7 +111,7 @@ const translations = {
         numpadHint: 'テンキー: 入力 - Enter: リセット - Backspace: 戻る',
         pressNumpad: 'テンキーを押して開始',
         settings: '設定:',
-        lowestDash: 'ダッシュの最小回数:',
+        lowestDash: 'ダッシュの最小乱数消費回数:',
         generalManip: '通常操作:',
         knightHammer: 'あくまのきしのハンマー投げ:',
         noNumpad: 'テンキーなし:',
