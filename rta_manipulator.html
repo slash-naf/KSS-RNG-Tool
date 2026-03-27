@@ -177,12 +177,97 @@
 
     
 
+    const STORAGE_KEY = 'kss-rta-settings';
+
+    function saveSettings() {
+        const settings = {
+            subgame: document.getElementById("subgame").value,
+            min: minBox.value,
+            max: maxBox.value,
+            difficulty1: difficultySelector1.value,
+            difficulty2: difficultySelector2.value,
+            difficulty3: difficultySelector3.value,
+            inputAmount: inputAmount.value,
+            fastDash: document.querySelector('input[name="fast-dash-toggle"]:checked')?.value,
+            twoDashHammer: document.querySelector('input[name="two-dash-on-hammer-throw"]:checked')?.value,
+            noNumpad: noNumpad.checked,
+            advanced: document.querySelector('#advanced-toggle').checked
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+
+        try {
+            const settings = JSON.parse(saved);
+            
+            if (settings.subgame !== undefined) {
+                document.getElementById("subgame").value = settings.subgame;
+                subgameToggle(settings.subgame);
+            }
+            if (settings.min !== undefined) minBox.value = settings.min;
+            if (settings.max !== undefined) maxBox.value = settings.max;
+            
+            if (settings.difficulty1 !== undefined) difficultySelector1.value = settings.difficulty1;
+            if (settings.difficulty2 !== undefined) difficultySelector2.value = settings.difficulty2;
+            if (settings.difficulty3 !== undefined) difficultySelector3.value = settings.difficulty3;
+
+            if (settings.inputAmount !== undefined) {
+                inputAmount.value = settings.inputAmount;
+                changeInputs(settings.inputAmount, "maxInputs");
+            }
+
+            if (settings.fastDash !== undefined) {
+                const radio = document.querySelector(`input[name="fast-dash-toggle"][value="${settings.fastDash}"]`);
+                if (radio) radio.checked = true;
+            }
+            if (settings.twoDashHammer !== undefined) {
+                const radio = document.querySelector(`input[name="two-dash-on-hammer-throw"][value="${settings.twoDashHammer}"]`);
+                if (radio) radio.checked = true;
+            }
+            if (settings.noNumpad !== undefined) noNumpad.checked = settings.noNumpad;
+            if (settings.advanced !== undefined) {
+                document.querySelector('#advanced-toggle').checked = settings.advanced;
+                advancedInfo(document.querySelector('#advanced-toggle'));
+            }
+        } catch (e) {
+            console.error("Failed to load settings:", e);
+        }
+    }
+
     //On page load
     window.onload = function() {
         i18n.init();
-        subgameToggle(document.querySelector("#subgame").value);
-        changeInputs(inputAmount.value, "maxInputs");
-        advancedInfo(document.querySelector('#advanced-toggle'));
+        loadSettings();
+        
+        // Initial setup if no settings were loaded
+        if (!localStorage.getItem(STORAGE_KEY)) {
+            subgameToggle(document.querySelector("#subgame").value);
+            changeInputs(inputAmount.value, "maxInputs");
+            advancedInfo(document.querySelector('#advanced-toggle'));
+        }
+
+        // Add auto-save event listeners
+        const autoSaveElements = [
+            "#subgame", "#min", "#max", 
+            "#enemy-difficulty1", "#enemy-difficulty2", "#enemy-difficulty3",
+            "#inputAmount", "#numpad-toggle", "#advanced-toggle"
+        ];
+        autoSaveElements.forEach(selector => {
+            document.querySelector(selector).addEventListener('change', saveSettings);
+        });
+        
+        // Input fields should save on input as well for responsiveness
+        ["#min", "#max"].forEach(selector => {
+            document.querySelector(selector).addEventListener('input', saveSettings);
+        });
+
+        // Radio buttons
+        document.querySelectorAll('input[name="fast-dash-toggle"], input[name="two-dash-on-hammer-throw"]').forEach(radio => {
+            radio.addEventListener('change', saveSettings);
+        });
     }
 
     window.addEventListener(
@@ -377,6 +462,7 @@
             minBox.value = 3100;
             maxBox.value = 3400;
         }
+        saveSettings();
     }
 
     
