@@ -20,6 +20,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         rightPower: magResult[3],
         actions: parseActions(magResult[0]),
         endingIndex: hexToCount(magResult[4]),
+        message: magResult[0],
     };
 
     // Knight (enemy=1, subgame=1)
@@ -33,6 +34,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         rightPower: knightResult[3],
         actions: parseActions(knightResult[0]),
         endingIndex: hexToCount(knightResult[4]),
+        message: knightResult[0],
     };
 
     // Dragon (enemy=2, subgame=1)
@@ -46,6 +48,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         rightPower: dragonResult[3],
         actions: parseActions(dragonResult[0]),
         endingIndex: hexToCount(dragonResult[4]),
+        message: dragonResult[0],
     };
 
     // Dragon 2nd Turn
@@ -188,13 +191,21 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         }
 
         // パワーの比較
-        if (m.leftPower !== s.leftPower) {
-            console.log(`[DIFF] ${name} leftPower: manipulate=${m.leftPower}, simulate=${s.leftPower}`);
-            allMatch = false;
-        }
         if (m.rightPower !== s.rightPower) {
             console.log(`[DIFF] ${name} rightPower: manipulate=${m.rightPower}, simulate=${s.rightPower}`);
             allMatch = false;
+            console.log(m);
+            console.log(s);
+            console.log('---');
+            return allMatch;
+        }
+        if (m.leftPower !== s.leftPower) {
+            console.log(`[DIFF] ${name} leftPower: manipulate=${m.leftPower}, simulate=${s.leftPower}`);
+            allMatch = false;
+            console.log(m);
+            console.log(s);
+            console.log('---');
+            return allMatch;
         }
 
         // 終了インデックスの比較
@@ -213,7 +224,8 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     if (allMatch) {
         //console.log(`[OK] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 全ての結果が一致`);
     } else {
-        console.log(`[NG] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 差異あり`);
+        console.log(m);
+        console.log(s);
         console.log('---');
     }
 
@@ -222,7 +234,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
 (async function(){
     let NGCount = 0;
-    for (let i=3100; i <= 3400; i++) {
+    for (let i=2500; i <= 4000; i++) {
         const allMatch = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
         if (!allMatch) {
             NGCount++

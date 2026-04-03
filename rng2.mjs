@@ -134,18 +134,31 @@ export class KssRng {
 			rightPower = "None";
 		}
 
-		//左の出現 (左右とも出現して同じ種類だったら再抽選)
+		//左の出現
 		let leftPower;
-		do{
-			if (this.randi(4) === 2) {
+		let leftAppearance = this.randi(4) === 2;
+		if (leftAppearance) {
+			const poolIdx = this.randi(4) & 1;
+			const pwrIdx = this.randi(12);
+			leftPower = POWER_POOLS[poolIdx][pwrIdx];
+		} else {
+			leftPower = "None";
+			return { leftPower, rightPower };
+		}
+
+		//左右とも出現して同じ種類だったら再抽選
+		while (leftPower === rightPower) {
+			const a = this.randi(4) === 2;
+			if (leftAppearance) {
+				leftAppearance = a;
 				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
 				leftPower = POWER_POOLS[poolIdx][pwrIdx];
 			} else {
 				leftPower = "None";
-				break;
+				return { leftPower, rightPower };
 			}
-		} while (leftPower === rightPower);
+		}
 
 		return { leftPower, rightPower };
 	}
