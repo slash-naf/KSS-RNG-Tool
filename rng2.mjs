@@ -145,4 +145,62 @@ export class KssRng {
 
 		return { leftPower, rightPower };
 	}
+
+	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す */
+	simulateBattleWindowsMWW(actionsForMagician, actionsForKnight, actionsForDragon, actionsForDragonAction, fastKnight, fastDragon, hammerThrow) {
+		// --- 魔法使い (常にEasy) ---
+		this.applyActions(actionsForMagician);
+		if (this.magicianAttacksFirst()) return null;
+		const magicianPowers = this.battleWindowsPowers();
+		this.hammerFlipChargeAndHit();
+
+		// --- 悪魔の騎士 ---
+		let knightPowers;
+		this.applyActions(actionsForKnight);
+		if (fastKnight) {
+			// Fastモード
+			if (this.hammerFlipChargeForFastKnight()) return null;
+			knightPowers = this.hammerFlipHitForFastBattleWindowsPowers();
+		} else {
+			// Easyモード
+			if (this.knightAttacksFirst()) return null;
+			knightPowers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
+		}
+		this.dash(hammerThrow);    // ハンマー投げのダッシュ
+		this.hammerHit();    // ハンマー投げのスイングのヒット
+		this.hammerHit();    // ハンマー投げのヒット
+
+		// --- レッドドラゴン ---
+		let dragonPowers;
+		this.applyActions(actionsForDragon);
+		if (fastDragon) {
+			// Fastモード
+			if (this.hammerFlipChargeForFDragon()) return null;
+			dragonPowers = this.hammerFlipHitForFastBattleWindowsPowers();
+		} else {
+			// Easyモード
+			if (this.dragonAttacksFirst()) return null;
+			dragonPowers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
+		}
+		this.hammerFlipChargeAndHit();
+
+		// --- レッドドラゴン2ターン目 ---
+		this.applyActions(actionsForDragonAction);
+		const dragonAction = this.dragonActs();
+
+		return {
+			actionsForMagician, magicianPowers,
+			actionsForKnight, knightPowers,
+			actionsForDragon, dragonPowers,
+			actionsForDragonAction, dragonAction,
+		};
+	}
+
+	applyActions({dashes=0, slides=0, hammerFlips=0}) {
+		this.dash(dashes);
+		this.slide(slides);
+		this.hammerFlip(hammerFlips);
+	}
 }
