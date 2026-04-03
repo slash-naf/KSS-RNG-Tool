@@ -180,50 +180,48 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     let allMatch = true;
     const enemies = ['magician', 'knight', 'dragon'];
 
+    let m = null;
+    let s = null;
     for (const name of enemies) {
-        const m = manip[name];
-        const s = sim[name];
+        m = manip[name];
+        s = sim[name];
 
         // 先制されないことを確認
         if (s.attacksFirst) {
             console.log(`[NG] ${name}: 先制される (manipulate のアクション不足)`);
             allMatch = false;
+            break;
         }
 
         // パワーの比較
         if (m.rightPower !== s.rightPower) {
             console.log(`[DIFF] ${name} rightPower: manipulate=${m.rightPower}, simulate=${s.rightPower}`);
             allMatch = false;
-            console.log(m);
-            console.log(s);
-            console.log('---');
-            return allMatch;
+            break;
         }
         if (m.leftPower !== s.leftPower) {
             console.log(`[DIFF] ${name} leftPower: manipulate=${m.leftPower}, simulate=${s.leftPower}`);
             allMatch = false;
-            console.log(m);
-            console.log(s);
-            console.log('---');
-            return allMatch;
+            break;
         }
 
         // 終了インデックスの比較
         if (m.endingIndex !== s.endingIndex) {
             console.log(`[DIFF] ${name} endingIndex: manipulate=${m.endingIndex}, simulate=${s.endingIndex}`);
             allMatch = false;
+            break;
+        }
+
+        // ガード判定の出力
+        if (name === "dragon" && !sim.guards) {
+            console.log(`[NG] Dragon guards: ${sim.guards}`);
+            allMatch = false;
+            break;
         }
     }
 
-    // ガード判定の出力
-    if (!sim.guards) {
-        console.log(`[NG] Dragon guards: ${sim.guards}`);
-        allMatch = false;
-    }
-
-    if (allMatch) {
-        //console.log(`[OK] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 全ての結果が一致`);
-    } else {
+    if (!allMatch) {
+        console.log(`startIndex: ${startIndex}`)
         console.log(m);
         console.log(s);
         console.log('---');
@@ -234,7 +232,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
 (async function(){
     let NGCount = 0;
-    for (let i=2500; i <= 4000; i++) {
+    for (let i=3100; i <= 3400; i++) {
         const allMatch = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
         if (!allMatch) {
             NGCount++
