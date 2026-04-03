@@ -6,7 +6,7 @@ import { KssRng } from './rng2.mjs';
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
  * @param {number} hammerThrow
- * @returns {{magician: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingValue: number}, knight: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingValue: number}, dragon: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingValue: number}, actionsForGuard: {dashes: number, slides: number, hammerFlips: number}}}
+ * @returns {{magician: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, knight: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, dragon: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, actionsForGuard: {dashes: number, slides: number, hammerFlips: number}}}
  */
 async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, hammerThrow) {
     const startHex = countToHex(startIndex);
@@ -19,7 +19,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         leftPower: magResult[2],
         rightPower: magResult[3],
         actions: parseActions(magResult[0]),
-        endingValue: advanceRngAndSlice(magResult[4], 0),
+        endingIndex: hexToCount(magResult[4]),
     };
 
     // Knight (enemy=1, subgame=1)
@@ -32,7 +32,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         leftPower: knightResult[2],
         rightPower: knightResult[3],
         actions: parseActions(knightResult[0]),
-        endingValue: advanceRngAndSlice(knightResult[4], 0),
+        endingIndex: hexToCount(knightResult[4]),
     };
 
     // Dragon (enemy=2, subgame=1)
@@ -45,7 +45,7 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         leftPower: dragonResult[2],
         rightPower: dragonResult[3],
         actions: parseActions(dragonResult[0]),
-        endingValue: advanceRngAndSlice(dragonResult[4], 0),
+        endingIndex: hexToCount(dragonResult[4]),
     };
 
     // Dragon 2nd Turn
@@ -76,7 +76,7 @@ function parseActions(message) {
  * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForGuard
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
- * @returns {{magician: {leftPower, rightPower, attacksFirst: boolean, endingValue: number}, knight: {leftPower, rightPower, attacksFirst: boolean, endingValue: number}, dragon: {leftPower, rightPower, attacksFirst: boolean, endingValue: number}, guards: boolean}}
+ * @returns {{magician: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, knight: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragon: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, guards: boolean}}
  */
 function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnight, actionsForDragon, actionsForGuard, fastKnight, fastDragon, hammerThrow) {
     const rng = new KssRng(startIndex);
@@ -90,7 +90,7 @@ function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnig
         leftPower: magPowers.leftPower,
         rightPower: magPowers.rightPower,
         attacksFirst: magAttacksFirst,
-        endingValue: rng.getCurrentValue(),
+        endingIndex: rng.index,
     };
 
     // --- 悪魔の騎士 ---
@@ -114,7 +114,7 @@ function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnig
         leftPower: knightPowers.leftPower,
         rightPower: knightPowers.rightPower,
         attacksFirst: knightAttacksFirst,
-        endingValue: rng.getCurrentValue(),
+        endingIndex: rng.index,
     };
 
     // --- レッドドラゴン ---
@@ -137,7 +137,7 @@ function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnig
         leftPower: dragonPowers.leftPower,
         rightPower: dragonPowers.rightPower,
         attacksFirst: dragonAttacksFirst,
-        endingValue: rng.getCurrentValue(),
+        endingIndex: rng.index,
     };
 
     // --- レッドドラゴン2ターン目 ---
@@ -195,9 +195,9 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
             allMatch = false;
         }
 
-        // 終了乱数値の比較
-        if (m.endingValue !== s.endingValue) {
-            console.log(`[DIFF] ${name} endingValue: manipulate=${m.endingValue}, simulate=${s.endingValue}`);
+        // 終了インデックスの比較
+        if (m.endingIndex !== s.endingIndex) {
+            console.log(`[DIFF] ${name} endingIndex: manipulate=${m.endingIndex}, simulate=${s.endingIndex}`);
             allMatch = false;
         }
     }
@@ -211,3 +211,5 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         console.log(`[NG] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 差異あり`);
     }
 }
+
+compareManipulationAndSimulation(3112, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
