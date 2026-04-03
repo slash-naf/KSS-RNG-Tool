@@ -109,13 +109,9 @@ export class KssRng {
 	dragonAttacksFirst() {
 		return this.randi(4) === 3;
 	}
-	dragonGuards() {
-		const r = this.randi(10);
-		return r === 6 || r === 9;
-	}
-	dragonStarAttacks() {
-		const r = this.randi(10);
-		return r === 0 || r === 3;
+	dragonActs() {
+		const ACTION_POOL = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
+		return ACTION_POOL[this.randi(10)];
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {

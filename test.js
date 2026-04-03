@@ -6,7 +6,7 @@ import { KssRng } from './rng2.mjs';
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
  * @param {number} hammerThrow
- * @returns {{magician: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, knight: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, dragon: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, actionsForGuard: {dashes: number, slides: number, hammerFlips: number}}}
+ * @returns {{magician: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, knight: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, dragon: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, actionsForDragonAction: {dashes: number, slides: number, hammerFlips: number}}}
  */
 async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, hammerThrow) {
     const startHex = countToHex(startIndex);
@@ -52,10 +52,10 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
     };
 
     // Dragon 2nd Turn
-    const guardResult = dragonSecondTurn(dragonResult[4], minDashes);
-    const actionsForGuard = parseActions(guardResult[0]);
+    const dragonSecondTurnResult = dragonSecondTurn(dragonResult[4], minDashes);
+    const actionsForDragonAction = parseActions(dragonSecondTurnResult[0]);
 
-    return { magician, knight, dragon, actionsForGuard };
+    return { magician, knight, dragon, actionsForDragonAction };
 }
 // アクション文字列を構造化データに変換
 function parseActions(message) {
@@ -76,12 +76,12 @@ function parseActions(message) {
  * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForMagician
  * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForKnight
  * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForDragon
- * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForGuard
+ * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForDragonAction
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
- * @returns {{magician: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, knight: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragon: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, guards: boolean}}
+ * @returns {{magician: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, knight: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragon: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragonAction}}
  */
-function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnight, actionsForDragon, actionsForGuard, fastKnight, fastDragon, hammerThrow) {
+function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnight, actionsForDragon, actionsForDragonAction, fastKnight, fastDragon, hammerThrow) {
     const rng = new KssRng(startIndex);
 
     // --- 魔法使い (常にEasy) ---
@@ -144,12 +144,10 @@ function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnig
     };
 
     // --- レッドドラゴン2ターン目 ---
-    applyActions(rng, actionsForGuard);
-    let guards = rng.dragonGuards();
-    rng.index--;
-    guards = guards || rng.dragonStarAttacks();
+    applyActions(rng, actionsForDragonAction);
+    const dragonAction = rng.dragonActs();
 
-    return { magician, knight, dragon, guards };
+    return { magician, knight, dragon, dragonAction };
 }
 // アクションを RNG に適用するヘルパー
 function applyActions(rng, actions) {
@@ -171,7 +169,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         manip.magician.actions,
         manip.knight.actions,
         manip.dragon.actions,
-        manip.actionsForGuard,
+        manip.actionsForDragonAction,
         fastKnight,
         fastDragon,
         hammerThrow,
@@ -212,11 +210,13 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
             break;
         }
 
-        // ガード判定の出力
-        if (name === "dragon" && !sim.guards) {
-            console.log(`[NG] Dragon guards: ${sim.guards}`);
-            allMatch = false;
-            break;
+        // レッドドラゴンの行動を確認
+        if (name === "dragon") {
+            if (sim.dragonAction !== "Guard" && sim.dragonAction !== "Star") {
+                console.log(`[NG] dragonAction: ${sim.dragonAction}`);
+                allMatch = false;
+                break;
+            }
         }
     }
 
