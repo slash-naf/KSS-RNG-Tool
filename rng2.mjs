@@ -111,7 +111,7 @@ export class KssRng {
 	}
 	dragonGuards() {
 		const r = this.randi(10);
-		return r !== 6 && r !== 9;
+		return r === 6 || r === 9;
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
@@ -123,7 +123,7 @@ export class KssRng {
 		//右の出現
 		let rightPower;
 		if (this.randi(4) === 1) {
-			const poolIdx = this.randi(2);
+			const poolIdx = this.randi(4) & 1;
 			const pwrIdx = this.randi(12);
 			rightPower = POWER_POOLS[poolIdx][pwrIdx];
 		} else {
@@ -134,7 +134,7 @@ export class KssRng {
 		let leftPower;
 		do{
 			if (this.randi(4) === 2) {
-				const poolIdx = this.randi(2);
+				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
 				leftPower = POWER_POOLS[poolIdx][pwrIdx];
 			} else {
@@ -142,9 +142,6 @@ export class KssRng {
 				break;
 			}
 		} while (leftPower === rightPower);
-
-		//最後に一律で1回進める
-		this.advance(1);
 
 		return { leftPower, rightPower };
 	}

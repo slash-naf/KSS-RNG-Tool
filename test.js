@@ -203,13 +203,29 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     }
 
     // ガード判定の出力
-    console.log(`Dragon guards: ${sim.guards}`);
+    if (!sim.guards) {
+        console.log(`[NG] Dragon guards: ${sim.guards}`);
+        allMatch = false;
+    }
 
     if (allMatch) {
-        console.log(`[OK] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 全ての結果が一致`);
+        //console.log(`[OK] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 全ての結果が一致`);
     } else {
         console.log(`[NG] startIndex=${startIndex} fastKnight=${fastKnight} fastDragon=${fastDragon}: 差異あり`);
+        console.log('---');
     }
+
+    return allMatch;
 }
 
-compareManipulationAndSimulation(3112, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
+(async function(){
+    let allMatchCount = 0;
+    for (let i=3100; i <= 3400; i++) {
+        const allMatch = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
+        if (!allMatch) {
+            allMatchCount++
+        }
+    }
+    console.log(`allMatchCount: ${allMatchCount}`)
+})();
+
