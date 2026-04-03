@@ -142,7 +142,9 @@ function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnig
 
     // --- レッドドラゴン2ターン目 ---
     applyActions(rng, actionsForGuard);
-    const guards = rng.dragonGuards();
+    let guards = rng.dragonGuards();
+    rng.index--;
+    guards = guards || rng.dragonStarAttacks();
 
     return { magician, knight, dragon, guards };
 }
@@ -219,13 +221,13 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 }
 
 (async function(){
-    let allMatchCount = 0;
+    let NGCount = 0;
     for (let i=3100; i <= 3400; i++) {
         const allMatch = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
         if (!allMatch) {
-            allMatchCount++
+            NGCount++
         }
     }
-    console.log(`allMatchCount: ${allMatchCount}`)
+    console.log(`NGCount: ${NGCount}`)
 })();
 

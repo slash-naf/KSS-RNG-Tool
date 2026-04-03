@@ -113,6 +113,10 @@ export class KssRng {
 		const r = this.randi(10);
 		return r === 6 || r === 9;
 	}
+	dragonStarAttacks() {
+		const r = this.randi(10);
+		return r === 0 || r === 3;
+	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
 		const POWER_POOLS = [
