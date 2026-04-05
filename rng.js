@@ -377,10 +377,10 @@ function battleWindowsPowers(startHex) {
     if (finalRNG == 4) {
         var repeats = -1;
         while ((leftPower == rightPower)) {
+            repeats += 1;
             leftPowerAppearanceNumber = advanceRngAndSlice(startHex, 6 + (repeats * 3));
             if (isBetween(leftPowerAppearanceNumber, 128, 191)) {
                 finalRNG += 3;
-                repeats += 1;
                 leftPower = determinePowerType(startHex, 6 + (repeats * 3));
                 //console.log("new leftPower: " + leftPower);
             }
@@ -417,7 +417,7 @@ function battleWindowsPowerSelect(determinePowerPool, powerNumber) {
     return pools[poolIndex][mapPowerNumber(powerNumber)];
 
     function mapPowerNumber(powerNumber) {
-        const ranges = [0, 22, 43, 64, 86, 107, 128, 149, 171, 192, 214, 234, 255];
+        const ranges = [0, 22, 43, 64, 86, 107, 128, 150, 171, 192, 214, 235, 256];
         for (let i = 0; i < ranges.length - 1; i++) {
             if (isBetween(powerNumber, ranges[i], ranges[i + 1] - 1)) {
                 return i;

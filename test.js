@@ -145,12 +145,19 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
 (async function(){
     let NGCount = 0;
-    for (let i=3100; i <= 3400; i++) {
-        const ng = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
-        if (ng) {
-            console.log(ng);
-            console.log("---");
-            NGCount++
+    for (let i=3000; i <= 3500; i++) {
+        for (let hammerThrow=0; hammerThrow < 2; hammerThrow++) {
+            for (let fastFlags=0; fastFlags < 4; fastFlags++) {
+                const fastKnight = (fastFlags & 1) !== 0;
+                const fastDragon = (fastFlags & 2) !== 0;
+                const ng = await compareManipulationAndSimulation(i, fastKnight, fastDragon, hammerThrow, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
+                if (ng) {
+                    console.log(ng);
+                    console.log(i, fastKnight, fastDragon, hammerThrow);
+                    console.log();
+                    NGCount++
+                }
+            }
         }
     }
     console.log(`NGCount: ${NGCount}`)
