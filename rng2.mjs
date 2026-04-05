@@ -12,9 +12,17 @@ for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 	s ^= s>>3 & 0x03;
 }
 
+export const starDirectionChars =  "↑↗→↘↓↙←↖";
+export const dragonActionNames = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
+const dragonActionMap = Int8Array.from(dragonActionNames, v => dragonActionNames.indexOf(v));
+const dragonStar = dragonActionNames.indexOf("Star");
+const dragonGuard = dragonActionNames.indexOf("Guard");
+export const battleWindowsPowerNames = ["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter", "Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing"];
+const battleWindowsPowerMap = Int8Array.from(battleWindowsPowerNames, v => battleWindowsPowerNames.indexOf(v));
+
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
-	constructor(startIndex) {
+	constructor(startIndex=0) {
 		this.index = startIndex;
 	}
 	/** 現在の乱数値を取得 */
@@ -110,24 +118,18 @@ export class KssRng {
 		return this.randi(4) === 3;
 	}
 	dragonActs() {
-		const ACTION_POOL = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
-		return ACTION_POOL[this.randi(10)];
+		return dragonActionMap[this.randi(10)];
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
-		const POWER_POOLS = [
-			["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter"],
-			["Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing"]
-		];
-
 		//右の出現
 		let rightPower;
 		if (this.randi(4) === 1) {
 			const poolIdx = this.randi(4) & 1;
 			const pwrIdx = this.randi(12);
-			rightPower = POWER_POOLS[poolIdx][pwrIdx];
+			rightPower = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 		} else {
-			rightPower = "None";
+			rightPower = -1;
 		}
 
 		//左の出現 (左右とも出現して同じ種類だったら再抽選)
@@ -136,9 +138,9 @@ export class KssRng {
 			if (this.randi(4) === 2) {
 				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
-				leftPower = POWER_POOLS[poolIdx][pwrIdx];
+				leftPower = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 			} else {
-				leftPower = "None";
+				leftPower = -1;
 				break;
 			}
 		} while (leftPower === rightPower);
