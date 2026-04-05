@@ -292,11 +292,11 @@ function battleWindowsAttackFirst(startHex, enemy) {
     //4 : Red Dragon
     //5 : Red Dragon Turn 2 (Shield)
 
-    console.log("attacks first function hex: " + startHex);
+    //console.log("attacks first function hex: " + startHex);
 
     const attacksFirstNumber = advanceRngAndSlice(startHex, 1);
 
-    console.log("attacksFirstNumber: " + attacksFirstNumber);
+    //console.log("attacksFirstNumber: " + attacksFirstNumber);
 
     switch (enemy) {
         case 0:
@@ -332,7 +332,7 @@ function battleWindowsPowers(startHex) {
     var leftPowerModifier = 1;
     var finalRNG = 0;
 
-    console.log("startHex: " + advanceRngAndSlice(startHex, 0));
+    //console.log("startHex: " + advanceRngAndSlice(startHex, 0));
 
     //find if right powerup shows up
     let rightPowerAppearanceNumber = advanceRngAndSlice(startHex, 0);
@@ -340,16 +340,16 @@ function battleWindowsPowers(startHex) {
         rightPowerAppearance = true;
         leftPowerModifier = 3;
     }
-    console.log("rightPowerAppearanceNumber: " + rightPowerAppearanceNumber);
-    console.log("rightPowerAppearance: " + rightPowerAppearance);
+    //console.log("rightPowerAppearanceNumber: " + rightPowerAppearanceNumber);
+    //console.log("rightPowerAppearance: " + rightPowerAppearance);
 
     //find if left powerup shows up
     let leftPowerAppearanceNumber = advanceRngAndSlice(startHex, leftPowerModifier);
     if (isBetween(leftPowerAppearanceNumber, 128, 191))
         leftPowerAppearance = true;
 
-    console.log("leftPowerAppearanceNumber: " + leftPowerAppearanceNumber);
-    console.log("leftPowerAppearance: " + leftPowerAppearance);
+    //console.log("leftPowerAppearanceNumber: " + leftPowerAppearanceNumber);
+    //console.log("leftPowerAppearance: " + leftPowerAppearance);
 
     //calculate right side
     if (rightPowerAppearance == true) {
@@ -360,7 +360,7 @@ function battleWindowsPowers(startHex) {
         rightPower = "None";
     }
 
-    console.log("rightPower: " + rightPower);
+    //console.log("rightPower: " + rightPower);
 
     //calculate left side
     if (leftPowerAppearance == true) {
@@ -371,7 +371,7 @@ function battleWindowsPowers(startHex) {
         leftPower = "None";
     }
 
-    console.log("leftPower: " + leftPower);
+    //console.log("leftPower: " + leftPower);
 
     //calculations for if both powers are the same
     if (finalRNG == 4) {
@@ -382,14 +382,14 @@ function battleWindowsPowers(startHex) {
                 finalRNG += 3;
                 repeats += 1;
                 leftPower = determinePowerType(startHex, 6 + (repeats * 3));
-                console.log("new leftPower: " + leftPower);
+                //console.log("new leftPower: " + leftPower);
             }
             else {
                 finalRNG += 1;
                 leftPower = "None";
             }
         }
-        console.log("new leftPower: " + leftPower);
+        //console.log("new leftPower: " + leftPower);
     }
 
     finalRNG += 1;
@@ -399,9 +399,9 @@ function battleWindowsPowers(startHex) {
 
 function determinePowerType (startHex, modifier) {
     determinePowerPool = advanceRngAndSlice(startHex, 1 + modifier);
-    console.log("determinePowerPool: " + determinePowerPool);
+    //console.log("determinePowerPool: " + determinePowerPool);
     powerNumber = advanceRngAndSlice(startHex, 2 + modifier);
-    console.log("powerNumber: " + powerNumber);
+    //console.log("powerNumber: " + powerNumber);
     return battleWindowsPowerSelect(determinePowerPool, powerNumber);
 }
 
@@ -435,8 +435,8 @@ function easyPredictionRTA (startHex, enemy, subgame, twoDashOnHammerThrow, minD
 
     var subgameModifier = subgame * 2;
 
-    console.log("Your starting Hex is: " + startHex);
-    console.log("Your starting RNG count is: " + hexToCount(startHex));
+    //console.log("Your starting Hex is: " + startHex);
+    //console.log("Your starting RNG count is: " + hexToCount(startHex));
 
     var firstAttackResults = ["Do Nothing", 0]; //initialize first attack results array
 
@@ -452,11 +452,11 @@ function easyPredictionRTA (startHex, enemy, subgame, twoDashOnHammerThrow, minD
     var rightPower = powers[1]; //what right power is
     advances += powers[2] + 1;  //how much RNG advances due to powers appearing, +1 for hit check
 
-    console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
+    //console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
 
     advances += 12; //hammer smoke
 
-    console.log("hit check 1: " + advanceRngAndSlice(startHex, advances + 1));
+    //console.log("hit check 1: " + advanceRngAndSlice(startHex, advances + 1));
 
     if (advanceRngAndSlice(startHex, advances + 1) < 64) //First battle windows hit
         advances += 10;
@@ -477,7 +477,7 @@ function easyPredictionRTA (startHex, enemy, subgame, twoDashOnHammerThrow, minD
         if (enemy == 1) { //Knight 
             advances += twoDashOnHammerThrow;
 
-            console.log("twodashonhammer: " + twoDashOnHammerThrow);
+            //console.log("twodashonhammer: " + twoDashOnHammerThrow);
 
             if (advanceRngAndSlice(startHex, advances + 1) < 64)
                 advances += 10; //Hard hit
@@ -502,7 +502,7 @@ function easyPredictionRTA (startHex, enemy, subgame, twoDashOnHammerThrow, minD
     }
     
     var finalHex = advanceRNG(startHex, advances);
-    console.log("Ending: " +  advanceRngAndSlice(finalHex, 0));
+    //console.log("Ending: " +  advanceRngAndSlice(finalHex, 0));
     
     return new Promise(resolve => setTimeout(resolve, 0, [message, advances, leftPower, rightPower, finalHex]));
 }
@@ -515,8 +515,8 @@ function slimePredictionRTA(startHex, minDashes) {
     //In addition to this, duplicate stars is also an issue I will need to combat at some point
     //It's gonna be foon
 
-    console.log("Your starting Hex is: " + startHex);
-    console.log("Your starting RNG count is: " + hexToCount(startHex));
+    //console.log("Your starting Hex is: " + startHex);
+    //console.log("Your starting RNG count is: " + hexToCount(startHex));
 
     var firstAttack = false;
     var firstAttackResults = ["Do Nothing", 0]; //initialize first attack results array
@@ -526,7 +526,7 @@ function slimePredictionRTA(startHex, minDashes) {
     if (battleWindowsAttackFirst(startHex, 0) || battleWindowsAttackFirst(advanceRNG(startHex, 2), 0))
         firstAttack = true; //0 = enemy type
     
-    console.log("Set first attack to: " + firstAttack);
+    //console.log("Set first attack to: " + firstAttack);
 
     //If Slime attacks first, find the next RNG number where he will not attack first
     //Else, do nothing
@@ -536,10 +536,10 @@ function slimePredictionRTA(startHex, minDashes) {
     //first fire cloud from hammer... +2 advances
     var advances = 2;
 
-    console.log("firstAttack: " + firstAttack);
-    console.log("firstAttack Number: " + advanceRngAndSlice(startHex, advances));
+    //console.log("firstAttack: " + firstAttack);
+    //console.log("firstAttack Number: " + advanceRngAndSlice(startHex, advances));
 
-    console.log("firstAttackResults: " + firstAttackResults[1]);
+    //console.log("firstAttackResults: " + firstAttackResults[1]);
 
     advances += firstAttackResults[1] + 12; //RNG advance for rest of hammer fire clouds +10, +1 for first turn check, +1 for hit check, + manual RNG advancements
 
@@ -552,22 +552,22 @@ function slimePredictionRTA(startHex, minDashes) {
 
     var message = firstAttackResults[0]; //message that is sent at the end
     advances += 1; //advance 1 RNG for hit check
-    console.log("before powerup calculations: " + advanceRngAndSlice(startHex, advances));
-    console.log("advances: " + advances)
+    //console.log("before powerup calculations: " + advanceRngAndSlice(startHex, advances));
+    //console.log("advances: " + advances)
 
     var leftPower = powers[0]; //what left power is 
     var rightPower = powers[1]; //what right power is
     advances += powers[2];  //how much RNG advances due to powers appearing
 
-    console.log("advances: " + advances);
+    //console.log("advances: " + advances);
 
-    console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
+    //console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
 
     advances += hitCheckAdvance; //Apply hit check RNG
 
     //Rest of the code is for calculating the ending so we can then find Puppet RNG...
 
-    console.log("First slime hit: " +  advanceRngAndSlice(startHex, advances));
+    //console.log("First slime hit: " +  advanceRngAndSlice(startHex, advances));
 
     if (advanceRngAndSlice(startHex, advances + 1) < 64) //weak hit or strong hit...
         advances += 12; //advance 8 + 4 at end
@@ -575,7 +575,7 @@ function slimePredictionRTA(startHex, minDashes) {
         advances += 3; //advance 1 + 2 at end
 
 
-    console.log("Ending: " +  advanceRngAndSlice(startHex, advances));
+    //console.log("Ending: " +  advanceRngAndSlice(startHex, advances));
 
     var finalHex = advanceRNG(startHex, advances);
 
@@ -587,8 +587,8 @@ function hardPredictionRTA(startHex, enemy, subgame, twoDashOnHammerThrow, minDa
 
     var subgameModifier = subgame * 2;
 
-    console.log("Your starting Hex is: " + startHex);
-    console.log("Your starting RNG count is: " + hexToCount(startHex));
+    //console.log("Your starting Hex is: " + startHex);
+    //console.log("Your starting RNG count is: " + hexToCount(startHex));
 
     var firstAttack = false;
     var firstAttackResults = ["Do Nothing", 0]; //initialize first attack results array
@@ -606,17 +606,17 @@ function hardPredictionRTA(startHex, enemy, subgame, twoDashOnHammerThrow, minDa
     if (battleWindowsAttackFirst(advanceRNG(startHex, advances), enemy + subgameModifier) || battleWindowsAttackFirst(advanceRNG(startHex, advances + 2), enemy + subgameModifier))
         firstAttack = true; //1 = enemy type
     
-    console.log("Set first attack to: " + firstAttack);
+    //console.log("Set first attack to: " + firstAttack);
 
     //If Puppet attacks first, find the next RNG number where he will not attack first
     //Else, do nothing
     if (firstAttack) 
         firstAttackResults = battleWindowsKirbyActions(advanceRNG(startHex, advances), enemy, 1, subgame, minDashes);
 
-    console.log("firstAttack: " + firstAttack);
-    console.log("firstAttack Number: " + advanceRngAndSlice(startHex, advances));
+    //console.log("firstAttack: " + firstAttack);
+    //console.log("firstAttack Number: " + advanceRngAndSlice(startHex, advances));
 
-    console.log("firstAttackResults: " + firstAttackResults[1]);
+    //console.log("firstAttackResults: " + firstAttackResults[1]);
 
     var message = firstAttackResults[0]; //message that is sent at the end
     advances += firstAttackResults[1]; 
@@ -628,8 +628,8 @@ function hardPredictionRTA(startHex, enemy, subgame, twoDashOnHammerThrow, minDa
         advances += 6;
     }
 
-    console.log("before powerup calculations: " + advanceRngAndSlice(startHex, advances));
-    console.log("advances: " + advances)
+    //console.log("before powerup calculations: " + advanceRngAndSlice(startHex, advances));
+    //console.log("advances: " + advances)
 
     if (advanceRngAndSlice(startHex, advances) < 64)
         hitCheckAdvance = 9; //we need to assign this to a variable because the RNG needs to be advanced AFTER power check
@@ -642,8 +642,8 @@ function hardPredictionRTA(startHex, enemy, subgame, twoDashOnHammerThrow, minDa
     var rightPower = powers[1]; //what right power is
     advances += powers[2] + hitCheckAdvance + 3;  //how much RNG advances due to powers appearing, +1 hit check, +1 power check, +2 dust clouds
 
-    console.log("advances: " + advances);
-    console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
+    //console.log("advances: " + advances);
+    //console.log("After powers appear: " +  advanceRngAndSlice(startHex, advances));
 
     //Anything after this is stuff after the first hit (which varies across Windows enemies)
 
@@ -680,7 +680,7 @@ function hardPredictionRTA(startHex, enemy, subgame, twoDashOnHammerThrow, minDa
     }
     
     var finalHex = advanceRNG(startHex, advances);
-    console.log("Ending: " +  advanceRngAndSlice(finalHex, 0));
+    //console.log("Ending: " +  advanceRngAndSlice(finalHex, 0));
     
     return new Promise(resolve => setTimeout(resolve, 0, [message, advances, leftPower, rightPower, finalHex]));
 }
@@ -726,7 +726,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                             */
                            /*
                             if (battleWindowsAttackFirst(advanceRNG(startHex, 9), enemy) == false) {
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["Slide", 9];
                             }
                             */
@@ -735,7 +735,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) { //Kirby will dash i number of times
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -748,12 +748,12 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                             */
                            /*
                             if (battleWindowsAttackFirst(advanceRNG(startHex, 9), enemy) == false) {
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["Slide", 9];
                             }
                             */
                             if (battleWindowsAttackFirst(advanceRNG(startHex, 14), enemy) == false) { //one up+y
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["up+y", 14];
                             }
                             for (var i = 1; i < 3; i++) { 
@@ -761,7 +761,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -770,13 +770,13 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return ["up+b & " + ((i - 13)) + " dash", i + 1];
                                 }
                             }
                             for (var i = 3; i < 7; i++) { 
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -798,7 +798,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if ((battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), enemy) == false)) { //Kirby will dash i number of times
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -814,7 +814,7 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if ((battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), enemy) == false)) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -823,13 +823,13 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                                     i++;
                                 }
                                 if ((battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), enemy) == false)) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return ["up+y & " + ((i - 13)) + " dash", i];
                                 }
                             }
                             for (var i = 3; i < 10; i++) { 
                                 if ((battleWindowsAttackFirst(advanceRNG(startHex, i), enemy) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), enemy) == false)) {
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return [(i) + " dash", i];
                                 }
                             }
@@ -847,39 +847,39 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
             switch (difficulty) {
                 //Easy
                 case 0:
-                    console.log("enemy: " + enemy);
+                    //console.log("enemy: " + enemy);
                     //All enemies follow the same pattern
                     for (var j = 0; j < 2; j++) { //if it loops a second time, it goes for stars instead of shield
-                        console.log("j:" + j);
-                        console.log("checking slide");
+                        //console.log("j:" + j);
+                        //console.log("checking slide");
                         if (battleWindowsAttackFirst(advanceRNG(startHex, 6), (enemy + 2 + j)) == false) { //one slide
-                            console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                            //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                             return ["Slide", 6, j];
                         }
-                        console.log("checking hammer");
+                        //console.log("checking hammer");
                         if (enemy != 0) {
                             if (battleWindowsAttackFirst(advanceRNG(startHex, 14), (enemy + 2 + j)) == false) { //one up+y
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["up+y", 14, j];
                             }
                         }
-                        console.log("checking dash");
+                        //console.log("checking dash");
                         for (var i = 1; i < 2; i++) { 
                             if (minDashes == '2' && i == 1) {
                                 i++;
                             }
                             if (battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2 + j)) == false) { //dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return [(i) + " dash", i, j];
                             }
                         }
-                        console.log("checking slide + dash");
+                        //console.log("checking slide + dash");
                         for (var i = 7; i < 9; i++) { 
                             if (minDashes == '2' && i == 7) {
                                 i++;
                             }
                             if (battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2 + j)) == false) { //slide + dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["Slide & " + (i - 6) + " dash", i, j];
                             }
                         }
@@ -889,22 +889,22 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                     }
 
                     for (var j = 0; j < 2; j++) {
-                        console.log("checking hammer + dash");
+                        //console.log("checking hammer + dash");
                         if (enemy != 0) {
                             for (var i = 15; i < 17; i++) { 
                                 if (minDashes == '2' && i == 15) {
                                     i++;
                                 }
                                 if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy + 2 + j) == false) { //up+y + dashes
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return ["up+y & " + (i - 14) + " dash", i, j];
                                 }
                             }
                         }
-                        console.log("checking dash");
+                        //console.log("checking dash");
                         for (var i = 2; i < 10; i++) { 
                             if (battleWindowsAttackFirst(advanceRNG(startHex, i), enemy + 2 + j) == false) { //rest is dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return [(i) + " dash", i, j];
                             }
                         }
@@ -917,56 +917,56 @@ function battleWindowsKirbyActions(startHex, enemy, difficulty, subgame, minDash
                     
                 //Hard
                 case 1:
-                    console.log("enemy: " + enemy);
+                    //console.log("enemy: " + enemy);
                     //All enemies follow the same pattern
-                        console.log("checking slide");
+                        //console.log("checking slide");
                         if ((battleWindowsAttackFirst(advanceRNG(startHex, 6), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, 8), (enemy + 2)) == false)) { //one slide
-                            console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                            //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                             return ["Slide", 6, j];
                         }
-                        console.log("checking hammer");
+                        //console.log("checking hammer");
                         if (enemy != 0) {
                             if ((battleWindowsAttackFirst(advanceRNG(startHex, 14), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, 16), (enemy + 2)) == false)) { //one up+y
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["up+y", 14, j];
                             }
                         }
-                        console.log("checking dash");
+                        //console.log("checking dash");
                         for (var i = 1; i < 2; i++) { 
                             if (minDashes == '2' && i == 1) {
                                 i++;
                             }
                             if ((battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), (enemy + 2)) == false)){ //dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return [(i) + " dash", i, j];
                             }
                         }
-                        console.log("checking slide + dash");
+                        //console.log("checking slide + dash");
                         for (var i = 7; i < 9; i++) { 
                             if (minDashes == '2' && i == 7) {
                                 i++;
                             }
                             if ((battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), (enemy + 2)) == false)) { //slide + dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return ["Slide & " + (i - 6) + " dash", i, j];
                             }
                         }
-                        console.log("checking hammer + dash");
+                        //console.log("checking hammer + dash");
                         if (enemy != 0) {
                             for (var i = 15; i < 17; i++) { 
                                 if (minDashes == '2' && i == 15) {
                                     i++;
                                 }
                                 if ((battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), (enemy + 2)) == false)) { //up+y + dashes
-                                    console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                    //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                     return ["up+y & " + (i - 14) + " dash", i, j];
                                 }
                             }
                         }
-                        console.log("checking dash");
+                        //console.log("checking dash");
                         for (var i = 2; i < 10; i++) { 
                             if ((battleWindowsAttackFirst(advanceRNG(startHex, i), (enemy + 2)) == false) && (battleWindowsAttackFirst(advanceRNG(startHex, i + 2), (enemy + 2)) == false)) { //rest is dashes
-                                console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
+                                //console.log("Leaving battle windows function with value: " + advanceRngAndSlice(startHex, i));
                                 return [(i) + " dash", i, j];
                             }
                         }

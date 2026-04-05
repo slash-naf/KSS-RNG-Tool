@@ -1,12 +1,11 @@
 import { KssRng } from './rng2.mjs';
 
 
-/** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする
+/** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理
  * @param {number} startIndex
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
  * @param {number} hammerThrow
- * @returns {{magician: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, knight: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, dragon: {leftPower, rightPower, actions: {dashes: number, slides: number, hammerFlips: number}, endingIndex: number}, actionsForDragonAction: {dashes: number, slides: number, hammerFlips: number}}}
  */
 async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, hammerThrow) {
     const startHex = countToHex(startIndex);
@@ -16,8 +15,10 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
     // Magician (enemy=0, subgame=1, always Easy)
     const magResult = await easyPredictionRTA(startHex, 0, 1, minDashes);
     const magician = {
-        leftPower: magResult[2],
-        rightPower: magResult[3],
+        powers: {
+            leftPower: magResult[2],
+            rightPower: magResult[3],
+        },
         actions: parseActions(magResult[0]),
         endingIndex: hexToCount(magResult[4]),
         message: magResult[0],
@@ -30,8 +31,10 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
     else
         knightResult = await hardPredictionRTA(magResult[4], 1, 1, twoDashOnHammerThrow, minDashes);
     const knight = {
-        leftPower: knightResult[2],
-        rightPower: knightResult[3],
+        powers: {
+            leftPower: knightResult[2],
+            rightPower: knightResult[3],
+        },
         actions: parseActions(knightResult[0]),
         endingIndex: hexToCount(knightResult[4]),
         message: knightResult[0],
@@ -44,8 +47,10 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
     else
         dragonResult = await hardPredictionRTA(knightResult[4], 2, 1, minDashes);
     const dragon = {
-        leftPower: dragonResult[2],
-        rightPower: dragonResult[3],
+        powers: {
+            leftPower: dragonResult[2],
+            rightPower: dragonResult[3],
+        },
         actions: parseActions(dragonResult[0]),
         endingIndex: hexToCount(dragonResult[4]),
         message: dragonResult[0],
@@ -79,81 +84,10 @@ function parseActions(message) {
  * @param {{dashes: number, slides: number, hammerFlips: number}} actionsForDragonAction
  * @param {boolean} fastKnight
  * @param {boolean} fastDragon
- * @returns {{magician: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, knight: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragon: {leftPower, rightPower, attacksFirst: boolean, endingIndex: number}, dragonAction}}
  */
 function simulateBattleWindowsMWW(startIndex, actionsForMagician, actionsForKnight, actionsForDragon, actionsForDragonAction, fastKnight, fastDragon, hammerThrow) {
     const rng = new KssRng(startIndex);
-
-    // --- 魔法使い (常にEasy) ---
-    applyActions(rng, actionsForMagician);
-    const magAttacksFirst = rng.magicianAttacksFirst();
-    const magPowers = rng.battleWindowsPowers();
-    rng.hammerFlipChargeAndHit();
-    const magician = {
-        leftPower: magPowers.leftPower,
-        rightPower: magPowers.rightPower,
-        attacksFirst: magAttacksFirst,
-        endingIndex: rng.index,
-    };
-
-    // --- 悪魔の騎士 ---
-    let knightAttacksFirst;
-    let knightPowers;
-    applyActions(rng, actionsForKnight);
-    if (!fastKnight) {
-        // Easyモード
-        knightAttacksFirst = rng.knightAttacksFirst();
-        knightPowers = rng.battleWindowsPowers();
-        rng.hammerFlipChargeAndHit();
-    } else {
-        // Fastモード
-        knightAttacksFirst = rng.hammerFlipChargeForFastKnight();
-        knightPowers = rng.hammerFlipHitForFastBattleWindowsPowers();
-    }
-    rng.dash(hammerThrow);    // ハンマー投げのダッシュ
-    rng.hammerHit();    // ハンマー投げのスイングのヒット
-    rng.hammerHit();    // ハンマー投げのヒット
-    const knight = {
-        leftPower: knightPowers.leftPower,
-        rightPower: knightPowers.rightPower,
-        attacksFirst: knightAttacksFirst,
-        endingIndex: rng.index,
-    };
-
-    // --- レッドドラゴン ---
-    let dragonAttacksFirst;
-    let dragonPowers;
-    applyActions(rng, actionsForDragon);
-    if (!fastDragon) {
-        // Easyモード
-        dragonAttacksFirst = rng.dragonAttacksFirst();
-        dragonPowers = rng.battleWindowsPowers();
-        rng.hammerFlipChargeAndHit();
-        rng.hammerFlipChargeAndHit();
-    } else {
-        // Fastモード
-        dragonAttacksFirst = rng.hammerFlipChargeForFDragon();
-        dragonPowers = rng.hammerFlipHitForFastBattleWindowsPowers();
-        rng.hammerFlipChargeAndHit();
-    }
-    const dragon = {
-        leftPower: dragonPowers.leftPower,
-        rightPower: dragonPowers.rightPower,
-        attacksFirst: dragonAttacksFirst,
-        endingIndex: rng.index,
-    };
-
-    // --- レッドドラゴン2ターン目 ---
-    applyActions(rng, actionsForDragonAction);
-    const dragonAction = rng.dragonActs();
-
-    return { magician, knight, dragon, dragonAction };
-}
-// アクションを RNG に適用するヘルパー
-function applyActions(rng, actions) {
-    rng.dash(actions.dashes);
-    rng.slide(actions.slides);
-    rng.hammerFlip(actions.hammerFlips);
+    return rng.simulateBattleWindowsMWW(actionsForMagician, actionsForKnight, actionsForDragon, actionsForDragonAction, fastKnight, fastDragon, hammerThrow);
 }
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整とシミュレーションの結果の比較と乱数調整が成功したかを確認して合わない部分をコンソール出力
@@ -175,7 +109,10 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         hammerThrow,
     );
 
-    let allMatch = true;
+    if (!sim) {
+        return {sim, manip};
+    }
+
     const enemies = ['magician', 'knight', 'dragon'];
 
     let m = null;
@@ -184,57 +121,35 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         m = manip[name];
         s = sim[name];
 
-        // 先制されないことを確認
-        if (s.attacksFirst) {
-            console.log(`[NG] ${name}: 先制される (manipulate のアクション不足)`);
-            allMatch = false;
-            break;
+        // コピーの元の比較
+        if (m.powers.rightPower !== s.powers.rightPower) {
+            console.log(`[DIFF] ${name} rightPower: manipulate=${m.powers.rightPower}, simulate=${s.powers.rightPower}`);
+            return {sim, manip};
         }
-
-        // パワーの比較
-        if (m.rightPower !== s.rightPower) {
-            console.log(`[DIFF] ${name} rightPower: manipulate=${m.rightPower}, simulate=${s.rightPower}`);
-            allMatch = false;
-            break;
-        }
-        if (m.leftPower !== s.leftPower) {
-            console.log(`[DIFF] ${name} leftPower: manipulate=${m.leftPower}, simulate=${s.leftPower}`);
-            allMatch = false;
-            break;
-        }
-
-        // 終了インデックスの比較
-        if (m.endingIndex !== s.endingIndex) {
-            console.log(`[DIFF] ${name} endingIndex: manipulate=${m.endingIndex}, simulate=${s.endingIndex}`);
-            allMatch = false;
-            break;
+        if (m.powers.leftPower !== s.powers.leftPower) {
+            console.log(`[DIFF] ${name} leftPower: manipulate=${m.powers.leftPower}, simulate=${s.powers.leftPower}`);
+            return {sim, manip};
         }
 
         // レッドドラゴンの行動を確認
         if (name === "dragon") {
             if (sim.dragonAction !== "Guard" && sim.dragonAction !== "Star") {
                 console.log(`[NG] dragonAction: ${sim.dragonAction}`);
-                allMatch = false;
-                break;
+                return {sim, manip};
             }
         }
     }
 
-    if (!allMatch) {
-        console.log(`startIndex: ${startIndex}`)
-        console.log(m);
-        console.log(s);
-        console.log('---');
-    }
-
-    return allMatch;
+    return null;
 }
 
 (async function(){
     let NGCount = 0;
     for (let i=3100; i <= 3400; i++) {
-        const allMatch = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
-        if (!allMatch) {
+        const ng = await compareManipulationAndSimulation(i, true, true, 2, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
+        if (ng) {
+            console.log(ng);
+            console.log("---");
             NGCount++
         }
     }

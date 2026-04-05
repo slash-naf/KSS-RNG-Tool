@@ -191,16 +191,14 @@ export class KssRng {
 		const dragonAction = this.dragonActs();
 
 		return {
-			actionsForMagician, magicianPowers,
-			actionsForKnight, knightPowers,
-			actionsForDragon, dragonPowers,
+			magician: {action: actionsForMagician, powers: magicianPowers},
+			knight: {action: actionsForKnight, powers: knightPowers},
+			dragon: {action: actionsForDragon, powers: dragonPowers},
 			actionsForDragonAction, dragonAction,
 		};
 	}
 
-	applyActions({dashes=0, slides=0, hammerFlips=0}) {
-		this.dash(dashes);
-		this.slide(slides);
-		this.hammerFlip(hammerFlips);
+	applyActions({ stars=0, dashes=0, slides=0, hammerFlips=0 } ) {
+		this.advance( 2*stars + 1*dashes + 6*slides + 14*hammerFlips );
 	}
 }
