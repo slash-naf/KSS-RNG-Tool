@@ -12,15 +12,26 @@ for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 	s ^= s>>3 & 0x03;
 }
 
-export const starDirectionChars =  "↑↗→↘↓↙←↖";
+// --- 乱数の結果を変換するテーブル ---
+export const StarDirectionChars =  "↑↗→↘↓↙←↖";
 
-export const dragonActionNames = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
-export const dragonStar = dragonActionNames.indexOf("Star");
-export const dragonGuard = dragonActionNames.indexOf("Guard");
-const dragonActionMap = Int8Array.from(dragonActionNames, v => dragonActionNames.indexOf(v));
+export const DragonActionNames = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
+export const DragonStar = DragonActionNames.indexOf("Star");
+export const DragonGuard = DragonActionNames.indexOf("Guard");
+const DragonActionMap = Int8Array.from(DragonActionNames, v => DragonActionNames.indexOf(v));
 
-export const battleWindowsPowerNames = ["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter", "Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing"];
-const battleWindowsPowerMap = Int8Array.from(battleWindowsPowerNames, v => battleWindowsPowerNames.indexOf(v));
+export const BattleWindowsPowerNames = ["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter", "Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing", "None"];
+export const BattleWindowsPowerNone = BattleWindowsPowerNames.indexOf("None");
+const BattleWindowsPowerMap = Int8Array.from(BattleWindowsPowerNames, v => BattleWindowsPowerNames.indexOf(v));
+
+// --- 乱数消費数 --
+const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星(1回は星の方向の判定)
+const DashAdvances = 1;	// ダッシュ
+const SlideAdvances = 6;	//スライディング
+const HammerFlipChargeAdvances = 12;	// 鬼殺し火炎ハンマー溜め中の土煙
+const HammerFlipFinishAdvances = 2;	// 鬼殺し火炎ハンマー後の土煙
+const HammerFlipAdvances = HammerFlipChargeAdvances + HammerFlipFinishAdvances;	// 鬼殺し火炎ハンマーの素振り
+const HammerHardHitAdvances = 9;
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
@@ -47,29 +58,29 @@ export class KssRng {
 		return this.randi(8);
 	}
 	/** ダッシュ */
-	dash(count=1) {
-		this.advance(count);
+	dash() {
+		this.advance(DashAdvances);
 	}
 	/** スライディング */
-	slide(count=1) {
-		this.advance(6 * count);
+	slide() {
+		this.advance(SlideAdvances);
 	}
 
 	// --- ハンマーのアクション ---
 	/** ハンマーのヒット */
 	hammerHit() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
-		if (hardHit) this.advance(9);	//ハードヒット
+		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
-		this.advance(12);	//溜め中の土煙
+		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
-		this.advance(2);	//攻撃時の土煙
+		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
 	}
 	/** 鬼殺し火炎ハンマーの素振り */
-	hammerFlip(count=1) {
-		this.advance(14 * count);	//溜め中の土煙: +12, 攻撃時の土煙: +2
+	hammerFlip() {
+		this.advance(HammerFlipAdvances);
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
@@ -98,8 +109,8 @@ export class KssRng {
 	hammerFlipHitForFastBattleWindowsPowers() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
 		const powers = this.battleWindowsPowers();
-		if (hardHit) this.advance(9);	//ハードヒット
-		this.advance(2);	//攻撃時の土煙
+		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
+		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
 		return powers;
 	}
 
@@ -120,7 +131,7 @@ export class KssRng {
 		return this.randi(4) === 3;
 	}
 	dragonActs() {
-		return dragonActionMap[this.randi(10)];
+		return DragonActionMap[this.randi(10)];
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
@@ -129,9 +140,9 @@ export class KssRng {
 		if (this.randi(4) === 1) {
 			const poolIdx = this.randi(4) & 1;
 			const pwrIdx = this.randi(12);
-			right = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
+			right = BattleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 		} else {
-			right = -1;
+			right = BattleWindowsPowerNone;
 		}
 
 		//左の出現 (左右とも出現して同じ種類だったら再抽選)
@@ -140,9 +151,9 @@ export class KssRng {
 			if (this.randi(4) === 2) {
 				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
-				left = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
+				left = BattleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 			} else {
-				left = -1;
+				left = BattleWindowsPowerNone;
 				break;
 			}
 		} while (left === right);
@@ -157,6 +168,7 @@ export class KssRng {
 		if (this.magicianAttacksFirst()) return null;
 		const magicianPowers = this.battleWindowsPowers();
 		this.hammerFlipChargeAndHit();
+		const endingIndexMagician = this.index;
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
@@ -171,9 +183,10 @@ export class KssRng {
 			knightPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.dash(hammerThrow);    // ハンマー投げのダッシュ
+		this.advance(hammerThrow*DashAdvances);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
+		const endingIndexKnight = this.index;
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
@@ -189,16 +202,22 @@ export class KssRng {
 			this.hammerFlipChargeAndHit();
 		}
 		this.hammerFlipChargeAndHit();
+		const endingIndexDragon = this.index;
 
 		// --- レッドドラゴン2ターン目 ---
 		this.applyActions(actionsTable.dragonAction);
 		const dragonAction = this.dragonActs();
 
-		return { powersTable: { magician: magicianPowers, knight: knightPowers, dragon: dragonPowers}, dragonAction };
+		return {
+			powersTable: { magician: magicianPowers, knight: knightPowers, dragon: dragonPowers},
+			endingIndexTable: { magician: endingIndexMagician, knight: endingIndexKnight, dragon: endingIndexDragon},
+			dragonAction,
+		};
 	}
 
+	/** 乱数の消費行動をまとめて行う */
 	applyActions({ stars=0, dashes=0, slides=0, hammerFlips=0 } ) {
-		this.advance( 2*stars + 1*dashes + 6*slides + 14*hammerFlips );
+		this.advance( stars*StarDirectionAdvances + dashes*DashAdvances + slides*SlideAdvances + hammerFlips*HammerFlipAdvances );
 	}
 }
 
@@ -243,8 +262,8 @@ export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDrag
 				// 理想的でなければ次の行動へ
 				if (sim === null) continue simulationLoop;
 				switch (sim.dragonAction) {
-				case dragonGuard: timeLoss += dragonGuardTimeLoss; break;
-				case dragonStar: timeLoss += dragonStarTimeLoss; break;
+				case DragonGuard: timeLoss += dragonGuardTimeLoss; break;
+				case DragonStar: timeLoss += dragonStarTimeLoss; break;
 				default: continue simulationLoop;
 				}
 

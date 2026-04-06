@@ -1,10 +1,10 @@
-import { KssRng, battleWindowsPowerNames, dragonStar, dragonGuard } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
-async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, hammerThrow) {
+async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon, hammerThrow) {
     const startHex = countToHex(startIndex);
-    const minDashes = '2';
+    const minDashes = '1';
     const twoDashOnHammerThrow = hammerThrow;
 
     // Magician (enemy=0, subgame=1, always Easy)
@@ -44,8 +44,8 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
         return {message, dashes, slides, hammerFlips };
     };
     const parsePowers = enemy => ({
-        left: battleWindowsPowerNames.indexOf(enemy.leftPower),
-        right: battleWindowsPowerNames.indexOf(enemy.rightPower),
+        left: BattleWindowsPowerNames.indexOf(enemy.leftPower),
+        right: BattleWindowsPowerNames.indexOf(enemy.rightPower),
     });
 
     return {
@@ -55,24 +55,25 @@ async function manipulateBattleWindowsMWW(startIndex, fastKnight, fastDragon, ha
             dragon: parseActions(dragon.message),
             dragonAction: parseActions(dragonSecondTurnMessage),
         },
+        fastKnight,
+        fastDragon,
+
         powersTable: {
             magician: parsePowers(magician),
             knight: parsePowers(knight),
             dragon: parsePowers(dragon),
         },
-        dragonAction: dragonAction === 0 ? dragonGuard : dragonStar,
+        endingIndexTable: {
+            magician: hexToCount(magician.finalHex),
+            knight: hexToCount(knight.finalHex),
+            dragon: hexToCount(dragon.finalHex),
+        },
+        dragonAction: dragonAction === 0 ? DragonGuard : DragonStar,
     };
 }
-
-/** 銀河に願いをのバトルウィンドウズ戦をシミュレートする */
-function simulateBattleWindowsMWW(startIndex, actionsTable, fastKnight, fastDragon, hammerThrow) {
-    const rng = new KssRng(startIndex);
-    return rng.simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow);
-}
-
 /** 銀河に願いをのバトルウィンドウズ戦の従来の乱数調整とシミュレーションの結果の比較 */
-async function compareManipulationAndSimulation(startIndex, fastKnight, fastDragon, hammerThrow, manipulate, simulate) {
-    const manip = await manipulate(startIndex, fastKnight, fastDragon, hammerThrow);
+async function compareManipulationAndSimulation(startIndex, fastKnight, fastDragon, hammerThrow, simulate) {
+    const manip = await manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon, hammerThrow);
 
     const sim = simulate(
         startIndex,
@@ -94,16 +95,16 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
         // コピーの元の比較
         if (mPowers.right !== sPowers.right) {
-            console.log(`[DIFF] ${name} right: manipulate=${battleWindowsPowerNames[mPowers.right]}, simulate=${battleWindowsPowerNames[sPowers.right]}`);
+            console.log(`[DIFF] ${name} right: manipulate=${BattleWindowsPowerNames[mPowers.right]}, simulate=${BattleWindowsPowerNames[sPowers.right]}`);
             return {sim, manip};
         }
         if (mPowers.left !== sPowers.left) {
-            console.log(`[DIFF] ${name} left: manipulate=${battleWindowsPowerNames[mPowers.left]}, simulate=${battleWindowsPowerNames[sPowers.left]}`);
+            console.log(`[DIFF] ${name} left: manipulate=${BattleWindowsPowerNames[mPowers.left]}, simulate=${BattleWindowsPowerNames[sPowers.left]}`);
             return {sim, manip};
         }
     }
 
-    // dragonActionの比較
+    // レッドドラゴンの行動の比較
     if (manip.dragonAction !== sim.dragonAction) {
         console.log(`[DIFF] dragonAction: manipulate=${manip.dragonAction}, simulate=${sim.dragonAction}`);
         return {sim, manip};
@@ -112,24 +113,35 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     return null;
 }
 /** 乱数範囲に対して、銀河に願いをのバトルウィンドウズ戦の従来の乱数調整とシミュレーションの結果の比較 */
-async function compareManipulationsAndSimulations(startIdx, endIdx){
+async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
     let diffCount = 0;
+    let NGCount = 0;
     for (let i=startIdx; i <= endIdx; i++) {
-        for (let hammerThrow=0; hammerThrow < 2; hammerThrow++) {
+        for (let hammerThrow=0; hammerThrow < 3; hammerThrow++) {
             for (let fastFlags=0; fastFlags < 4; fastFlags++) {
                 const fastKnight = (fastFlags & 1) !== 0;
                 const fastDragon = (fastFlags & 2) !== 0;
-                const ng = await compareManipulationAndSimulation(i, fastKnight, fastDragon, hammerThrow, manipulateBattleWindowsMWW, simulateBattleWindowsMWW);
+                const ng = await compareManipulationAndSimulation(i, fastKnight, fastDragon, hammerThrow, simulate);
                 if (ng) {
-                    console.log(ng);
-                    console.log(i, fastKnight, fastDragon, hammerThrow);
-                    console.log();
-                    diffCount++
+                    if (
+                        ng.manip.actionsTable.magician.message === "N" ||
+                        ng.manip.actionsTable.knight.message === "N" ||
+                        ng.manip.actionsTable.dragon.message === "N"
+                    ) {
+                        NGCount++;
+                    } else {
+                        console.log("manip:", ng.manip.endingIndexTable);
+                        console.log("sim:  ", ng.sim?.endingIndexTable);
+                        console.log(i, fastKnight, fastDragon, hammerThrow);
+                        console.log("---");
+                        diffCount++
+                    }
                 }
             }
         }
     }
     console.log(`diffCount: ${diffCount}`)
+    console.log(`NGCount: ${NGCount}`)
 }
 
-compareManipulationsAndSimulations(3000, 3500);
+compareManipulationsAndSimulations(3000, 3500, (startIndex, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow));
