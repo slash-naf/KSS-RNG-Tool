@@ -204,3 +204,66 @@ export class KssRng {
 		this.advance( 2*stars + 1*dashes + 6*slides + 14*hammerFlips );
 	}
 }
+
+/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
+ * @param {Iterable} actionsIterator 難易度が低い順の乱数調整行動全体
+ * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
+*/
+export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
+	const r = new KssRng();
+	// 星の方向が全て一致する乱数位置を探す
+	const indexList = [];
+	for (let i=minIndex; i <= maxIndex; i++) {
+		r.index = i;
+		if (stars.every(v => r.starDirection() === v)) indexList.push(i);
+	}
+	const indexArray = new Uint16Array(indexList);
+
+	// レッドドラゴンのタイムロスのフレーム数
+	const dragonGuardTimeLoss = 0;
+	const dragonStarTimeLoss = 50;
+
+	// 走査するFastモードの組み合わせとタイムロスの初期値
+	const fastList = [];
+	if (fastKnight) fastList.push({ timeLoss: 40 * indexArray.length, fastKnight: false, fastDragon });
+	if (fastDragon) fastList.push({ timeLoss: 40 * indexArray.length, fastKnight, fastDragon: false });
+	fastList.push({ timeLoss: 0, fastKnight, fastDragon });
+
+	// 難易度の低い順に行動を走査
+	let resultActionsList = null;
+	let minTimeLoss = CYCLE_LEN * 100;
+	let resultFastKnghit = fastKnight;
+	let resultFastDragon = fastDragon;
+	for (const a of actionsIterator) {
+		simulationLoop: for (let {timeLoss, fastKnight, fastDragon} of fastList) {
+			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
+
+			// 可能性のある全ての乱数位置で理想的か確認
+			for (const index of indexArray) {
+				r.index = index;
+				const sim = r.simulateBattleWindowsMWW(a.magician, a.knight, a.dragon, a.dragonAction, fastKnight, fastDragon, hammerThrow);
+
+				// 理想的でなければ次の行動へ
+				if (sim === null) continue simulationLoop;
+				switch (sim.dragonAction) {
+				case dragonGuard: timeLoss += dragonGuardTimeLoss; break;
+				case dragonStar: timeLoss += dragonStarTimeLoss; break;
+				default: continue simulationLoop;
+				}
+
+				if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
+			}
+
+			// 更新
+			resultActionsList = a;
+			minTimeLoss = timeLoss;
+			resultFastKnghit = fastKnight;
+			resultFastDragon = fastDragon;
+
+			// タイムロスが0ならならそれで確定
+			if (minTimeLoss === 0) return { actionsList: resultActionsList, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+		}
+	}
+
+	return { actionsList: resultActionsList, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+}
