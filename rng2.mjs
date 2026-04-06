@@ -149,16 +149,16 @@ export class KssRng {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す */
-	simulateBattleWindowsMWW(actionsForMagician, actionsForKnight, actionsForDragon, actionsForDragonAction, fastKnight, fastDragon, hammerThrow) {
+	simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow) {
 		// --- 魔法使い (常にEasy) ---
-		this.applyActions(actionsForMagician);
+		this.applyActions(actionsTable.magician);
 		if (this.magicianAttacksFirst()) return null;
 		const magicianPowers = this.battleWindowsPowers();
 		this.hammerFlipChargeAndHit();
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
-		this.applyActions(actionsForKnight);
+		this.applyActions(actionsTable.knight);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return null;
@@ -175,7 +175,7 @@ export class KssRng {
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
-		this.applyActions(actionsForDragon);
+		this.applyActions(actionsTable.dragon);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFDragon()) return null;
@@ -189,15 +189,10 @@ export class KssRng {
 		this.hammerFlipChargeAndHit();
 
 		// --- レッドドラゴン2ターン目 ---
-		this.applyActions(actionsForDragonAction);
+		this.applyActions(actionsTable.dragonAction);
 		const dragonAction = this.dragonActs();
 
-		return {
-			magician: {action: actionsForMagician, powers: magicianPowers},
-			knight: {action: actionsForKnight, powers: knightPowers},
-			dragon: {action: actionsForDragon, powers: dragonPowers},
-			actionsForDragonAction, dragonAction,
-		};
+		return { powersTable: { magician: magicianPowers, knight: knightPowers, dragon: dragonPowers}, dragonAction };
 	}
 
 	applyActions({ stars=0, dashes=0, slides=0, hammerFlips=0 } ) {
@@ -224,24 +219,24 @@ export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDrag
 	const dragonStarTimeLoss = 50;
 
 	// 走査するFastモードの組み合わせとタイムロスの初期値
-	const fastList = [];
-	if (fastKnight) fastList.push({ timeLoss: 40 * indexArray.length, fastKnight: false, fastDragon });
-	if (fastDragon) fastList.push({ timeLoss: 40 * indexArray.length, fastKnight, fastDragon: false });
-	fastList.push({ timeLoss: 0, fastKnight, fastDragon });
+	const fastTable = [];
+	if (fastKnight) fastTable.push({ timeLoss: 40 * indexArray.length, fastKnight: false, fastDragon });
+	if (fastDragon) fastTable.push({ timeLoss: 40 * indexArray.length, fastKnight, fastDragon: false });
+	fastTable.push({ timeLoss: 0, fastKnight, fastDragon });
 
 	// 難易度の低い順に行動を走査
-	let resultActionsList = null;
 	let minTimeLoss = CYCLE_LEN * 100;
+	let resultActionsTable = null;
 	let resultFastKnghit = fastKnight;
 	let resultFastDragon = fastDragon;
-	for (const a of actionsIterator) {
-		simulationLoop: for (let {timeLoss, fastKnight, fastDragon} of fastList) {
+	for (const actionsTable of actionsIterator) {
+		simulationLoop: for (let {timeLoss, fastKnight, fastDragon} of fastTable) {
 			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
 
 			// 可能性のある全ての乱数位置で理想的か確認
 			for (const index of indexArray) {
 				r.index = index;
-				const sim = r.simulateBattleWindowsMWW(a.magician, a.knight, a.dragon, a.dragonAction, fastKnight, fastDragon, hammerThrow);
+				const sim = r.simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow);
 
 				// 理想的でなければ次の行動へ
 				if (sim === null) continue simulationLoop;
@@ -255,15 +250,15 @@ export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDrag
 			}
 
 			// 更新
-			resultActionsList = a;
+			resultActionsTable = actionsTable;
 			minTimeLoss = timeLoss;
 			resultFastKnghit = fastKnight;
 			resultFastDragon = fastDragon;
 
 			// タイムロスが0ならならそれで確定
-			if (minTimeLoss === 0) return { actionsList: resultActionsList, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+			if (minTimeLoss === 0) return { actionsTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
 		}
 	}
 
-	return { actionsList: resultActionsList, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+	return { actionsTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
 }
