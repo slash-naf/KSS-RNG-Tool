@@ -13,17 +13,19 @@ for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 }
 
 export const starDirectionChars =  "↑↗→↘↓↙←↖";
+
 export const dragonActionNames = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
+export const dragonStar = dragonActionNames.indexOf("Star");
+export const dragonGuard = dragonActionNames.indexOf("Guard");
 const dragonActionMap = Int8Array.from(dragonActionNames, v => dragonActionNames.indexOf(v));
-const dragonStar = dragonActionNames.indexOf("Star");
-const dragonGuard = dragonActionNames.indexOf("Guard");
+
 export const battleWindowsPowerNames = ["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter", "Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing"];
 const battleWindowsPowerMap = Int8Array.from(battleWindowsPowerNames, v => battleWindowsPowerNames.indexOf(v));
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
-	constructor(startIndex=0) {
-		this.index = startIndex;
+	constructor(index=0) {
+		this.index = index;
 	}
 	/** 現在の乱数値を取得 */
 	getCurrentValue() {
@@ -123,29 +125,29 @@ export class KssRng {
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
 		//右の出現
-		let rightPower;
+		let right;
 		if (this.randi(4) === 1) {
 			const poolIdx = this.randi(4) & 1;
 			const pwrIdx = this.randi(12);
-			rightPower = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
+			right = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 		} else {
-			rightPower = -1;
+			right = -1;
 		}
 
 		//左の出現 (左右とも出現して同じ種類だったら再抽選)
-		let leftPower;
+		let left;
 		do{
 			if (this.randi(4) === 2) {
 				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
-				leftPower = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
+				left = battleWindowsPowerMap[poolIdx * 12 + pwrIdx];
 			} else {
-				leftPower = -1;
+				left = -1;
 				break;
 			}
-		} while (leftPower === rightPower);
+		} while (left === right);
 
-		return { leftPower, rightPower };
+		return { left, right };
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す */
