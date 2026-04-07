@@ -235,50 +235,37 @@ export function manipulateBattleWindowsMWW(advancesIterator, fastKnight, fastDra
 	}
 	const indexArray = new Uint16Array(indexList);
 
-	// レッドドラゴンのタイムロスのフレーム数
-	const dragonGuardTimeLoss = 0;
-	const dragonStarTimeLoss = 50;
-
-	// 走査するFastモードの組み合わせとタイムロスの初期値
-	const fastTable = [];
-	if (fastKnight) fastTable.push({ timeLoss: 40 * indexArray.length, fastKnight: false, fastDragon });
-	if (fastDragon) fastTable.push({ timeLoss: 40 * indexArray.length, fastKnight, fastDragon: false });
-	fastTable.push({ timeLoss: 0, fastKnight, fastDragon });
-
 	// 難易度の低い順に行動を走査
-	let minTimeLoss = CYCLE_LEN * 100;
+	let minTimeLoss = CYCLE_LEN;
 	let resultAdvancesTable = null;
 	let resultFastKnghit = fastKnight;
 	let resultFastDragon = fastDragon;
-	for (const advancesTable of advancesIterator) {
-		simulationLoop: for (let {timeLoss, fastKnight, fastDragon} of fastTable) {
-			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
+	simulationLoop: for (const advancesTable of advancesIterator) {
+		// 可能性のある全ての乱数位置で理想的か確認
+		let timeLoss = 0;
+		for (const index of indexArray) {
+			r.index = index;
+			const sim = r.simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow);
 
-			// 可能性のある全ての乱数位置で理想的か確認
-			for (const index of indexArray) {
-				r.index = index;
-				const sim = r.simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow);
-
-				// 理想的でなければ次の行動へ
-				if (sim === null) continue simulationLoop;
-				switch (sim.dragonAction) {
-				case DragonGuard: timeLoss += dragonGuardTimeLoss; break;
-				case DragonStar: timeLoss += dragonStarTimeLoss; break;
-				default: continue simulationLoop;
-				}
-
-				if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
+			// 理想的でなければ次の行動へ
+			if (sim === null) continue simulationLoop;
+			switch (sim.dragonAction) {
+			case DragonGuard: break;
+			case DragonStar: timeLoss++; break;
+			default: continue simulationLoop;
 			}
 
-			// 更新
-			resultAdvancesTable = advancesTable;
-			minTimeLoss = timeLoss;
-			resultFastKnghit = fastKnight;
-			resultFastDragon = fastDragon;
-
-			// タイムロスが0ならならそれで確定
-			if (minTimeLoss === 0) return { advancesTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
 		}
+
+		// 更新
+		resultAdvancesTable = advancesTable;
+		minTimeLoss = timeLoss;
+		resultFastKnghit = fastKnight;
+		resultFastDragon = fastDragon;
+
+		// タイムロスが0ならならそれで確定
+		if (minTimeLoss === 0) break simulationLoop;
 	}
 
 	return { advancesTable: resultAdvancesTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
