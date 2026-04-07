@@ -25,13 +25,13 @@ export const BattleWindowsPowerNone = BattleWindowsPowerNames.indexOf("None");
 const BattleWindowsPowerMap = Int8Array.from(BattleWindowsPowerNames, v => BattleWindowsPowerNames.indexOf(v));
 
 // --- 乱数消費数 --
-const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星(1回は星の方向の判定)
-const DashAdvances = 1;	// ダッシュ
-const SlideAdvances = 6;	//スライディング
-const HammerFlipChargeAdvances = 12;	// 鬼殺し火炎ハンマー溜め中の土煙
-const HammerFlipFinishAdvances = 2;	// 鬼殺し火炎ハンマー後の土煙
-const HammerFlipAdvances = HammerFlipChargeAdvances + HammerFlipFinishAdvances;	// 鬼殺し火炎ハンマーの素振り
-const HammerHardHitAdvances = 9;
+export const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星(1回は星の方向の判定)
+export const DashAdvances = 1;	// ダッシュ
+export const SlideAdvances = 6;	//スライディング
+export const HammerFlipChargeAdvances = 12;	// 鬼殺し火炎ハンマー溜め中の土煙
+export const HammerFlipFinishAdvances = 2;	// 鬼殺し火炎ハンマー後の土煙
+export const HammerFlipAdvances = HammerFlipChargeAdvances + HammerFlipFinishAdvances;	// 鬼殺し火炎ハンマーの素振り
+export const HammerHardHitAdvances = 9;
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
