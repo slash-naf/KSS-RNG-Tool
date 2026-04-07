@@ -1,10 +1,10 @@
-const INITIAL_SEED = 0x7777
-const CYCLE_LEN = 65534	//乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
+export const INITIAL_SEED = 0x7777
+export const CYCLE_LEN = 65534	//乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
 
 /** 乱数のリスト */
-export const rngCycle = new Uint8Array(CYCLE_LEN)
+export const RngCycle = new Uint8Array(CYCLE_LEN * 2);	// 一周したとき用に2週分
 for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
-	rngCycle[i] = s;
+	RngCycle[i] = s;
 	const a = s ^ s>>1;
 	s = a>>5 ^ (~a & 1)<<10 ^ (s & 3)<<8 | (s & 0x1F)<<11;
 	s ^= s>>3 & 0xE0;
@@ -40,11 +40,11 @@ export class KssRng {
 	}
 	/** 現在の乱数値を取得 */
 	getCurrentValue() {
-		return rngCycle[this.index];
+		return RngCycle[this.index];
 	}
 	/** 乱数を1回進めて、0以上max未満の乱数を返す */
 	randi(max) {
-		return (rngCycle[++this.index] * max) >> 8;
+		return (RngCycle[++this.index] * max) >> 8;
 	}
 	/** 乱数を指定の回数進める */
 	advance(count) {
