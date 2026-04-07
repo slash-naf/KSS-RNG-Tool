@@ -161,10 +161,15 @@ export class KssRng {
 		return { left, right };
 	}
 
-	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す */
-	simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow) {
+	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す
+	 * @param {{magician: number, knight: number, dragon: number, dragonAction: number}} advancesTable 乱数調整のための消費数
+	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
+	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
+	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
+	*/
+	simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow) {
 		// --- 魔法使い (常にEasy) ---
-		this.applyActions(actionsTable.magician);
+		this.advance(advancesTable.magician);
 		if (this.magicianAttacksFirst()) return null;
 		const magicianPowers = this.battleWindowsPowers();
 		this.hammerFlipChargeAndHit();
@@ -172,7 +177,7 @@ export class KssRng {
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
-		this.applyActions(actionsTable.knight);
+		this.advance(advancesTable.knight);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return null;
@@ -183,14 +188,14 @@ export class KssRng {
 			knightPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.advance(hammerThrow*DashAdvances);    // ハンマー投げのダッシュ
+		this.advance(hammerThrow);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
 		const endingIndexKnight = this.index;
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
-		this.applyActions(actionsTable.dragon);
+		this.advance(advancesTable.dragon);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFDragon()) return null;
@@ -205,7 +210,7 @@ export class KssRng {
 		const endingIndexDragon = this.index;
 
 		// --- レッドドラゴン2ターン目 ---
-		this.applyActions(actionsTable.dragonAction);
+		this.advance(advancesTable.dragonAction);
 		const dragonAction = this.dragonActs();
 
 		return {
@@ -214,18 +219,13 @@ export class KssRng {
 			dragonAction,
 		};
 	}
-
-	/** 乱数の消費行動をまとめて行う */
-	applyActions({ stars=0, dashes=0, slides=0, hammerFlips=0 } ) {
-		this.advance( stars*StarDirectionAdvances + dashes*DashAdvances + slides*SlideAdvances + hammerFlips*HammerFlipAdvances );
-	}
 }
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
- * @param {Iterable} actionsIterator 難易度が低い順の乱数調整行動全体
+ * @param {Iterable} advancesIterator 難易度が低い順の乱数調整行動全体
  * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
 */
-export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
+export function manipulateBattleWindowsMWW(advancesIterator, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
 	const r = new KssRng();
 	// 星の方向が全て一致する乱数位置を探す
 	const indexList = [];
@@ -247,17 +247,17 @@ export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDrag
 
 	// 難易度の低い順に行動を走査
 	let minTimeLoss = CYCLE_LEN * 100;
-	let resultActionsTable = null;
+	let resultAdvancesTable = null;
 	let resultFastKnghit = fastKnight;
 	let resultFastDragon = fastDragon;
-	for (const actionsTable of actionsIterator) {
+	for (const advancesTable of advancesIterator) {
 		simulationLoop: for (let {timeLoss, fastKnight, fastDragon} of fastTable) {
 			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
 
 			// 可能性のある全ての乱数位置で理想的か確認
 			for (const index of indexArray) {
 				r.index = index;
-				const sim = r.simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow);
+				const sim = r.simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow);
 
 				// 理想的でなければ次の行動へ
 				if (sim === null) continue simulationLoop;
@@ -271,15 +271,15 @@ export function manipulateBattleWindowsMWW(actionsIterator, fastKnight, fastDrag
 			}
 
 			// 更新
-			resultActionsTable = actionsTable;
+			resultAdvancesTable = advancesTable;
 			minTimeLoss = timeLoss;
 			resultFastKnghit = fastKnight;
 			resultFastDragon = fastDragon;
 
 			// タイムロスが0ならならそれで確定
-			if (minTimeLoss === 0) return { actionsTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+			if (minTimeLoss === 0) return { advancesTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
 		}
 	}
 
-	return { actionsTable: resultActionsTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+	return { advancesTable: resultAdvancesTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
 }
