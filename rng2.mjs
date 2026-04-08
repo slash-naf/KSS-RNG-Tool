@@ -84,9 +84,10 @@ export class KssRng {
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
-	//コピーの元の出現に影響しないように、最速4Fで鬼殺しをする必要がある
-	//先制判定は鬼殺しの溜め中の土煙の最中に行われ、前半の2Fと後半の2Fで乱数位置が違うため、両方を考慮する必要がある
+	//コピーの元の出現に影響しないように、最速で鬼殺しをする必要がある
+	//先制判定は鬼殺しの溜め中の土煙の最中に行われ、タイミングによって異なる2つの乱数位置を考慮する必要がある
 	//コピーの元も、ハードヒット判定とヒットの間にコピーの元の判定が行われる
+	//魔法使いでは鬼殺しの開始タイミングを調整して乱数調整を行い、タイミングによってハードヒット判定がコピーの元判定の前か後か異なる
 	/** 悪魔の騎士への最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
 	hammerFlipChargeForFastKnight() {
 		this.advance(8);
@@ -97,7 +98,7 @@ export class KssRng {
 		return a || b;
 	}
 	/** レッドドラゴンへの最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
-	hammerFlipChargeForFDragon() {
+	hammerFlipChargeForFastDragon() {
 		this.advance(6);
 		const a = this.dragonAttacksFirst();
 		this.advance(1);
@@ -105,12 +106,35 @@ export class KssRng {
 		this.advance(4);
 		return a || b;
 	}
-	/** バトルウィンドウズでの鬼殺し火炎ハンマーのヒットと、出現するコピーの元 */
+	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastBattleWindowsPowers() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
 		const powers = this.battleWindowsPowers();
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
+		return powers;
+	}
+	/** 魔法使いでの鬼殺しの溜めとヒットをし、先制されるならnullを、そうでなければ出現するコピーの元を返す */
+	hammerFlipChargeAndHitForFastMagician(firstAdvances) {
+		// 溜め中の土煙と先制されるか
+		this.advance(firstAdvances);
+		if (this.magicianAttacksFirst()) return null;
+		this.advance(HammerFlipChargeAdvances - firstAdvances);
+
+		// ヒットと出現するコピーの元
+		let hardHit, powers;
+		if (firstAdvances === 6) {
+			// 先にハードヒットの判定
+			hardHit = this.randi(4) === 0;
+			powers = this.battleWindowsPowers();
+		} else {
+			// 後にハードヒットの判定
+			powers = this.battleWindowsPowers();
+			hardHit = this.randi(4) === 0;
+		}
+		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
+		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
+
 		return powers;
 	}
 
@@ -198,7 +222,7 @@ export class KssRng {
 		this.advance(advancesTable.dragon);
 		if (fastDragon) {
 			// Fastモード
-			if (this.hammerFlipChargeForFDragon()) return null;
+			if (this.hammerFlipChargeForFastDragon()) return null;
 			dragonPowers = this.hammerFlipHitForFastBattleWindowsPowers();
 		} else {
 			// Easyモード
