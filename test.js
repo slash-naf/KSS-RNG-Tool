@@ -43,18 +43,29 @@ async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon,
         }
         return {message, dashes, slides, hammerFlips };
     };
+    const parseAdvances = ({dashes, slides, hammerFlips}) => dashes + slides*6 + hammerFlips*14
     const parsePowers = enemy => ({
         left: BattleWindowsPowerNames.indexOf(enemy.leftPower),
         right: BattleWindowsPowerNames.indexOf(enemy.rightPower),
     });
 
+    const actionsTable = {
+        magician: parseActions(magician.message),
+        knight: parseActions(knight.message),
+        dragon: parseActions(dragon.message),
+        dragonAction: parseActions(dragonSecondTurnMessage),
+    };
+    const advancesTable = {
+        magician1: parseAdvances(actionsTable.magician),
+        magician2: 0,
+        fastMagician: false,
+        knight: parseAdvances(actionsTable.knight),
+        dragon: parseAdvances(actionsTable.dragon),
+        dragonAction: parseAdvances(actionsTable.dragonAction),
+    };
     return {
-        actionsTable: {
-            magician: parseActions(magician.message),
-            knight: parseActions(knight.message),
-            dragon: parseActions(dragon.message),
-            dragonAction: parseActions(dragonSecondTurnMessage),
-        },
+        actionsTable,
+        advancesTable,
         fastKnight,
         fastDragon,
 
@@ -77,7 +88,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
     const sim = simulate(
         startIndex,
-        manip.actionsTable,
+        manip.advancesTable,
         fastKnight,
         fastDragon,
         hammerThrow,
@@ -114,6 +125,8 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 }
 /** 乱数範囲に対して、銀河に願いをのバトルウィンドウズ戦の従来の乱数調整とシミュレーションの結果の比較 */
 async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
+    console.log("# compareManipulationsAndSimulations")
+
     let diffCount = 0;
     let NGCount = 0;
     for (let i=startIdx; i <= endIdx; i++) {
@@ -130,18 +143,22 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
                     ) {
                         NGCount++;
                     } else {
+                        console.log("---");
                         console.log("manip:", ng.manip.endingIndexTable);
                         console.log("sim:  ", ng.sim?.endingIndexTable);
                         console.log(i, fastKnight, fastDragon, hammerThrow);
-                        console.log("---");
                         diffCount++
                     }
                 }
             }
+        }
+        if (i % 10 === 0) {
+            console.log("---");
+            console.log("i: " + i)
         }
     }
     console.log(`diffCount: ${diffCount}`)
     console.log(`NGCount: ${NGCount}`)
 }
 
-compareManipulationsAndSimulations(3000, 3500, (startIndex, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(actionsTable, fastKnight, fastDragon, hammerThrow));
+compareManipulationsAndSimulations(3000, 3500, (startIndex, advancesTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow));

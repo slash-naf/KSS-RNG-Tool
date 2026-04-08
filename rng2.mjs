@@ -26,7 +26,9 @@ const BattleWindowsPowerMap = Int8Array.from(BattleWindowsPowerNames, v => Battl
 
 // --- 乱数消費数 --
 export const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星(1回は星の方向の判定)
-export const DashAdvances = 1;	// ダッシュ
+export const ShortDashAdvances = 1;	// 一瞬だけダッシュ
+export const StartDashAdvances = 2;	// ダッシュの最初の土煙
+export const ContinueDashAdvances = 1;	// ダッシュ継続中の土煙
 export const SlideAdvances = 6;	//スライディング
 export const HammerFlipChargeAdvances = 12;	// 鬼殺し火炎ハンマー溜め中の土煙
 export const HammerFlipFinishAdvances = 2;	// 鬼殺し火炎ハンマー後の土煙
@@ -51,22 +53,11 @@ export class KssRng {
 		this.index += count;
 	}
 
-	// --- 基本アクション ---
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
 		return this.randi(8);
 	}
-	/** ダッシュ */
-	dash() {
-		this.advance(DashAdvances);
-	}
-	/** スライディング */
-	slide() {
-		this.advance(SlideAdvances);
-	}
-
-	// --- ハンマーのアクション ---
 	/** ハンマーのヒット */
 	hammerHit() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
@@ -86,7 +77,7 @@ export class KssRng {
 	// --- Fastモードの鬼殺し火炎ハンマー ---
 	//コピーの元の出現に影響しないように、最速で鬼殺しをする必要がある
 	//先制判定は鬼殺しの溜め中の土煙の最中に行われ、タイミングによって異なる2つの乱数位置を考慮する必要がある
-	//コピーの元も、ハードヒット判定とヒットの間にコピーの元の判定が行われる
+	//コピーの元判定も、ハードヒット判定とヒットの間に行われる
 	//魔法使いでは鬼殺しの開始タイミングを調整して乱数調整を行い、タイミングによってハードヒット判定がコピーの元判定の前か後か異なる
 	/** 悪魔の騎士への最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
 	hammerFlipChargeForFastKnight() {
@@ -114,16 +105,19 @@ export class KssRng {
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
 		return powers;
 	}
-	/** 魔法使いでの鬼殺しの溜めとヒットをし、先制されるならnullを、そうでなければ出現するコピーの元を返す */
-	hammerFlipChargeAndHitForFastMagician(firstAdvances) {
+	/** 魔法使いでの鬼殺しの溜め中の土煙と、先制されるか */
+	hammerFlipChargeForFastMagician(advances) {
 		// 溜め中の土煙と先制されるか
-		this.advance(firstAdvances);
-		if (this.magicianAttacksFirst()) return null;
-		this.advance(HammerFlipChargeAdvances - firstAdvances);
-
+		this.advance(advances);
+		const a = this.magicianAttacksFirst();
+		this.advance(HammerFlipChargeAdvances - advances);
+		return a;
+	}
+	/** 魔法使いでの鬼殺しのヒットと、出現するコピーの元 */
+	hammerFlipHitForFastMagician(hardHitFirst) {
 		// ヒットと出現するコピーの元
 		let hardHit, powers;
-		if (firstAdvances === 6) {
+		if (hardHitFirst) {
 			// 先にハードヒットの判定
 			hardHit = this.randi(4) === 0;
 			powers = this.battleWindowsPowers();
@@ -134,7 +128,6 @@ export class KssRng {
 		}
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-
 		return powers;
 	}
 
@@ -186,17 +179,26 @@ export class KssRng {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す
-	 * @param {{magician: number, knight: number, dragon: number, dragonAction: number}} advancesTable 乱数調整のための消費数
+	 * @param {{magician1: number, magician2: number, fastMagician: boolean, knight: number, dragon: number, dragonAction: number}} advancesTable 乱数調整のための消費数
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
 	*/
 	simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow) {
-		// --- 魔法使い (常にEasy) ---
-		this.advance(advancesTable.magician);
-		if (this.magicianAttacksFirst()) return null;
-		const magicianPowers = this.battleWindowsPowers();
-		this.hammerFlipChargeAndHit();
+		// --- 魔法使い ---
+		let magicianPowers;
+		if (advancesTable.fastMagician) {
+			// Fastモード
+			if (this.hammerFlipChargeForFastMagician(advancesTable.magician1)) return null;
+			magicianPowers = this.hammerFlipHitForFastMagician(advancesTable.magician1 === 6);
+		} else {
+			// Easyモード
+			this.advance(advancesTable.magician1);
+			if (this.magicianAttacksFirst()) return null;
+			this.advance(advancesTable.magician2);	// スライディングは間に合わないから先制判定は間に挟まる
+			magicianPowers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
+		}
 		const endingIndexMagician = this.index;
 
 		// --- 悪魔の騎士 ---
@@ -230,7 +232,7 @@ export class KssRng {
 			dragonPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.hammerFlipChargeAndHit();
+		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
 		const endingIndexDragon = this.index;
 
 		// --- レッドドラゴン2ターン目 ---
