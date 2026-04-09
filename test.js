@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, manipulateBattleWindowsMWW } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, BranchTypes, manipulateBattleWindowsMWW } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -231,7 +231,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     let magicianNGCount = 0;
     let otherNGCount = 0;
     let wrongCount = 0;
-    let knightStarCount = 0;
+    let branchCount = 0;
 
     let magicianCountList = {};
     let knightCountList = {};
@@ -246,7 +246,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             starsList.push(r.starDirection());
         }
 
-        const {magician, actionsTable, knightStarDirection, fallbackActionsTable} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+        const {magician, actionsTable, branch} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
 
         if (magician === null) {
             magicianNGCount++;
@@ -257,16 +257,18 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             continue;
         }
 
-        const k = new KssRng(
-            new KssRng(r.index).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow)[0].index
-        ).starDirection();
-        let t = actionsTable;
-        if (fallbackActionsTable !== null && fallbackActionsTable !== undefined && knightStarDirection === k) {
-            t = fallbackActionsTable;
-            knightStarCount++;
+        // 分岐が設定されている場合、観測値に基づいてactionsTableを切り替え
+        let chosenActionsTable = actionsTable;
+        if (branch) {
+            const bt = BranchTypes[branch.type];
+            const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+            if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
+                chosenActionsTable = branch.fallbackActionsTable;
+                branchCount++;
+            }
         }
 
-        const result = r.simulateBattleWindowsMWW(magician, t, fastKnight, fastDragon, hammerThrow);
+        const result = r.simulateBattleWindowsMWW(magician, chosenActionsTable, fastKnight, fastDragon, hammerThrow);
         if (result.length !== 4) { wrongCount++; continue; }
 
         // メッセージ集計
@@ -286,7 +288,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     console.log('magicianNGCount: '+ magicianNGCount);
     console.log('otherNGCount: '+ otherNGCount);
     console.log('wrongCount: '+ wrongCount);
-    console.log('knightStarCount: '+ knightStarCount);
+    console.log('branchCount: '+ branchCount);
 
     console.log("## magicianCountList");
     for (let [message, val] of Object.entries(magicianCountList)) {
