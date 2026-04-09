@@ -99,15 +99,28 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         hammerThrow,
     );
 
-    if (!sim) {
+    // simが全ステップ失敗ならNG
+    if (sim.length === 0) {
         return {sim, manip};
     }
 
+    // sim[0]=magician, sim[1]=knight, sim[2]=dragonの順に格納される
     const enemies = ['magician', 'knight', 'dragon'];
 
-    for (const name of enemies) {
+    for (let idx = 0; idx < enemies.length; idx++) {
+        const name = enemies[idx];
         const mPowers = manip.powersTable[name];
-        const sPowers = sim.powersTable[name];
+        const sPowers = sim[idx];
+        const message = manip.actionsTable[name].message;
+
+        if (sPowers === undefined) {
+            if (message !== "N") {
+                console.log(`[DIFF] ${name}: simulate 失敗`);
+                return {sim, manip};
+            } else {
+                return null;
+            }
+        }
 
         // コピーの元の比較
         if (mPowers.right !== sPowers.right) {
@@ -121,8 +134,8 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     }
 
     // レッドドラゴンの行動の比較
-    if (manip.dragonAction !== sim.dragonAction) {
-        console.log(`[DIFF] dragonAction: manipulate=${manip.dragonAction}, simulate=${sim.dragonAction}`);
+    if (manip.dragonAction === DragonGuard && sim.length !== 4) {
+        console.log(`[DIFF] dragonAction: manipulate=${manip.dragonAction}, simulate length=${sim.length}`);
         return {sim, manip};
     }
 
@@ -133,7 +146,6 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
     console.log("# compareManipulationsAndSimulations")
 
     let diffCount = 0;
-    let NGCount = 0;
     for (let i=startIdx; i <= endIdx; i++) {
         for (let hammerThrow=0; hammerThrow < 3; hammerThrow++) {
             for (let fastFlags=0; fastFlags < 4; fastFlags++) {
@@ -141,19 +153,9 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
                 const fastDragon = (fastFlags & 2) !== 0;
                 const ng = await compareManipulationAndSimulation(i, fastKnight, fastDragon, hammerThrow, simulate);
                 if (ng) {
-                    if (
-                        ng.manip.actionsTable.magician.message === "N" ||
-                        ng.manip.actionsTable.knight.message === "N" ||
-                        ng.manip.actionsTable.dragon.message === "N"
-                    ) {
-                        NGCount++;
-                    } else {
-                        console.log("---");
-                        console.log("manip:", ng.manip.endingIndexTable);
-                        console.log("sim:  ", ng.sim?.endingIndexTable);
-                        console.log(i, fastKnight, fastDragon, hammerThrow);
-                        diffCount++
-                    }
+                    console.log(i, fastKnight, fastDragon, hammerThrow);
+                    console.log("---");
+                    diffCount++
                 }
             }
         }
@@ -163,10 +165,9 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
         }
     }
     console.log(`diffCount: ${diffCount}`)
-    console.log(`NGCount: ${NGCount}`)
 }
 
-//compareManipulationsAndSimulations(3000, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));
+//compareManipulationsAndSimulations(3100, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));
 
 
 
@@ -230,7 +231,6 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     let magicianNGCount = 0;
     let otherNGCount = 0;
     let wrongCount = 0;
-    let dragonStarCount = 0;
 
     let magicianCountList = {};
     let knightCountList = {};
@@ -257,9 +257,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
         }
 
         const result = r.simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
-        if (result === null) wrongCount++;
-
-        if (result.dragonAction === DragonStar) dragonStarCount++;
+        if (result.length !== 4) { wrongCount++; continue; }
 
         // メッセージ集計
         const magicianMsg = magician.message;
@@ -278,7 +276,6 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     console.log('magicianNGCount: '+ magicianNGCount);
     console.log('otherNGCount: '+ otherNGCount);
     console.log('wrongCount: '+ wrongCount);
-    console.log('dragonStarCount: '+ dragonStarCount);
 
     console.log("## magicianCountList");
     for (let [message, val] of Object.entries(magicianCountList)) {

@@ -184,65 +184,65 @@ export class KssRng {
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
 	*/
 	simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow) {
+		const result = [];
+
 		// --- 魔法使い ---
 		let magicianPowers;
 		if (magician.fast) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastMagician(magician.advances1)) return null;
+			if (this.hammerFlipChargeForFastMagician(magician.advances1)) return result;
 			magicianPowers = this.hammerFlipHitForFastMagician(magician.advances1 === 6);
 		} else {
 			// Easyモード
 			this.advance(magician.advances1);
-			if (this.magicianAttacksFirst()) return null;
+			if (this.magicianAttacksFirst()) return result;
 			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
 			magicianPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		const endingIndexMagician = this.index;
+		result.push(magicianPowers);
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
 		this.advance(actionsTable.knight.advances);
 		if (fastKnight) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastKnight()) return null;
+			if (this.hammerFlipChargeForFastKnight()) return result;
 			knightPowers = this.hammerFlipHitForFastBattleWindowsPowers();
 		} else {
 			// Easyモード
-			if (this.knightAttacksFirst()) return null;
+			if (this.knightAttacksFirst()) return result;
 			knightPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
 		this.advance(hammerThrow);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
-		const endingIndexKnight = this.index;
+		result.push(knightPowers);
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
 		this.advance(actionsTable.dragon.advances);
 		if (fastDragon) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastDragon()) return null;
+			if (this.hammerFlipChargeForFastDragon()) return result;
 			dragonPowers = this.hammerFlipHitForFastBattleWindowsPowers();
 		} else {
 			// Easyモード
-			if (this.dragonAttacksFirst()) return null;
+			if (this.dragonAttacksFirst()) return result;
 			dragonPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
-		const endingIndexDragon = this.index;
+		result.push(dragonPowers);
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
+		if (dragonAction !== DragonGuard) return result;
+		result.push(dragonAction);
 
-		return {
-			powersTable: { magician: magicianPowers, knight: knightPowers, dragon: dragonPowers},
-			endingIndexTable: { magician: endingIndexMagician, knight: endingIndexKnight, dragon: endingIndexDragon},
-			dragonAction,
-		};
+		return result;
 	}
 }
 
@@ -318,34 +318,16 @@ export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fa
 
 	// 難易度の低い順に行動を走査
 	let resultActionsTable = null;
-	let minTimeLoss = CYCLE_LEN;
 	simulationLoop: for (const actionsTable of actions.list) {
 		// 可能性のある全ての乱数位置で理想的か確認
-		let timeLoss = 0;
 		for (const index of indexArray) {
 			r.index = index;
 			const sim = r.simulateBattleWindowsMWW(resultMagician, actionsTable, fastKnight, fastDragon, hammerThrow);
-
-			// 理想的でなければ次の行動へ
-			if (sim === null) continue simulationLoop;
-			switch (sim.dragonAction) {
-			case DragonGuard: break;
-			case DragonStar: timeLoss++; break;
-			default: continue simulationLoop;
-			}
-
-			if (timeLoss >= minTimeLoss) continue simulationLoop;	// タイムロスの総計がより小さくなければ次へ
+			if (sim.length !== 4) continue simulationLoop;	// 理想的でなければ次の行動へ
 		}
-
-		// 更新
-		resultActionsTable = actionsTable;
-		minTimeLoss = timeLoss;
-
-		// タイムロスが0ならならそれで確定
-		if (minTimeLoss === 0) {
-			return {magician: resultMagician, actionsTable: resultActionsTable};
-		}
+		// 全乱数位置で理想的なら確定
+		return {magician: resultMagician, actionsTable};
 	}
 
-	return {magician: resultMagician, actionsTable: resultActionsTable};
+	return {magician: resultMagician, actionsTable: null};
 }
