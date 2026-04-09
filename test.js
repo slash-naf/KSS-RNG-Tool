@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -43,29 +43,33 @@ async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon,
         }
         return {message, dashes, slides, hammerFlips };
     };
-    const parseAdvances = ({dashes, slides, hammerFlips}) => dashes + slides*6 + hammerFlips*14
+    const parseAdvances = ({dashes=0, slides=0, hammerFlips=0}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances;
     const parsePowers = enemy => ({
         left: BattleWindowsPowerNames.indexOf(enemy.leftPower),
         right: BattleWindowsPowerNames.indexOf(enemy.rightPower),
     });
 
-    const actionsTable = {
-        magician: parseActions(magician.message),
-        knight: parseActions(knight.message),
-        dragon: parseActions(dragon.message),
-        dragonAction: parseActions(dragonSecondTurnMessage),
+    const magicianActions = parseActions(magician.message);
+    const knightActions   = parseActions(knight.message);
+    const dragonActions   = parseActions(dragon.message);
+    const dragonActionActions = parseActions(dragonSecondTurnMessage);
+
+    // simulateBattleWindowsMWW の magician 引数 (fast=false: Easyモード)
+    const magicianArg = {
+        fast: false,
+        advances1: parseAdvances(magicianActions),
+        advances2: 0,
     };
-    const advancesTable = {
-        magician1: parseAdvances(actionsTable.magician),
-        magician2: 0,
-        fastMagician: false,
-        knight: parseAdvances(actionsTable.knight),
-        dragon: parseAdvances(actionsTable.dragon),
-        dragonAction: parseAdvances(actionsTable.dragonAction),
+    // simulateBattleWindowsMWW の actionsTable 引数
+    const actionsTable = {
+        magician:    { message: magician.message,             advances: parseAdvances(magicianActions) },
+        knight:      { message: knight.message,               advances: parseAdvances(knightActions) },
+        dragon:      { message: dragon.message,               advances: parseAdvances(dragonActions) },
+        dragonAction:{ message: dragonSecondTurnMessage,      advances: parseAdvances(dragonActionActions) },
     };
     return {
+        magicianArg,
         actionsTable,
-        advancesTable,
         fastKnight,
         fastDragon,
 
@@ -88,7 +92,8 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
     const sim = simulate(
         startIndex,
-        manip.advancesTable,
+        manip.magicianArg,
+        manip.actionsTable,
         fastKnight,
         fastDragon,
         hammerThrow,
@@ -161,4 +166,4 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
     console.log(`NGCount: ${NGCount}`)
 }
 
-compareManipulationsAndSimulations(3000, 3500, (startIndex, advancesTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow));
+compareManipulationsAndSimulations(3000, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));

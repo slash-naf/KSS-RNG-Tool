@@ -179,23 +179,22 @@ export class KssRng {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す
-	 * @param {{magician1: number, magician2: number, fastMagician: boolean, knight: number, dragon: number, dragonAction: number}} advancesTable 乱数調整のための消費数
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
 	*/
-	simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow) {
+	simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow) {
 		// --- 魔法使い ---
 		let magicianPowers;
-		if (advancesTable.fastMagician) {
+		if (magician.fast) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastMagician(advancesTable.magician1)) return null;
-			magicianPowers = this.hammerFlipHitForFastMagician(advancesTable.magician1 === 6);
+			if (this.hammerFlipChargeForFastMagician(magician.advances1)) return null;
+			magicianPowers = this.hammerFlipHitForFastMagician(magician.advances1 === 6);
 		} else {
 			// Easyモード
-			this.advance(advancesTable.magician1);
+			this.advance(magician.advances1);
 			if (this.magicianAttacksFirst()) return null;
-			this.advance(advancesTable.magician2);	// スライディングは間に合わないから先制判定は間に挟まる
+			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
 			magicianPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
@@ -203,7 +202,7 @@ export class KssRng {
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
-		this.advance(advancesTable.knight);
+		this.advance(actionsTable.knight.advances);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return null;
@@ -221,7 +220,7 @@ export class KssRng {
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
-		this.advance(advancesTable.dragon);
+		this.advance(actionsTable.dragon.advances);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return null;
@@ -236,7 +235,7 @@ export class KssRng {
 		const endingIndexDragon = this.index;
 
 		// --- レッドドラゴン2ターン目 ---
-		this.advance(advancesTable.dragonAction);
+		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
 
 		return {
@@ -247,11 +246,56 @@ export class KssRng {
 	}
 }
 
+export class Actions {
+	constructor(t) {
+		const parseAdvances = ({dashes, slides, hammerFlips, stars}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
+		const parseMessage = ({dashes, slides, hammerFlips, stars, advances}) => {
+			const a = [];
+			if (advances !== undefined) {
+				if (slides) a.push(["", "", "", "", "準速スライディング", "最速スライディング", ][advances]);
+				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
+			} else {
+				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
+				if (slides) a.push(["", "スライディング", "2スライディング"][slides]);
+				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
+				if (stars) a.push(["", "星", "2星"][stars]);
+			}
+			return a.join(" & ");
+		};
+
+		this.magicianList = t.magician.toSorted((a, b) => a.difficulty - b.difficulty).map(a => {
+			const advances = parseAdvances(a);
+			return {
+				difficulty: a.difficulty,
+				advances1: a.advances === undefined ? advances : a.advances,
+				advances2: a.advances === undefined ? 0 : advances - a.advances,
+				fast: a.hammerFlips !== undefined,
+				actions: a
+			};
+		});
+		this.knightList = t.knight.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
+		this.dragonList = t.dragon.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
+		this.dragonActionList = t.dragonAction.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
+		this.list = [];
+		for (const knight of this.knightList) {
+			for (const dragon of this.dragonList) {
+				for (const dragonAction of this.dragonActionList) {
+					a.push({
+						difficulty: knight.difficulty + dragon.difficulty + dragonAction.difficulty,
+						knight, dragon, dragonAction,
+					});
+				}
+			}
+		}
+		this.list.sort((a, b) => a.difficulty - b.difficulty);
+	}
+}
+
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
- * @param {Iterable} advancesIterator 難易度が低い順の乱数調整行動全体
+ * @param {Actions} actions 難易度が低い順の乱数調整行動全体
  * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
 */
-export function manipulateBattleWindowsMWW(advancesIterator, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
+export function manipulateBattleWindowsMWW(actions, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
 	const r = new KssRng();
 	// 星の方向が全て一致する乱数位置を探す
 	const indexList = [];
@@ -261,17 +305,21 @@ export function manipulateBattleWindowsMWW(advancesIterator, fastKnight, fastDra
 	}
 	const indexArray = new Uint16Array(indexList);
 
+	// 魔法使いに先制されない行動を探す
+	let resultMagician = null;
+	for (const magician of actions.magicianList) {
+		if (indexArray.some(v => new KssRng(v + magician.advances1).magicianAttacksFirst())) continue;
+		resultMagician = magician;
+	}
 	// 難易度の低い順に行動を走査
+	let resultActionsTable = null;
 	let minTimeLoss = CYCLE_LEN;
-	let resultAdvancesTable = null;
-	let resultFastKnghit = fastKnight;
-	let resultFastDragon = fastDragon;
-	simulationLoop: for (const advancesTable of advancesIterator) {
+	simulationLoop: for (const actionsTable of actions.list) {
 		// 可能性のある全ての乱数位置で理想的か確認
 		let timeLoss = 0;
 		for (const index of indexArray) {
 			r.index = index;
-			const sim = r.simulateBattleWindowsMWW(advancesTable, fastKnight, fastDragon, hammerThrow);
+			const sim = r.simulateBattleWindowsMWW(resultMagician, actionsTable, fastKnight, fastDragon, hammerThrow);
 
 			// 理想的でなければ次の行動へ
 			if (sim === null) continue simulationLoop;
@@ -285,14 +333,14 @@ export function manipulateBattleWindowsMWW(advancesIterator, fastKnight, fastDra
 		}
 
 		// 更新
-		resultAdvancesTable = advancesTable;
+		resultActionsTable = actionsTable;
 		minTimeLoss = timeLoss;
-		resultFastKnghit = fastKnight;
-		resultFastDragon = fastDragon;
 
 		// タイムロスが0ならならそれで確定
-		if (minTimeLoss === 0) break simulationLoop;
+		if (minTimeLoss === 0) {
+			return {magician: resultMagician, actionsTable: resultActionsTable};
+		}
 	}
 
-	return { advancesTable: resultAdvancesTable, fastKnight: resultFastKnghit, fastDragon: resultFastDragon};
+	return {magician: resultMagician, actionsTable: resultActionsTable};
 }
