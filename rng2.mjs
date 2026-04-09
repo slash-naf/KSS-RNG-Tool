@@ -200,7 +200,7 @@ export class KssRng {
 			magicianPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		result.push(magicianPowers);
+		result.push({ powers: magicianPowers, index: this.index });
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
@@ -218,7 +218,7 @@ export class KssRng {
 		this.advance(hammerThrow);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
-		result.push(knightPowers);
+		result.push({ powers: knightPowers, index: this.index });
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
@@ -234,13 +234,13 @@ export class KssRng {
 			this.hammerFlipChargeAndHit();
 		}
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
-		result.push(dragonPowers);
+		result.push({ powers: dragonPowers, index: this.index });
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
 		if (dragonAction !== DragonGuard) return result;
-		result.push(dragonAction);
+		result.push({ dragonAction, index: this.index });
 
 		return result;
 	}
@@ -319,7 +319,7 @@ export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fa
 	// 難易度の低い順に行動を走査
 	const bestPartialMatches = [];
 	let bestMatchCount = 0;
-	simulationLoop: for (const actionsTable of actions.list) {
+	for (const actionsTable of actions.list) {
 		// 可能性のある全ての乱数位置で理想的か確認
 		const list = [];
 		let matchCount = 0;
@@ -345,6 +345,59 @@ export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fa
 		}
 	}
 
-	result.actionsTable = bestPartialMatches[0][0].actionsTable;
+
+
+
+	// 全ての可能性に対応するものがなかった場合、最初に星を出して向きを確認したいので、knight前の調整で星を出すパターンを選ぶ。
+	// また、lengthが4でなかったものの星の向きがすべて一致し、且つlengthが4のものにそれと一致するものが一つもないパターンを選ぶ。
+	// その星の向きだった時にすべき行動と、そうでない場合にすべき行動を両方返す
+	for (const list of bestPartialMatches) {
+		const actionsTable = list[0].actionsTable;
+		if (!actionsTable.knight.actions.stars) continue;
+
+		// magician終了後のインデックスから星の向きを取得し、成功/失敗に分類
+		const withStarDir = list.map(entry => {
+			if (entry.sim.length === 0) return { ...entry, starDir: -1 };
+			const starRng = new KssRng(entry.sim[0].index);
+			return { ...entry, starDir: starRng.starDirection() };
+		});
+		const matched   = withStarDir.filter(e => e.sim.length === 4);
+		const unmatched = withStarDir.filter(e => e.sim.length < 4);
+		if (unmatched.length === 0 || matched.length === 0) continue;
+
+		// 失敗インデックスの星の向きが全て同一か
+		const failDir = unmatched[0].starDir;
+		if (failDir === -1 || unmatched.some(e => e.starDir !== failDir)) continue;
+
+		// 成功インデックスにその向きが含まれていないか
+		if (matched.some(e => e.starDir === failDir)) continue;
+
+		// star分岐が有効。失敗インデックス群に対して機能するactionsTableを探す
+		const failIndices = unmatched.map(e => e.index);
+		let fallbackActionsTable = null;
+		for (const altActionsTable of actions.list) {
+			// 星は既に消費済みなので、knight側に星を含むactionsTableのみ対象
+			if (!altActionsTable.knight.actions.stars) continue;
+			let allMatch = true;
+			for (const index of failIndices) {
+				r.index = index;
+				const sim = r.simulateBattleWindowsMWW(result.magician, altActionsTable, fastKnight, fastDragon, hammerThrow);
+				if (sim.length !== 4) { allMatch = false; break; }
+			}
+			if (allMatch) {
+				fallbackActionsTable = altActionsTable;
+				break;
+			}
+		}
+
+		// 星の向きに応じた2パターンの行動を返す
+		result.actionsTable = actionsTable;
+		result.knightStarDirection = failDir;
+		result.fallbackActionsTable = fallbackActionsTable;
+		return result;
+	}
+
+	// 星分岐でも解決しない場合は最良の部分一致を返す
+	result.actionsTable = bestPartialMatches[0]?.[0]?.actionsTable ?? null;
 	return result;
 }

@@ -231,6 +231,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     let magicianNGCount = 0;
     let otherNGCount = 0;
     let wrongCount = 0;
+    let knightStarCount = 0;
 
     let magicianCountList = {};
     let knightCountList = {};
@@ -245,7 +246,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             starsList.push(r.starDirection());
         }
 
-        const {magician, actionsTable} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+        const {magician, actionsTable, knightStarDirection, fallbackActionsTable} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
 
         if (magician === null) {
             magicianNGCount++;
@@ -256,7 +257,16 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             continue;
         }
 
-        const result = r.simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+        const k = new KssRng(
+            new KssRng(r.index).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow)[0].index
+        ).starDirection();
+        let t = actionsTable;
+        if (fallbackActionsTable !== null && fallbackActionsTable !== undefined && knightStarDirection === k) {
+            t = fallbackActionsTable;
+            knightStarCount++;
+        }
+
+        const result = r.simulateBattleWindowsMWW(magician, t, fastKnight, fastDragon, hammerThrow);
         if (result.length !== 4) { wrongCount++; continue; }
 
         // メッセージ集計
@@ -276,6 +286,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     console.log('magicianNGCount: '+ magicianNGCount);
     console.log('otherNGCount: '+ otherNGCount);
     console.log('wrongCount: '+ wrongCount);
+    console.log('knightStarCount: '+ knightStarCount);
 
     console.log("## magicianCountList");
     for (let [message, val] of Object.entries(magicianCountList)) {
