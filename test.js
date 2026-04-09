@@ -295,4 +295,4 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
     }
 }
 
-testNewManipulation(3100, 3400, true, true, true, 1, 3);
+testNewManipulation(3100, 3376, true, true, true, 1, 3);

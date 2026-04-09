@@ -307,27 +307,44 @@ export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fa
 	const indexArray = new Uint16Array(indexList);
 
 	// 魔法使いに先制されない行動を探す
-	let resultMagician = null;
+	const result = {magician: null, actionsTable: null};
 	for (const magician of actions.magicianList) {
 		if ((!fastMagician) && magician.fast) continue;
 		if (indexArray.some(v => new KssRng(v + magician.advances1).magicianAttacksFirst())) continue;
-		resultMagician = magician;
+		result.magician = magician;
 		break;
 	}
-	if (resultMagician === null) return {magician: null, actionsTable: null};
+	if (result.magician === null) return result;
 
 	// 難易度の低い順に行動を走査
-	let resultActionsTable = null;
+	const bestPartialMatches = [];
+	let bestMatchCount = 0;
 	simulationLoop: for (const actionsTable of actions.list) {
 		// 可能性のある全ての乱数位置で理想的か確認
+		const list = [];
+		let matchCount = 0;
 		for (const index of indexArray) {
 			r.index = index;
-			const sim = r.simulateBattleWindowsMWW(resultMagician, actionsTable, fastKnight, fastDragon, hammerThrow);
-			if (sim.length !== 4) continue simulationLoop;	// 理想的でなければ次の行動へ
+			const sim = r.simulateBattleWindowsMWW(result.magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+			if (sim.length === 4) matchCount++;
+			list.push({ actionsTable, index, sim });
 		}
+
 		// 全乱数位置で理想的なら確定
-		return {magician: resultMagician, actionsTable};
+		if (matchCount === indexArray.length) {
+			result.actionsTable = actionsTable;
+			return result;
+		}
+		// 理想的なのが最多の結果を蓄積
+		if (matchCount >= bestMatchCount) {
+			if (matchCount > bestMatchCount) {
+				bestPartialMatches.length = 0;
+				bestMatchCount = matchCount;
+			}
+			bestPartialMatches.push(list);
+		}
 	}
 
-	return {magician: resultMagician, actionsTable: null};
+	result.actionsTable = bestPartialMatches[0][0].actionsTable;
+	return result;
 }
