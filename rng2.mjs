@@ -248,7 +248,7 @@ export class KssRng {
 
 export class Actions {
 	constructor(t) {
-		const parseAdvances = ({dashes, slides, hammerFlips, stars}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
+		const parseAdvances = ({dashes=0, slides=0, hammerFlips=0, stars=0}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
 		const parseMessage = ({dashes, slides, hammerFlips, stars, advances}) => {
 			const a = [];
 			if (advances !== undefined) {
@@ -260,7 +260,7 @@ export class Actions {
 				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
 				if (stars) a.push(["", "星", "2星"][stars]);
 			}
-			return a.join(" & ");
+			return a.length ? a.join(" & ") : "待機";
 		};
 
 		this.magicianList = t.magician.toSorted((a, b) => a.difficulty - b.difficulty).map(a => {
@@ -270,7 +270,8 @@ export class Actions {
 				advances1: a.advances === undefined ? advances : a.advances,
 				advances2: a.advances === undefined ? 0 : advances - a.advances,
 				fast: a.hammerFlips !== undefined,
-				actions: a
+				actions: a,
+				message: parseMessage(a),
 			};
 		});
 		this.knightList = t.knight.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
@@ -280,7 +281,7 @@ export class Actions {
 		for (const knight of this.knightList) {
 			for (const dragon of this.dragonList) {
 				for (const dragonAction of this.dragonActionList) {
-					a.push({
+					this.list.push({
 						difficulty: knight.difficulty + dragon.difficulty + dragonAction.difficulty,
 						knight, dragon, dragonAction,
 					});
@@ -295,22 +296,26 @@ export class Actions {
  * @param {Actions} actions 難易度が低い順の乱数調整行動全体
  * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
 */
-export function manipulateBattleWindowsMWW(actions, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
+export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
 	const r = new KssRng();
 	// 星の方向が全て一致する乱数位置を探す
 	const indexList = [];
 	for (let i=minIndex; i <= maxIndex; i++) {
 		r.index = i;
-		if (stars.every(v => r.starDirection() === v)) indexList.push(i);
+		if (stars.every(v => r.starDirection() === v)) indexList.push(r.index);
 	}
 	const indexArray = new Uint16Array(indexList);
 
 	// 魔法使いに先制されない行動を探す
 	let resultMagician = null;
 	for (const magician of actions.magicianList) {
+		if ((!fastMagician) && magician.fast) continue;
 		if (indexArray.some(v => new KssRng(v + magician.advances1).magicianAttacksFirst())) continue;
 		resultMagician = magician;
+		break;
 	}
+	if (resultMagician === null) return {magician: null, actionsTable: null};
+
 	// 難易度の低い順に行動を走査
 	let resultActionsTable = null;
 	let minTimeLoss = CYCLE_LEN;

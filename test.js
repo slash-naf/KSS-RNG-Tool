@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, manipulateBattleWindowsMWW } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -166,4 +166,136 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
     console.log(`NGCount: ${NGCount}`)
 }
 
-compareManipulationsAndSimulations(3000, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));
+//compareManipulationsAndSimulations(3000, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));
+
+
+
+
+
+const actionsDifficultyTable = {
+    magician: [
+        { difficulty: -4, hammerFlips: 1, advances: 6 },
+        { difficulty: -3, hammerFlips: 1, advances: 4 },
+        { difficulty: -2, hammerFlips: 1, advances: 2 },
+        { difficulty: -1, hammerFlips: 1, advances: 0 },
+        { difficulty: 0 },
+        { difficulty: 201, slides: 1, advances: 4 },
+        { difficulty: 202, dashes: 2 },
+        { difficulty: 203, dashes: 3 },
+        { difficulty: 204, slides: 1, advances: 5 },
+        { difficulty: 205, dashes: 1 },
+    ],
+    knight: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 2, hammerFlips: 1 },
+        { difficulty: 3, slides: 1 },
+        { difficulty: 11, stars: 2 },
+        { difficulty: 12, hammerFlips: 2 },
+        { difficulty: 13, slides: 2 },
+        { difficulty: 21, hammerFlips: 1, stars: 1 },
+        { difficulty: 22, slides: 1, stars: 1 },
+        { difficulty: 23, slides: 1, hammerFlips: 1 },
+        { difficulty: 24, dashes: 3 },
+        { difficulty: 41, dashes: 3, stars: 1 },
+        { difficulty: 42, dashes: 3, hammerFlips: 1 },
+        { difficulty: 43, dashes: 3, slides: 1 },
+    ],
+    dragon: [
+        { difficulty: 0 },
+        { difficulty: 4, stars: 1 },
+        { difficulty: 5, slides: 1 },
+        { difficulty: 16, stars: 2 },
+        { difficulty: 17, slides: 2 },
+        { difficulty: 31, slides: 1, stars: 1 },
+        { difficulty: 32, dashes: 3 },
+        { difficulty: 51, dashes: 3, stars: 1 },
+        { difficulty: 52, dashes: 3, slides: 1 },
+    ],
+    dragonAction: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 1, hammerFlips: 1 },
+        { difficulty: 1, slides: 1 },
+        { difficulty: 1, dashes: 3 },
+        { difficulty: 6, dashes: 2, stars: 1 },
+        { difficulty: 7, dashes: 2, slides: 1 },
+        { difficulty: 8, dashes: 2, hammerFlips: 1 },
+    ],
+};
+const actions = new Actions(actionsDifficultyTable);
+function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars){
+    console.log("# testNewManipulation");
+
+    let magicianNGCount = 0;
+    let otherNGCount = 0;
+    let wrongCount = 0;
+    let dragonStarCount = 0;
+
+    let magicianCountList = {};
+    let knightCountList = {};
+    let dragonCountList = {};
+    let dragonActionCountList = {};
+
+    for (let i=startIdx; i <= endIdx; i++) {
+        const r = new KssRng(i);
+
+        const starsList = [];
+        for (let i=0; i < stars; i++) {
+            starsList.push(r.starDirection());
+        }
+
+        const {magician, actionsTable} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+
+        if (magician === null) {
+            magicianNGCount++;
+            continue;
+        }
+        if (actionsTable === null) {
+            otherNGCount++;
+            continue;
+        }
+
+        const result = r.simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+        if (result === null) wrongCount++;
+
+        if (result.dragonAction === DragonStar) dragonStarCount++;
+
+        // メッセージ集計
+        const magicianMsg = magician.message;
+        magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
+
+        const knightMsg = actionsTable.knight.message;
+        knightCountList[knightMsg] = (knightCountList[knightMsg] || 0) + 1;
+
+        const dragonMsg = actionsTable.dragon.message;
+        dragonCountList[dragonMsg] = (dragonCountList[dragonMsg] || 0) + 1;
+
+        const dragonActionMsg = actionsTable.dragonAction.message;
+        dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
+    }
+
+    console.log('magicianNGCount: '+ magicianNGCount);
+    console.log('otherNGCount: '+ otherNGCount);
+    console.log('wrongCount: '+ wrongCount);
+    console.log('dragonStarCount: '+ dragonStarCount);
+
+    console.log("## magicianCountList");
+    for (let [message, val] of Object.entries(magicianCountList)) {
+        console.log(message +': '+ val);
+    }
+    console.log("## knightCountList");
+    for (let [message, val] of Object.entries(knightCountList)) {
+        console.log(message +': '+ val);
+    }
+    console.log("## dragonCountList");
+    for (let [message, val] of Object.entries(dragonCountList)) {
+        console.log(message +': '+ val);
+    }
+    console.log("## dragonActionCountList");
+    for (let [message, val] of Object.entries(dragonActionCountList)) {
+        console.log(message +': '+ val);
+    }
+}
+
+testNewManipulation(3100, 3400, true, true, true, 1, 3);
