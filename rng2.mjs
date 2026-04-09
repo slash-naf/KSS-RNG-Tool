@@ -239,6 +239,7 @@ export class KssRng {
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
+		if (dragonAction !== DragonGuard) return result;
 		result.push({ dragonAction, index: this.index });
 
 		return result;
@@ -297,6 +298,7 @@ export class Actions {
 */
 export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars) {
 	const r = new KssRng();
+
 	// 星の方向が全て一致する乱数位置を探す
 	const indexList = [];
 	for (let i=minIndex; i <= maxIndex; i++) {
@@ -305,44 +307,95 @@ export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fa
 	}
 	const indexArray = new Uint16Array(indexList);
 
-	// 走査するFastモードの組み合わせ
-	const fastTable = [{ fastKnight, fastDragon }];
-	if (fastKnight) fastTable.push({ fastKnight: false, fastDragon });
-	if (fastDragon) fastTable.push({ fastKnight, fastDragon: false });
-	if (fastKnight && fastDragon) fastTable.push({ fastKnight: false, fastDragon: false });
-
+	// 魔法使いに先制されない行動を探す
+	const result = {magician: null, actionsTable: null, knightStarDirection: null, fallbackActionsTable: null};
 	const magicianList = actions.magicianList.filter(magician => (fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
+	if (magicianList.length === 0) return result;
 
-	let bestCount = 0;
-	let result = {magician: null, actionsTable: null, fastKnight, fastDragon};
-	for (const { fastKnight, fastDragon } of fastTable) {
-		// レッドドラゴンの行動
-		for (const dragonAction of [DragonGuard, DragonStar]) {
-			// 魔法使いに先制されない行動に絞る
-			for (const magician of magicianList) {
-				// 難易度の低い順に行動を走査
-				for (const actionsTable of actions.list) {
-					// 可能性のある全ての乱数位置で理想的か確認
-					let count = 0;
-					for (const index of indexArray) {
-						r.index = index;
-						const sim = r.simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
-						if (sim.length === 4 && sim[3].dragonAction === dragonAction) count++;
-					}
-					if (count > bestCount) {
-						bestCount = count;
-						result = {magician, actionsTable, fastKnight, fastDragon};
-						if (count === indexArray.length) return result;
-					}
+	let bestMatchResult = {magician: null, actionsTable: null, knightStarDirection: null, fallbackActionsTable: null};
+	let bestMatchCountAll = 0;
+	for (const magician of magicianList) {
+		result.magician = magician;
+
+		// 難易度の低い順に行動を走査
+		const bestPartialMatches = [];
+		let bestMatchCount = 0;
+		for (const actionsTable of actions.list) {
+			// 可能性のある全ての乱数位置で理想的か確認
+			const list = [];
+			let matchCount = 0;
+			for (const index of indexArray) {
+				r.index = index;
+				const sim = r.simulateBattleWindowsMWW(result.magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+				if (sim.length === 4) matchCount++;
+				list.push({ actionsTable, index, sim });
+			}
+
+			// 全乱数位置で理想的なら確定
+			if (matchCount === indexArray.length) {
+				result.actionsTable = actionsTable;
+				return result;
+			}
+			// 理想的なのが最多の結果を蓄積
+			if (matchCount >= bestMatchCount) {
+				if (matchCount > bestMatchCount) {
+					bestPartialMatches.length = 0;
+					bestMatchCount = matchCount;
+				}
+				bestPartialMatches.push(list);
+			}
+		}
+
+		// 全ての可能性に対応するものがなかった場合、最初に星を出して向きを確認したいので、悪魔の騎士前の調整で星を出すパターンを選ぶ
+		// また、理想的でない結果になる乱数位置の星の向きがすべて一致して、他の乱数位置ではそれと一致するものが一つもないパターンを選ぶ
+		// その星の向きだった時にすべき行動と、そうでない場合にすべき行動を両方を決める
+		for (const list of bestPartialMatches) {
+			const actionsTable = list[0].actionsTable;
+			if (!actionsTable.knight.actions.stars) continue;	// 乱数調整で星を出すか
+
+			// 悪魔の騎士前の星の向きを取得し、成功/失敗に分類
+			const withStarDir = list.map(entry => {
+				if (entry.sim.length === 0) return { ...entry, starDir: -1 };
+				const starRng = new KssRng(entry.sim[0].index);
+				return { ...entry, starDir: starRng.starDirection() };
+			});
+			const matched   = withStarDir.filter(e => e.sim.length === 4);
+			const unmatched = withStarDir.filter(e => e.sim.length < 4);
+			if (unmatched.length === 0 || matched.length === 0) continue;
+
+			// 失敗乱数位置の星の向きが全て同一か、成功乱数位置にその向きが含まれていないか
+			const failDir = unmatched[0].starDir;
+			if (failDir === -1 || unmatched.some(e => e.starDir !== failDir)) continue;
+			if (matched.some(e => e.starDir === failDir)) continue;
+
+			// 星による分岐が有効。失敗乱数位置群に対して機能するactionsTableを探す
+			const failIndices = unmatched.map(e => e.index);
+			for (const altActionsTable of actions.list) {
+				// 星は既に消費済みなので、悪魔の騎士の調整に星を含むactionsTableのみ対象
+				if (!altActionsTable.knight.actions.stars) continue;
+				let allMatch = true;
+				for (const index of failIndices) {
+					r.index = index;
+					const sim = r.simulateBattleWindowsMWW(result.magician, altActionsTable, fastKnight, fastDragon, hammerThrow);
+					if (sim.length !== 4) { allMatch = false; break; }
+				}
+				if (allMatch) {
+					// 星の向きに応じた2パターンの行動を返す
+					result.actionsTable = actionsTable;
+					result.knightStarDirection = failDir;
+					result.fallbackActionsTable = altActionsTable;
+					return result;
 				}
 			}
 		}
+
+		if (bestMatchCount > bestMatchCountAll) {
+			bestMatchCountAll = bestMatchCount;
+			bestMatchResult.magician = magician;
+			bestMatchResult.actionsTable = bestPartialMatches[0][0].actionsTable;
+		}
 	}
-	for (const index of indexArray) {
-		r.index = index;
-		const sim = r.simulateBattleWindowsMWW(result.magician, result.actionsTable, result.fastKnight, result.fastDragon, hammerThrow);
-		console.log(index, sim)
-	}
-	console.log(result)
-	return result;
+
+	// 星分岐でも解決しない場合は最良の部分一致を返す
+	return bestMatchResult;
 }
