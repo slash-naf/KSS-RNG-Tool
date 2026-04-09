@@ -228,15 +228,15 @@ const actions = new Actions(actionsDifficultyTable);
 function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars){
     console.log("# testNewManipulation");
 
-    let magicianNGCount = 0;
-    let otherNGCount = 0;
+    let NGCount = 0;
     let wrongCount = 0;
-    let knightStarCount = 0;
 
     let magicianCountList = {};
     let knightCountList = {};
     let dragonCountList = {};
     let dragonActionCountList = {};
+
+    const dragonActsCountList = {};
 
     for (let i=startIdx; i <= endIdx; i++) {
         const r = new KssRng(i);
@@ -246,28 +246,19 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             starsList.push(r.starDirection());
         }
 
-        const {magician, actionsTable, knightStarDirection, fallbackActionsTable} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+        const a = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+        const magician = a.magician;
+        const actionsTable = a.actionsTable;
 
-        if (magician === null) {
-            magicianNGCount++;
-            continue;
-        }
         if (actionsTable === null) {
-            otherNGCount++;
+            NGCount++;
             continue;
         }
 
-        const k = new KssRng(
-            new KssRng(r.index).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow)[0].index
-        ).starDirection();
-        let t = actionsTable;
-        if (fallbackActionsTable !== null && fallbackActionsTable !== undefined && knightStarDirection === k) {
-            t = fallbackActionsTable;
-            knightStarCount++;
-        }
-
-        const result = r.simulateBattleWindowsMWW(magician, t, fastKnight, fastDragon, hammerThrow);
+        const result = r.simulateBattleWindowsMWW(magician, actionsTable, a.fastKnight, a.fastDragon, hammerThrow);
         if (result.length !== 4) { wrongCount++; continue; }
+
+        dragonActsCountList[result[3].dragonAction] = (dragonActsCountList[result[3].dragonAction] || 0) + 1;
 
         // メッセージ集計
         const magicianMsg = magician.message;
@@ -283,10 +274,10 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
         dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
     }
 
-    console.log('magicianNGCount: '+ magicianNGCount);
-    console.log('otherNGCount: '+ otherNGCount);
+    console.log(dragonActsCountList);
+
+    console.log('NGCount: '+ NGCount);
     console.log('wrongCount: '+ wrongCount);
-    console.log('knightStarCount: '+ knightStarCount);
 
     console.log("## magicianCountList");
     for (let [message, val] of Object.entries(magicianCountList)) {
