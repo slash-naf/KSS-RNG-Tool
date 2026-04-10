@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, BranchTypes, manipulateBattleWindowsMWW } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, BranchTypes, BattleWindowsMWWManipulator } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -173,60 +173,13 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
 
 
 
-const actionsDifficultyTable = {
-    magician: [
-        { difficulty: -4, hammerFlips: 1, advances: 6 },
-        { difficulty: -3, hammerFlips: 1, advances: 4 },
-        { difficulty: -2, hammerFlips: 1, advances: 2 },
-        { difficulty: -1, hammerFlips: 1, advances: 0 },
-        { difficulty: 0 },
-        { difficulty: 201, slides: 1, advances: 4 },
-        { difficulty: 202, dashes: 2 },
-        { difficulty: 203, dashes: 3 },
-        { difficulty: 204, slides: 1, advances: 5 },
-        { difficulty: 205, dashes: 1 },
-    ],
-    knight: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 2, hammerFlips: 1 },
-        { difficulty: 3, slides: 1 },
-        { difficulty: 11, stars: 2 },
-        { difficulty: 12, hammerFlips: 2 },
-        { difficulty: 13, slides: 2 },
-        { difficulty: 21, hammerFlips: 1, stars: 1 },
-        { difficulty: 22, slides: 1, stars: 1 },
-        { difficulty: 23, slides: 1, hammerFlips: 1 },
-        { difficulty: 24, dashes: 3 },
-        { difficulty: 41, dashes: 3, stars: 1 },
-        { difficulty: 42, dashes: 3, hammerFlips: 1 },
-        { difficulty: 43, dashes: 3, slides: 1 },
-    ],
-    dragon: [
-        { difficulty: 0 },
-        { difficulty: 4, stars: 1 },
-        { difficulty: 5, slides: 1 },
-        { difficulty: 16, stars: 2 },
-        { difficulty: 17, slides: 2 },
-        { difficulty: 31, slides: 1, stars: 1 },
-        { difficulty: 32, dashes: 3 },
-        { difficulty: 51, dashes: 3, stars: 1 },
-        { difficulty: 52, dashes: 3, slides: 1 },
-    ],
-    dragonAction: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 1, hammerFlips: 1 },
-        { difficulty: 1, slides: 1 },
-        { difficulty: 1, dashes: 3 },
-        { difficulty: 6, dashes: 2, stars: 1 },
-        { difficulty: 7, dashes: 2, slides: 1 },
-        { difficulty: 8, dashes: 2, hammerFlips: 1 },
-    ],
-};
-const actions = new Actions(actionsDifficultyTable);
 function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars){
     console.log("# testNewManipulation");
+
+    const manipulator = new BattleWindowsMWWManipulator({
+        fastMagician, fastKnight, fastDragon, hammerThrow,
+        minIndex: startIdx, maxIndex: endIdx
+    });
 
     let magicianNGCount = 0;
     let otherNGCount = 0;
@@ -246,7 +199,7 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             starsList.push(r.starDirection());
         }
 
-        const {magician, actionsTable, branch} = manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, startIdx, endIdx, starsList);
+        const {magician, actionsTable, branch} = manipulator.manipulate(starsList);
 
         if (magician === null) {
             magicianNGCount++;

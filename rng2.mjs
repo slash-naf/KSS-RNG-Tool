@@ -200,7 +200,7 @@ export class KssRng {
 			magicianPowers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		result.push({ powers: magicianPowers, index: this.index });
+		result.push({ powers: magicianPowers });
 
 		// --- 悪魔の騎士 ---
 		let knightPowers;
@@ -218,7 +218,7 @@ export class KssRng {
 		this.advance(hammerThrow);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
-		result.push({ powers: knightPowers, index: this.index });
+		result.push({ powers: knightPowers });
 
 		// --- レッドドラゴン ---
 		let dragonPowers;
@@ -234,13 +234,13 @@ export class KssRng {
 			this.hammerFlipChargeAndHit();
 		}
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
-		result.push({ powers: dragonPowers, index: this.index });
+		result.push({ powers: dragonPowers });
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
 		if (dragonAction !== DragonGuard) return result;
-		result.push({ dragonAction, index: this.index });
+		result.push({ dragonAction });
 
 		return result;
 	}
@@ -291,6 +291,58 @@ export class Actions {
 		this.list.sort((a, b) => a.difficulty - b.difficulty);
 	}
 }
+
+export const DefaultActionsDifficultyTable = {
+    magician: [
+        { difficulty: -4, hammerFlips: 1, advances: 6 },
+        { difficulty: -3, hammerFlips: 1, advances: 4 },
+        { difficulty: -2, hammerFlips: 1, advances: 2 },
+        { difficulty: -1, hammerFlips: 1, advances: 0 },
+        { difficulty: 0 },
+        { difficulty: 201, slides: 1, advances: 4 },
+        { difficulty: 202, dashes: 2 },
+        { difficulty: 203, dashes: 3 },
+        { difficulty: 204, slides: 1, advances: 5 },
+        { difficulty: 205, dashes: 1 },
+    ],
+    knight: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 2, hammerFlips: 1 },
+        { difficulty: 3, slides: 1 },
+        { difficulty: 11, stars: 2 },
+        { difficulty: 12, hammerFlips: 2 },
+        { difficulty: 13, slides: 2 },
+        { difficulty: 21, hammerFlips: 1, stars: 1 },
+        { difficulty: 22, slides: 1, stars: 1 },
+        { difficulty: 23, slides: 1, hammerFlips: 1 },
+        { difficulty: 24, dashes: 3 },
+        { difficulty: 41, dashes: 3, stars: 1 },
+        { difficulty: 42, dashes: 3, hammerFlips: 1 },
+        { difficulty: 43, dashes: 3, slides: 1 },
+    ],
+    dragon: [
+        { difficulty: 0 },
+        { difficulty: 4, stars: 1 },
+        { difficulty: 5, slides: 1 },
+        { difficulty: 16, stars: 2 },
+        { difficulty: 17, slides: 2 },
+        { difficulty: 31, slides: 1, stars: 1 },
+        { difficulty: 32, dashes: 3 },
+        { difficulty: 51, dashes: 3, stars: 1 },
+        { difficulty: 52, dashes: 3, slides: 1 },
+    ],
+    dragonAction: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 1, hammerFlips: 1 },
+        { difficulty: 1, slides: 1 },
+        { difficulty: 1, dashes: 3 },
+        { difficulty: 6, dashes: 2, stars: 1 },
+        { difficulty: 7, dashes: 2, slides: 1 },
+        { difficulty: 8, dashes: 2, hammerFlips: 1 },
+    ],
+};
 
 // --- 分岐方式の定義 ---
 // 完全一致するactionsTableがない場合、途中で観測できる値に基づいて行動を分岐する
@@ -374,115 +426,135 @@ export const BranchTypes = {
 
 export const DefaultBranchPriorities = ['dragonPowerLeft', 'knightPowerLeft'];
 
-/** 部分一致候補から分岐方式を適用して解を探す */
-function tryBranch(branchTypeName, bestPartialMatches, actionsList, r, magician, fastKnight, fastDragon, hammerThrow) {
-	const bt = BranchTypes[branchTypeName];
-	if (!bt) return null;
-
-	for (const list of bestPartialMatches) {
-		const actionsTable = list[0].actionsTable;
-		if (!bt.filterPrimary(actionsTable)) continue;
-
-		const matched   = list.filter(e => e.sim.length === 4);
-		const unmatched = list.filter(e => e.sim.length < 4);
-		if (unmatched.length === 0 || matched.length === 0) continue;
-
-		// 失敗エントリのsim長が分岐に必要な長さに満たない場合はスキップ
-		if (unmatched.some(e => e.sim.length < bt.minSimLength)) continue;
-
-		// 失敗エントリの観測値が全て同一で、成功エントリにその値がないか確認
-		const failObs = bt.getObservable(unmatched[0]);
-		if (unmatched.some(e => bt.getObservable(e) !== failObs)) continue;
-		if (matched.some(e => bt.getObservable(e) === failObs)) continue;
-
-		// 失敗インデックス群に対して機能するactionsTableを探す
-		const failIndices = unmatched.map(e => e.index);
-		for (const altActionsTable of actionsList) {
-			if (!bt.filterFallback(actionsTable, altActionsTable)) continue;
-			let allMatch = true;
-			for (const index of failIndices) {
-				r.index = index;
-				const sim = r.simulateBattleWindowsMWW(magician, altActionsTable, fastKnight, fastDragon, hammerThrow);
-				if (sim.length !== 4) { allMatch = false; break; }
-			}
-			if (allMatch) {
-				return {
-					actionsTable,
-					branch: { type: branchTypeName, value: failObs, fallbackActionsTable: altActionsTable },
-				};
-			}
-		}
+export class BattleWindowsMWWManipulator {
+	constructor({
+		actionsTable = DefaultActionsDifficultyTable,
+		fastMagician = true,
+		fastKnight = true,
+		fastDragon = true,
+		hammerThrow = 1,
+		minIndex = 3000,
+		maxIndex = 3500,
+		branchPriorities = DefaultBranchPriorities
+	} = {}) {
+		this.actions = actionsTable instanceof Actions ? actionsTable : new Actions(actionsTable);
+		this.fastMagician = fastMagician;
+		this.fastKnight = fastKnight;
+		this.fastDragon = fastDragon;
+		this.hammerThrow = hammerThrow;
+		this.minIndex = minIndex;
+		this.maxIndex = maxIndex;
+		this.branchPriorities = branchPriorities;
 	}
-	return null;
-}
 
-/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
- * @param {Actions} actions 難易度が低い順の乱数調整行動全体
- * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
- * @param {Array<string>} branchPriorities 完全一致しない場合に試す分岐方式の優先順位
-*/
-export function manipulateBattleWindowsMWW(actions, fastMagician, fastKnight, fastDragon, hammerThrow, minIndex, maxIndex, stars, branchPriorities = DefaultBranchPriorities) {
-	const r = new KssRng();
+	/** 部分一致候補から分岐方式を適用して解を探す */
+	_tryBranch(branchTypeName, bestPartialMatches, r, magician) {
+		const bt = BranchTypes[branchTypeName];
+		if (!bt) return null;
 
-	// 星の方向が全て一致する乱数位置を探す
-	const indexList = [];
-	for (let i=minIndex; i <= maxIndex; i++) {
-		r.index = i;
-		if (stars.every(v => r.starDirection() === v)) indexList.push(r.index);
-	}
-	const indexArray = new Uint16Array(indexList);
+		for (const list of bestPartialMatches) {
+			const actionsTable = list[0].actionsTable;
+			if (!bt.filterPrimary(actionsTable)) continue;
 
-	// 魔法使いに先制されない行動を探す
-	const emptyResult = { magician: null, actionsTable: null, branch: null };
-	const magicianList = actions.magicianList.filter(magician => (fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
-	if (magicianList.length === 0) return emptyResult;
+			const matched   = list.filter(e => e.sim.length === 4);
+			const unmatched = list.filter(e => e.sim.length < 4);
+			if (unmatched.length === 0 || matched.length === 0) continue;
 
-	let bestPartialResult = { ...emptyResult };
-	let bestMatchCountAll = 0;
-	for (const magician of magicianList) {
+			// 失敗エントリのsim長が分岐に必要な長さに満たない場合はスキップ
+			if (unmatched.some(e => e.sim.length < bt.minSimLength)) continue;
 
-		// 難易度の低い順に行動を走査
-		const bestPartialMatches = [];
-		let bestMatchCount = 0;
-		for (const actionsTable of actions.list) {
-			// 可能性のある全ての乱数位置で理想的か確認
-			const list = [];
-			let matchCount = 0;
-			for (const index of indexArray) {
-				r.index = index;
-				const sim = r.simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
-				if (sim.length === 4) matchCount++;
-				list.push({ actionsTable, index, sim });
-			}
+			// 失敗エントリの観測値が全て同一で、成功エントリにその値がないか確認
+			const failObs = bt.getObservable(unmatched[0]);
+			if (unmatched.some(e => bt.getObservable(e) !== failObs)) continue;
+			if (matched.some(e => bt.getObservable(e) === failObs)) continue;
 
-			// 全乱数位置で理想的なら確定
-			if (matchCount === indexArray.length) {
-				return { magician, actionsTable, branch: null };
-			}
-			// 理想的なのが最多の結果を蓄積
-			if (matchCount >= bestMatchCount) {
-				if (matchCount > bestMatchCount) {
-					bestPartialMatches.length = 0;
-					bestMatchCount = matchCount;
+			// 失敗インデックス群に対して機能するactionsTableを探す
+			const failIndices = unmatched.map(e => e.index);
+			for (const altActionsTable of this.actions.list) {
+				if (!bt.filterFallback(actionsTable, altActionsTable)) continue;
+				let allMatch = true;
+				for (const index of failIndices) {
+					r.index = index;
+					const sim = r.simulateBattleWindowsMWW(magician, altActionsTable, this.fastKnight, this.fastDragon, this.hammerThrow);
+					if (sim.length !== 4) { allMatch = false; break; }
 				}
-				bestPartialMatches.push(list);
+				if (allMatch) {
+					return {
+						actionsTable,
+						branch: { type: branchTypeName, value: failObs, fallbackActionsTable: altActionsTable },
+					};
+				}
 			}
 		}
-
-		// 分岐方式を優先度順に試す
-		for (const branchTypeName of branchPriorities) {
-			const branchResult = tryBranch(branchTypeName, bestPartialMatches, actions.list, r, magician, fastKnight, fastDragon, hammerThrow);
-			if (branchResult) {
-				return { magician, actionsTable: branchResult.actionsTable, branch: branchResult.branch };
-			}
-		}
-
-		// 最良の部分一致を記録
-		if (bestMatchCount > bestMatchCountAll) {
-			bestMatchCountAll = bestMatchCount;
-			bestPartialResult = { magician, actionsTable: bestPartialMatches[0]?.[0]?.actionsTable ?? null, branch: null };
-		}
+		return null;
 	}
 
-	return bestPartialResult;
+	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
+	 * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
+	*/
+	manipulate(stars) {
+		const r = new KssRng();
+
+		// 星の方向が全て一致する乱数位置を探す
+		const indexList = [];
+		for (let i = this.minIndex; i <= this.maxIndex; i++) {
+			r.index = i;
+			if (stars.every(v => r.starDirection() === v)) indexList.push(r.index);
+		}
+		const indexArray = new Uint16Array(indexList);
+
+		// 魔法使いに先制されない行動を探す
+		const emptyResult = { magician: null, actionsTable: null, branch: null };
+		const magicianList = this.actions.magicianList.filter(magician => (this.fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
+		if (magicianList.length === 0) return emptyResult;
+
+		let bestPartialResult = { ...emptyResult };
+		let bestMatchCountAll = 0;
+		for (const magician of magicianList) {
+
+			// 難易度の低い順に行動を走査
+			const bestPartialMatches = [];
+			let bestMatchCount = 0;
+			for (const actionsTable of this.actions.list) {
+				// 可能性のある全ての乱数位置で理想的か確認
+				const list = [];
+				let matchCount = 0;
+				for (const index of indexArray) {
+					r.index = index;
+					const sim = r.simulateBattleWindowsMWW(magician, actionsTable, this.fastKnight, this.fastDragon, this.hammerThrow);
+					if (sim.length === 4) matchCount++;
+					list.push({ actionsTable, index, sim });
+				}
+
+				// 全乱数位置で理想的なら確定
+				if (matchCount === indexArray.length) {
+					return { magician, actionsTable, branch: null };
+				}
+				// 理想的なのが最多の結果を蓄積
+				if (matchCount >= bestMatchCount) {
+					if (matchCount > bestMatchCount) {
+						bestPartialMatches.length = 0;
+						bestMatchCount = matchCount;
+					}
+					bestPartialMatches.push(list);
+				}
+			}
+
+			// 分岐方式を優先度順に試す
+			for (const branchTypeName of this.branchPriorities) {
+				const branchResult = this._tryBranch(branchTypeName, bestPartialMatches, r, magician);
+				if (branchResult) {
+					return { magician, actionsTable: branchResult.actionsTable, branch: branchResult.branch };
+				}
+			}
+
+			// 最良の部分一致を記録
+			if (bestMatchCount > bestMatchCountAll) {
+				bestMatchCountAll = bestMatchCount;
+				bestPartialResult = { magician, actionsTable: bestPartialMatches[0]?.[0]?.actionsTable ?? null, branch: null };
+			}
+		}
+
+		return bestPartialResult;
+	}
 }
