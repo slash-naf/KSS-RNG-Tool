@@ -178,69 +178,65 @@ export class KssRng {
 		return { left, right };
 	}
 
-	/** 銀河に願いをのバトルウィンドウズ戦をシミュレートし、理想的な乱数ならその結果を、そうでなければnullを返す
+	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
+	 * @returns {Array<{left, right}>} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4になる
 	*/
 	simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow) {
 		const result = [];
 
 		// --- 魔法使い ---
-		let magicianPowers;
 		if (magician.fast) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastMagician(magician.advances1)) return result;
-			magicianPowers = this.hammerFlipHitForFastMagician(magician.advances1 === 6);
+			const hardHitFirst = magician.advances1 >= 6;
+			result.push(this.hammerFlipHitForFastMagician(hardHitFirst));
 		} else {
 			// Easyモード
 			this.advance(magician.advances1);
 			if (this.magicianAttacksFirst()) return result;
 			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
-			magicianPowers = this.battleWindowsPowers();
+			result.push(this.battleWindowsPowers());
 			this.hammerFlipChargeAndHit();
 		}
-		result.push({ powers: magicianPowers });
 
 		// --- 悪魔の騎士 ---
-		let knightPowers;
 		this.advance(actionsTable.knight.advances);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return result;
-			knightPowers = this.hammerFlipHitForFastBattleWindowsPowers();
+			result.push(this.hammerFlipHitForFastBattleWindowsPowers());
 		} else {
 			// Easyモード
 			if (this.knightAttacksFirst()) return result;
-			knightPowers = this.battleWindowsPowers();
+			result.push(this.battleWindowsPowers());
 			this.hammerFlipChargeAndHit();
 		}
 		this.advance(hammerThrow);    // ハンマー投げのダッシュ
 		this.hammerHit();    // ハンマー投げのスイングのヒット
 		this.hammerHit();    // ハンマー投げのヒット
-		result.push({ powers: knightPowers });
 
 		// --- レッドドラゴン ---
-		let dragonPowers;
 		this.advance(actionsTable.dragon.advances);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return result;
-			dragonPowers = this.hammerFlipHitForFastBattleWindowsPowers();
+			result.push(this.hammerFlipHitForFastBattleWindowsPowers());
 		} else {
 			// Easyモード
 			if (this.dragonAttacksFirst()) return result;
-			dragonPowers = this.battleWindowsPowers();
+			result.push(this.battleWindowsPowers());
 			this.hammerFlipChargeAndHit();
 		}
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
-		result.push({ powers: dragonPowers });
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionsTable.dragonAction.advances);
 		const dragonAction = this.dragonActs();
 		if (dragonAction !== DragonGuard) return result;
-		result.push({ dragonAction });
+		result.push(this.battleWindowsPowers());
 
 		return result;
 	}
@@ -345,83 +341,28 @@ export const DefaultActionsDifficultyTable = {
 };
 
 // --- 分岐方式の定義 ---
-// 完全一致するactionsTableがない場合、途中で観測できる値に基づいて行動を分岐する
-// 各方式は以下のプロパティを持つ:
-//   getObservable(entry): sim結果から観測値を取得
-//   minSimLength: 観測に必要な最小sim長 (magician後=1, knight後=2, dragon後=3)
-//   filterPrimary(actionsTable): 主actionsTableの制約
-//   filterFallback(primary, alt): fallback actionsTableの制約
+const obsLeft = s => s.left;
+const obsRight = s => s.right;
+const obsPowers = s => s.left * BattleWindowsPowerMap.length + s.right;
+const createBranchType = (simIndex, observableFn) => ({
+	getObservable: e => observableFn(e.sim[simIndex]),
+	minSimLength: simIndex + 1,
+	filterFallback: [
+		() => true,
+		(p, a) => p.knight.advances === a.knight.advances,
+		(p, a) => p.knight.advances === a.knight.advances && p.dragon.advances === a.dragon.advances
+	][simIndex]
+});
 export const BranchTypes = {
-	knightStar: {
-		// 悪魔の騎士前の星の向き
-		getObservable: entry => new KssRng(entry.sim[0].index).starDirection(),
-		minSimLength: 1,
-		filterPrimary: at => at.knight.actions.stars >= 1,
-		filterFallback: (_primary, alt) => alt.knight.actions.stars >= 1,
-	},
-	magicianPowerLeft: {
-		// 魔法使いの左コピーの元
-		getObservable: entry => entry.sim[0].powers.left,
-		minSimLength: 1,
-		filterPrimary: () => true,
-		filterFallback: () => true,
-	},
-	magicianPowerRight: {
-		// 魔法使いの右コピーの元
-		getObservable: entry => entry.sim[0].powers.right,
-		minSimLength: 1,
-		filterPrimary: () => true,
-		filterFallback: () => true,
-	},
-	magicianPowers: {
-		// 魔法使いの左右コピーの元の組み合わせ
-		getObservable: entry => entry.sim[0].powers.left * 25 + entry.sim[0].powers.right,
-		minSimLength: 1,
-		filterPrimary: () => true,
-		filterFallback: () => true,
-	},
-	knightPowerLeft: {
-		// 悪魔の騎士の左コピーの元
-		getObservable: entry => entry.sim[1].powers.left,
-		minSimLength: 2,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances,
-	},
-	knightPowerRight: {
-		// 悪魔の騎士の右コピーの元
-		getObservable: entry => entry.sim[1].powers.right,
-		minSimLength: 2,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances,
-	},
-	knightPowers: {
-		// 悪魔の騎士の左右コピーの元の組み合わせ
-		getObservable: entry => entry.sim[1].powers.left * 25 + entry.sim[1].powers.right,
-		minSimLength: 2,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances,
-	},
-	dragonPowerLeft: {
-		// レッドドラゴンの左コピーの元
-		getObservable: entry => entry.sim[2].powers.left,
-		minSimLength: 3,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances && primary.dragon.advances === alt.dragon.advances,
-	},
-	dragonPowerRight: {
-		// レッドドラゴンの右コピーの元
-		getObservable: entry => entry.sim[2].powers.right,
-		minSimLength: 3,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances && primary.dragon.advances === alt.dragon.advances,
-	},
-	dragonPowers: {
-		// レッドドラゴンの左右コピーの元の組み合わせ
-		getObservable: entry => entry.sim[2].powers.left * 25 + entry.sim[2].powers.right,
-		minSimLength: 3,
-		filterPrimary: () => true,
-		filterFallback: (primary, alt) => primary.knight.advances === alt.knight.advances && primary.dragon.advances === alt.dragon.advances,
-	},
+	magicianPowerLeft:  createBranchType(0, obsLeft),
+	magicianPowerRight: createBranchType(0, obsRight),
+	magicianPowers:     createBranchType(0, obsPowers),
+	knightPowerLeft:    createBranchType(1, obsLeft),
+	knightPowerRight:   createBranchType(1, obsRight),
+	knightPowers:       createBranchType(1, obsPowers),
+	dragonPowerLeft:    createBranchType(2, obsLeft),
+	dragonPowerRight:   createBranchType(2, obsRight),
+	dragonPowers:       createBranchType(2, obsPowers),
 };
 
 export const DefaultBranchPriorities = ['dragonPowerLeft', 'knightPowerLeft'];
@@ -453,9 +394,6 @@ export class BattleWindowsMWWManipulator {
 		if (!bt) return null;
 
 		for (const list of bestPartialMatches) {
-			const actionsTable = list[0].actionsTable;
-			if (!bt.filterPrimary(actionsTable)) continue;
-
 			const matched   = list.filter(e => e.sim.length === 4);
 			const unmatched = list.filter(e => e.sim.length < 4);
 			if (unmatched.length === 0 || matched.length === 0) continue;
@@ -469,6 +407,7 @@ export class BattleWindowsMWWManipulator {
 			if (matched.some(e => bt.getObservable(e) === failObs)) continue;
 
 			// 失敗インデックス群に対して機能するactionsTableを探す
+			const actionsTable = list[0].actionsTable;
 			const failIndices = unmatched.map(e => e.index);
 			for (const altActionsTable of this.actions.list) {
 				if (!bt.filterFallback(actionsTable, altActionsTable)) continue;
