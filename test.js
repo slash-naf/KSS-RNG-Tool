@@ -173,7 +173,7 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
 
 
 
-function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastDragon, hammerThrow, stars, branchPriorities){
+export function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastDragon, hammerThrow, stars){
     console.log("## 設定");
     console.log("魔法使い: " + (fastMagician ? "Fast" : "Easy"));
     console.log("悪魔の騎士: " + (fastKnight ? "Fast" : "Easy"));
@@ -184,7 +184,7 @@ function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastD
 
     const manipulator = new BattleWindowsMWWManipulator({
         fastMagician, fastKnight, fastDragon, hammerThrow,
-        minIndex, maxIndex, branchPriorities
+        minIndex, maxIndex
     });
 
     const result = manipulator.test(stars, true);
@@ -215,4 +215,6 @@ function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastD
     for (let [message, val] of Object.entries(result.dragonActionCountList)) console.log(message +': '+ val);
 }
 
-testNewManipulation(3100, 3376, true, true, true, 1, 3);
+if (typeof window === 'undefined') {
+    testNewManipulation(3100, 3376, true, true, true, 1, 3);
+}

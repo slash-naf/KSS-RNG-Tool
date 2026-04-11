@@ -47,18 +47,23 @@ export class KssRng {
 	 * @param {*} [result]
 	 * @param {string|Function} [details]
 	 */
-	debugLog(actionName, result, details) {
+	debugLog(actionName="", result="", details="") {
 		if (this.debug) {
 			let msg = "";
 			if (typeof details === "function") {
 				msg = details(result);
-			} else if (details !== undefined) {
+			} else if (details) {
 				msg = details;
-			} else if (result !== undefined) {
-				msg = `result=${result}`;
+			} else if (result) {
+				msg = result;
 			}
 			const value = this.getCurrentValue()
-			console.log(`${actionName}: index=${this.index}, value=0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]${msg ? ', ' + msg : ''}`);
+			console.log({
+				name: actionName,
+				result: msg,
+				index: this.index,
+				value: `0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]`,
+			});
 		}
 		return result;
 	}
@@ -80,7 +85,7 @@ export class KssRng {
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
-		return this.debugLog('starDirection', this.randi(8), r => `result=${StarDirectionChars[r]}`);
+		return this.debugLog('starDirection', this.randi(8), r => `starDirection=${StarDirectionChars[r]}`);
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
@@ -643,12 +648,12 @@ export class BattleWindowsMWWManipulator {
 					}
 					return BattleWindowsPowerNames[val];
 				};
-				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${formatVal(branch.type, branch.value)}`
+				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${formatVal(branch.type, branch.value)}`;
 				const key = `${starStr} ${branchStr.replace("≠", "=")}`;
 				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [] };
 				branchGroups[key][isEqual].push(i);
 			}
-			if (showsSimulation) console.log("分岐: " + branchStr);
+			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐", branchStr);
 
 			// 行動を適用
 			const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
