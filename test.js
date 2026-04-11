@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, BranchTypes, BattleWindowsMWWManipulator } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, BranchTypes, BattleWindowsMWWManipulator, DragonActionNames } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -60,8 +60,8 @@ async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon,
         advances1: parseAdvances(magicianActions),
         advances2: 0,
     };
-    // simulateBattleWindowsMWW の actionsTable 引数
-    const actionsTable = {
+    // simulateBattleWindowsMWW の actionCombination 引数
+    const actionCombination = {
         magician:    { message: magician.message,             advances: parseAdvances(magicianActions) },
         knight:      { message: knight.message,               advances: parseAdvances(knightActions) },
         dragon:      { message: dragon.message,               advances: parseAdvances(dragonActions) },
@@ -69,7 +69,7 @@ async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon,
     };
     return {
         magicianArg,
-        actionsTable,
+        actionCombination,
         fastKnight,
         fastDragon,
 
@@ -93,7 +93,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
     const sim = simulate(
         startIndex,
         manip.magicianArg,
-        manip.actionsTable,
+        manip.actionCombination,
         fastKnight,
         fastDragon,
         hammerThrow,
@@ -111,7 +111,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
         const name = enemies[idx];
         const mPowers = manip.powersTable[name];
         const sPowers = sim[idx];
-        const message = manip.actionsTable[name].message;
+        const message = manip.actionCombination[name].message;
 
         if (sPowers === undefined) {
             if (message !== "N") {
@@ -135,7 +135,7 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
     // レッドドラゴンの行動の比較
     if (manip.dragonAction === DragonGuard && sim.length !== 4) {
-        console.log(`[DIFF] dragonAction: manipulate=${manip.dragonAction}, simulate length=${sim.length}`);
+        console.log(`[DIFF] dragonAction: manipulate dragonAction=${DragonActionNames[manip.dragonAction]}, simulate length=${sim.length}`);
         return {sim, manip};
     }
 
@@ -167,7 +167,7 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
     console.log(`diffCount: ${diffCount}`)
 }
 
-//compareManipulationsAndSimulations(3100, 3500, (startIndex, magician, actionsTable, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow));
+//compareManipulationsAndSimulations(3100, 3500, (startIndex, magician, actionCombination, fastKnight, fastDragon, hammerThrow) => new KssRng(startIndex).simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow));
 
 
 
