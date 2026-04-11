@@ -562,7 +562,6 @@ export class BattleWindowsMWWManipulator {
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
 	 * コンソールへの出力は行わず、結果をオブジェクトとして返す。
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
-	 * @returns {Object}
 	 */
 	test(stars) {
 		let magicianNGCount = 0;

@@ -173,19 +173,24 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
 
 
 
-function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars, branchPriorities){
-    console.log("# testNewManipulation");
-    console.log(JSON.stringify({
-        fastMagician, fastKnight, fastDragon, hammerThrow,
-        minIndex: startIdx, maxIndex: endIdx, stars, branchPriorities
-    }, null, 2));
+function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastDragon, hammerThrow, stars, branchPriorities){
+    console.log("## 設定");
+    console.log("魔法使い: " + (fastMagician ? "Fast" : "Easy"));
+    console.log("悪魔の騎士: " + (fastKnight ? "Fast" : "Easy"));
+    console.log("レッドドラゴン: " + (fastDragon ? "Fast" : "Easy"));
+    console.log("ハンマー投げのダッシュによる消費数: " + hammerThrow);
+    console.log("探索する乱数位置: " + minIndex + " ～ " + maxIndex);
+    console.log("星を出す回数: " + stars);
+    console.log("分岐の優先度: " + (branchPriorities ? branchPriorities.join(", ") : "未指定"));
 
     const manipulator = new BattleWindowsMWWManipulator({
         fastMagician, fastKnight, fastDragon, hammerThrow,
-        minIndex: startIdx, maxIndex: endIdx, branchPriorities
+        minIndex, maxIndex, branchPriorities
     });
 
     const result = manipulator.test(stars);
+
+    console.log("## 統計");
 
     console.log('魔法使いの条件に合う行動が存在しない: '+ result.magicianNGCount);
     console.log('敵の行動の組み合わせが存在しない: '+ result.otherNGCount);
@@ -195,19 +200,19 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             console.log(`  ${key}: [${indices.join(', ')}]`);
         }
     }
-    console.log('## 行動を適用してシミュレーションした結果');
+    console.log('### 行動を適用してシミュレーションした結果');
     console.log('魔法使いで失敗: '+ result.wrongCounts[0]);
     console.log('悪魔の騎士で失敗: '+ result.wrongCounts[1]);
     console.log('レッドドラゴンで失敗: '+ result.wrongCounts[2]);
     console.log('レッドドラゴン2ターン目で失敗: '+ result.wrongCounts[3]);
 
-    console.log("## 魔法使いの行動");
+    console.log("### 魔法使いでの行動");
     for (let [message, val] of Object.entries(result.magicianCountList)) console.log(message +': '+ val);
-    console.log("## 悪魔の騎士の行動");
+    console.log("### 悪魔の騎士での行動");
     for (let [message, val] of Object.entries(result.knightCountList)) console.log(message +': '+ val);
-    console.log("## レッドドラゴンの行動");
+    console.log("### レッドドラゴンでの行動");
     for (let [message, val] of Object.entries(result.dragonCountList)) console.log(message +': '+ val);
-    console.log("## レッドドラゴン2ターン目の行動");
+    console.log("### レッドドラゴン2ターン目での行動");
     for (let [message, val] of Object.entries(result.dragonActionCountList)) console.log(message +': '+ val);
 }
 
