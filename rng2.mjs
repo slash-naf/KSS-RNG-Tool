@@ -295,11 +295,11 @@ const DefaultActionsDifficultyTable = {
         { difficulty: -2, hammerFlips: 1, advances: 2 },
         { difficulty: -1, hammerFlips: 1, advances: 0 },
         { difficulty: 0 },
-        { difficulty: 201, slides: 1, advances: 4 },
-        { difficulty: 202, dashes: 2 },
-        { difficulty: 203, dashes: 3 },
-        { difficulty: 204, slides: 1, advances: 5 },
-        { difficulty: 205, dashes: 1 },
+        { difficulty: 301, slides: 1, advances: 4 },
+        { difficulty: 302, dashes: 2 },
+        { difficulty: 303, dashes: 3 },
+        { difficulty: 304, slides: 1, advances: 5 },
+        { difficulty: 305, dashes: 1 },
     ],
     knight: [
         { difficulty: 0 },
@@ -318,6 +318,9 @@ const DefaultActionsDifficultyTable = {
         { difficulty: 43, dashes: 3, slides: 1 },
         { difficulty: 44, dashes: 2, stars: 1, hammerFlips: 1 },
         { difficulty: 45, dashes: 2, stars: 1, slides: 1 },
+        { difficulty: 150, dashes: 1 },
+        { difficulty: 201, dashes: 1, hammerFlips: 1 },
+        { difficulty: 202, dashes: 1, slides: 1 },
     ],
     dragon: [
         { difficulty: 0 },
@@ -330,6 +333,8 @@ const DefaultActionsDifficultyTable = {
         { difficulty: 51, dashes: 3, stars: 1 },
         { difficulty: 52, dashes: 3, slides: 1 },
         { difficulty: 54, dashes: 2, stars: 1, slides: 1 },
+        { difficulty: 200, dashes: 1 },
+        { difficulty: 251, dashes: 1, slides: 1 },
     ],
     dragonAction: [
         { difficulty: 0 },
@@ -340,6 +345,9 @@ const DefaultActionsDifficultyTable = {
         { difficulty: 6, dashes: 2, stars: 1 },
         { difficulty: 7, dashes: 2, slides: 1 },
         { difficulty: 8, dashes: 2, hammerFlips: 1 },
+        { difficulty: 250, dashes: 1 },
+        { difficulty: 351, dashes: 1, hammerFlips: 1 },
+        { difficulty: 352, dashes: 1, slides: 1 },
     ],
 };
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
@@ -386,8 +394,8 @@ export class BattleWindowsMWWManipulator {
 				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
 			} else {
 				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
-				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
 				if (stars) a.push(["", "星", "2星"][stars]);
+				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
 				if (slides) a.push(["", "スライディング", "2スライディング"][slides]);
 			}
 			return a.length ? a.join(" & ") : "待機";
@@ -400,8 +408,8 @@ export class BattleWindowsMWWManipulator {
 				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
 			} else {
 				if (dashes) a.push(["", "Short Dash", "Dash", "Long Dash"][dashes]);
-				if (hammerFlips) a.push(["", "Hammer Flip", "2 Hammer Flips"][hammerFlips]);
 				if (stars) a.push(["", "Star", "2 Stars"][stars]);
+				if (hammerFlips) a.push(["", "Flip", "2 Flips"][hammerFlips]);
 				if (slides) a.push(["", "Slide", "2 Slides"][slides]);
 			}
 			return a.length ? a.join(" & ") : "Wait";
