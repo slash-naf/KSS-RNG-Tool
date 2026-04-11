@@ -173,92 +173,37 @@ async function compareManipulationsAndSimulations(startIdx, endIdx, simulate){
 
 
 
-function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars){
+function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDragon, hammerThrow, stars, branchPriorities){
     console.log("# testNewManipulation");
+    console.log(JSON.stringify({
+        fastMagician, fastKnight, fastDragon, hammerThrow,
+        minIndex: startIdx, maxIndex: endIdx, stars, branchPriorities
+    }, null, 2));
 
     const manipulator = new BattleWindowsMWWManipulator({
         fastMagician, fastKnight, fastDragon, hammerThrow,
-        minIndex: startIdx, maxIndex: endIdx
+        minIndex: startIdx, maxIndex: endIdx, branchPriorities
     });
 
-    let magicianNGCount = 0;
-    let otherNGCount = 0;
-    let wrongCount = 0;
-    let branchCount = 0;
+    const result = manipulator.test(stars);
 
-    let magicianCountList = {};
-    let knightCountList = {};
-    let dragonCountList = {};
-    let dragonActionCountList = {};
+    console.log('魔法使いの条件に合う行動が存在しない: '+ result.magicianNGCount);
+    console.log('敵の行動の組み合わせが存在しない: '+ result.otherNGCount);
+    console.log('分岐発生数: '+ result.branchIndices.length + (result.branchIndices.length > 0 ? ' (' + result.branchIndices.join(', ') + ')' : ''));
+    console.log('## 行動を適用してシミュレーションした結果');
+    console.log('魔法使いで失敗: '+ result.wrongCounts[0]);
+    console.log('悪魔の騎士で失敗: '+ result.wrongCounts[1]);
+    console.log('レッドドラゴンで失敗: '+ result.wrongCounts[2]);
+    console.log('レッドドラゴン2ターン目で失敗: '+ result.wrongCounts[3]);
 
-    for (let i=startIdx; i <= endIdx; i++) {
-        const r = new KssRng(i);
-
-        const starsList = [];
-        for (let i=0; i < stars; i++) {
-            starsList.push(r.starDirection());
-        }
-
-        const {magician, actionCombination, branch} = manipulator.manipulate(starsList);
-
-        if (magician === null) {
-            magicianNGCount++;
-            continue;
-        }
-        if (actionCombination === null) {
-            otherNGCount++;
-            continue;
-        }
-
-        // 分岐が設定されている場合、観測値に基づいてactionCombinationを切り替え
-        let chosenActionCombination = actionCombination;
-        if (branch) {
-            const bt = BranchTypes[branch.type];
-            const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow);
-            if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
-                chosenActionCombination = branch.fallbackActionCombination;
-                branchCount++;
-            }
-        }
-
-        const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, fastKnight, fastDragon, hammerThrow);
-        if (result.length !== 4) { wrongCount++; continue; }
-
-        // メッセージ集計
-        const magicianMsg = magician.messageJa;
-        magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
-
-        const knightMsg = actionCombination.knight.messageJa;
-        knightCountList[knightMsg] = (knightCountList[knightMsg] || 0) + 1;
-
-        const dragonMsg = actionCombination.dragon.messageJa;
-        dragonCountList[dragonMsg] = (dragonCountList[dragonMsg] || 0) + 1;
-
-        const dragonActionMsg = actionCombination.dragonAction.messageJa;
-        dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
-    }
-
-    console.log('magicianNGCount: '+ magicianNGCount);
-    console.log('otherNGCount: '+ otherNGCount);
-    console.log('wrongCount: '+ wrongCount);
-    console.log('branchCount: '+ branchCount);
-
-    console.log("## magicianCountList");
-    for (let [message, val] of Object.entries(magicianCountList)) {
-        console.log(message +': '+ val);
-    }
-    console.log("## knightCountList");
-    for (let [message, val] of Object.entries(knightCountList)) {
-        console.log(message +': '+ val);
-    }
-    console.log("## dragonCountList");
-    for (let [message, val] of Object.entries(dragonCountList)) {
-        console.log(message +': '+ val);
-    }
-    console.log("## dragonActionCountList");
-    for (let [message, val] of Object.entries(dragonActionCountList)) {
-        console.log(message +': '+ val);
-    }
+    console.log("## 魔法使いの行動");
+    for (let [message, val] of Object.entries(result.magicianCountList)) console.log(message +': '+ val);
+    console.log("## 悪魔の騎士の行動");
+    for (let [message, val] of Object.entries(result.knightCountList)) console.log(message +': '+ val);
+    console.log("## レッドドラゴンの行動");
+    for (let [message, val] of Object.entries(result.dragonCountList)) console.log(message +': '+ val);
+    console.log("## レッドドラゴン2ターン目の行動");
+    for (let [message, val] of Object.entries(result.dragonActionCountList)) console.log(message +': '+ val);
 }
 
 testNewManipulation(3100, 3376, true, true, true, 1, 3);

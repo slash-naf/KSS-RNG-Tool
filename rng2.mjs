@@ -558,4 +558,82 @@ export class BattleWindowsMWWManipulator {
 
 		return bestPartialResult;
 	}
+
+	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
+	 * コンソールへの出力は行わず、結果をオブジェクトとして返す。
+	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
+	 * @returns {Object}
+	 */
+	test(stars) {
+		let magicianNGCount = 0;
+		let otherNGCount = 0;
+		let wrongCounts = [0, 0, 0, 0];
+		let branchIndices = [];
+
+		let magicianCountList = {};
+		let knightCountList = {};
+		let dragonCountList = {};
+		let dragonActionCountList = {};
+
+		for (let i = this.minIndex; i <= this.maxIndex; i++) {
+			// 星の方向を確認
+			const r = new KssRng(i);
+			const starDirectionList = [];
+			for (let j = 0; j < stars; j++) {
+				starDirectionList.push(r.starDirection());
+			}
+
+			// 乱数調整のための行動を計算
+			const { magician, actionCombination, branch } = this.manipulate(starDirectionList);
+			if (magician === null) {
+				magicianNGCount++;
+				continue;
+			}
+			if (actionCombination === null) {
+				otherNGCount++;
+				continue;
+			}
+			let chosenActionCombination = actionCombination;
+			if (branch) {
+				const bt = BranchTypes[branch.type];
+				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
+					chosenActionCombination = branch.fallbackActionCombination;
+					branchIndices.push(i);
+				}
+			}
+
+			// 行動を適用
+			const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+
+			// 行動の結果を確認
+			if (result.length !== 4) {
+				wrongCounts[result.length]++;
+				continue;
+			}
+
+			const magicianMsg = magician.messageJa;
+			magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
+
+			const knightMsg = chosenActionCombination.knight.messageJa;
+			knightCountList[knightMsg] = (knightCountList[knightMsg] || 0) + 1;
+
+			const dragonMsg = chosenActionCombination.dragon.messageJa;
+			dragonCountList[dragonMsg] = (dragonCountList[dragonMsg] || 0) + 1;
+
+			const dragonActionMsg = chosenActionCombination.dragonAction.messageJa;
+			dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
+		}
+
+		return {
+			magicianNGCount,
+			otherNGCount,
+			wrongCounts,
+			branchIndices,
+			magicianCountList,
+			knightCountList,
+			dragonCountList,
+			dragonActionCountList
+		};
+	}
 }
