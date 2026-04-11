@@ -245,11 +245,11 @@ export class KssRng {
 }
 
 /**
- * 星の方向に一致する乱数インデックスを探索し、星を消費した後のインデックスのリストを返す
+ * 星の方向に一致する乱数位置を探索し、星を消費した後の乱数位置のリストを返す
  * @param {Array<number>} stars 観測された星の向きの配列
- * @param {number} minIndex 探索開始インデックス
- * @param {number} maxIndex 探索終了インデックス
- * @returns {Uint16Array} 星消費後の乱数インデックスの配列
+ * @param {number} minIndex 探索開始の乱数位置
+ * @param {number} maxIndex 探索終了の乱数位置
+ * @returns {Uint16Array} 星消費後の乱数位置の配列
  */
 export function findIndexesByStars(stars, minIndex, maxIndex) {
 	const indexList = [];
@@ -287,7 +287,7 @@ export const BranchTypes = {
 	dragonPowers:       createBranchType(2, obsPowers),
 };
 // BattleWindowsMWWManipulatorのデフォルト値
-const DefaultBranchPriorities = ['dragonPowerLeft', 'knightPowerLeft'];
+const DefaultBranchPriorities = ['dragonPowers', 'knightPowers', 'magicianPowers'];
 const DefaultActionsDifficultyTable = {
     magician: [
         { difficulty: -4, hammerFlips: 1, advances: 6 },
@@ -477,7 +477,7 @@ export class BattleWindowsMWWManipulator {
 			if (unmatched.some(e => bt.getObservable(e) !== failObs)) continue;
 			if (matched.some(e => bt.getObservable(e) === failObs)) continue;
 
-			// 失敗インデックス群に対して機能するactionCombinationを探す
+			// 失敗した乱数位置の群に対して機能するactionCombinationを探す
 			const actionCombination = list[0].actionCombination;
 			const failIndices = unmatched.map(e => e.index);
 			for (const altActionCombination of this.actionCombinations) {
@@ -502,7 +502,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
 	*/
 	manipulate(stars) {
-		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後のインデックスが返る）
+		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後の乱数位置が返る）
 		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す
@@ -568,7 +568,8 @@ export class BattleWindowsMWWManipulator {
 		let magicianNGCount = 0;
 		let otherNGCount = 0;
 		let wrongCounts = [0, 0, 0, 0];
-		let branchIndices = [];
+		let branchCount = 0;
+		let branchGroups = {};
 
 		let magicianCountList = {};
 		let knightCountList = {};
@@ -595,11 +596,15 @@ export class BattleWindowsMWWManipulator {
 			}
 			let chosenActionCombination = actionCombination;
 			if (branch) {
+				branchCount++;
+				const starKey = starDirectionList.map(v => StarDirectionChars[v]).join('');
+				if (!branchGroups[starKey]) branchGroups[starKey] = [];
+				branchGroups[starKey].push(i);
+
 				const bt = BranchTypes[branch.type];
 				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
 					chosenActionCombination = branch.fallbackActionCombination;
-					branchIndices.push(i);
 				}
 			}
 
@@ -629,7 +634,8 @@ export class BattleWindowsMWWManipulator {
 			magicianNGCount,
 			otherNGCount,
 			wrongCounts,
-			branchIndices,
+			branchCount,
+			branchGroups,
 			magicianCountList,
 			knightCountList,
 			dragonCountList,

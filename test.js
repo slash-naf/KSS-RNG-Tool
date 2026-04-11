@@ -189,7 +189,12 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
 
     console.log('魔法使いの条件に合う行動が存在しない: '+ result.magicianNGCount);
     console.log('敵の行動の組み合わせが存在しない: '+ result.otherNGCount);
-    console.log('分岐発生数: '+ result.branchIndices.length + (result.branchIndices.length > 0 ? ' (' + result.branchIndices.join(', ') + ')' : ''));
+    console.log('分岐発生数: '+ result.branchCount);
+    if (Object.keys(result.branchGroups).length > 0) {
+        for (const [key, indices] of Object.entries(result.branchGroups)) {
+            console.log(`  ${key}: [${indices.join(', ')}]`);
+        }
+    }
     console.log('## 行動を適用してシミュレーションした結果');
     console.log('魔法使いで失敗: '+ result.wrongCounts[0]);
     console.log('悪魔の騎士で失敗: '+ result.wrongCounts[1]);
