@@ -242,6 +242,24 @@ export class KssRng {
 	}
 }
 
+/**
+ * 星の方向に一致する乱数インデックスを探索し、星を消費した後のインデックスのリストを返す
+ * @param {Array<number>} stars 観測された星の向きの配列
+ * @param {number} minIndex 探索開始インデックス
+ * @param {number} maxIndex 探索終了インデックス
+ * @returns {Uint16Array} 星消費後の乱数インデックスの配列
+ */
+export function findIndexesByStars(stars, minIndex, maxIndex) {
+	const indexList = [];
+	for (let i = minIndex; i <= maxIndex; i++) {
+		const r = new KssRng(i);
+		if (stars.every(v => r.starDirection() === v)) {
+			indexList.push(r.index);
+		}
+	}
+	return new Uint16Array(indexList);
+}
+
 // --- 分岐方式の定義 ---
 const obsLeft = s => s.left;
 const obsRight = s => s.right;
@@ -432,7 +450,7 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 部分一致候補から分岐方式を適用して解を探す */
-	_tryBranch(branchTypeName, bestPartialMatches, r, magician) {
+	_tryBranch(branchTypeName, bestPartialMatches, magician) {
 		const bt = BranchTypes[branchTypeName];
 		if (!bt) return null;
 
@@ -456,8 +474,7 @@ export class BattleWindowsMWWManipulator {
 				if (!bt.filterFallback(actionCombination, altActionCombination)) continue;
 				let allMatch = true;
 				for (const index of failIndices) {
-					r.index = index;
-					const sim = r.simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 					if (sim.length !== 4) { allMatch = false; break; }
 				}
 				if (allMatch) {
@@ -475,15 +492,8 @@ export class BattleWindowsMWWManipulator {
 	 * @param {Array<number>} stars バトルウィンドウズ戦開始時に出した星の向き
 	*/
 	manipulate(stars) {
-		const r = new KssRng();
-
-		// 星の方向が全て一致する乱数位置を探す
-		const indexList = [];
-		for (let i = this.minIndex; i <= this.maxIndex; i++) {
-			r.index = i;
-			if (stars.every(v => r.starDirection() === v)) indexList.push(r.index);
-		}
-		const indexArray = new Uint16Array(indexList);
+		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後のインデックスが返る）
+		const indexArray = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す
 		const emptyResult = { magician: null, actionCombination: null, branch: null };
@@ -502,8 +512,7 @@ export class BattleWindowsMWWManipulator {
 				const list = [];
 				let matchCount = 0;
 				for (const index of indexArray) {
-					r.index = index;
-					const sim = r.simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 					if (sim.length === 4) matchCount++;
 					list.push({ actionCombination, index, sim });
 				}
@@ -524,7 +533,7 @@ export class BattleWindowsMWWManipulator {
 
 			// 分岐方式を優先度順に試す
 			for (const branchTypeName of this.branchPriorities) {
-				const branchResult = this._tryBranch(branchTypeName, bestPartialMatches, r, magician);
+				const branchResult = this._tryBranch(branchTypeName, bestPartialMatches, magician);
 				if (branchResult) {
 					return { magician, actionCombination: branchResult.actionCombination, branch: branchResult.branch };
 				}
