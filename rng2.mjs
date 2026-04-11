@@ -57,7 +57,8 @@ export class KssRng {
 			} else if (result !== undefined) {
 				msg = `result=${result}`;
 			}
-			console.log(`[KssRng] ${actionName}: index=${this.index}${msg ? ', ' + msg : ''}`);
+			const value = this.getCurrentValue()
+			console.log(`${actionName}: index=${this.index}, value=0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]${msg ? ', ' + msg : ''}`);
 		}
 		return result;
 	}
@@ -79,7 +80,7 @@ export class KssRng {
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
-		return this.debugLog('starDirection', this.randi(8), r => `result=${r} (${StarDirectionChars[r]})`);
+		return this.debugLog('starDirection', this.randi(8), r => `result=${StarDirectionChars[r]}`);
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
@@ -590,7 +591,7 @@ export class BattleWindowsMWWManipulator {
 	 * コンソールへの出力は行わず、結果をオブジェクトとして返す。
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 */
-	test(stars) {
+	test(stars, showsSimulation=false) {
 		let magicianNGCount = 0;
 		let otherNGCount = 0;
 		let wrongCounts = [0, 0, 0, 0];
@@ -604,7 +605,8 @@ export class BattleWindowsMWWManipulator {
 
 		for (let i = this.minIndex; i <= this.maxIndex; i++) {
 			// 星の方向を確認
-			const r = new KssRng(i);
+			const r = new KssRng(i, showsSimulation);
+			if (showsSimulation) r.debugLog("## 開始乱数")
 			const starDirectionList = [];
 			for (let j = 0; j < stars; j++) {
 				starDirectionList.push(r.starDirection());
@@ -641,11 +643,12 @@ export class BattleWindowsMWWManipulator {
 					}
 					return BattleWindowsPowerNames[val];
 				};
-				branchStr = `${branch.type} = ${formatVal(branch.type, branch.value)}`
-				const key = `${starStr} ${branchStr}`;
+				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${formatVal(branch.type, branch.value)}`
+				const key = `${starStr} ${branchStr.replace("≠", "=")}`;
 				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [] };
 				branchGroups[key][isEqual].push(i);
 			}
+			if (showsSimulation) console.log("分岐: " + branchStr);
 
 			// 行動を適用
 			const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);

@@ -187,7 +187,7 @@ function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastD
         minIndex, maxIndex, branchPriorities
     });
 
-    const result = manipulator.test(stars);
+    const result = manipulator.test(stars, true);
 
     console.log("## 統計");
 
