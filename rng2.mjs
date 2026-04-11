@@ -37,8 +37,29 @@ export const HammerHardHitAdvances = 9;
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
-	constructor(index=0) {
+	constructor(index=0, debug=false) {
 		this.index = index;
+		this.debug = debug;
+	}
+	/**
+	 * デバッグ結果を出力し、結果の値をそのまま返す
+	 * @param {string} actionName
+	 * @param {*} [result]
+	 * @param {string|Function} [details]
+	 */
+	debugLog(actionName, result, details) {
+		if (this.debug) {
+			let msg = "";
+			if (typeof details === "function") {
+				msg = details(result);
+			} else if (details !== undefined) {
+				msg = details;
+			} else if (result !== undefined) {
+				msg = `result=${result}`;
+			}
+			console.log(`[KssRng] ${actionName}: index=${this.index}${msg ? ', ' + msg : ''}`);
+		}
+		return result;
 	}
 	/** 現在の乱数値を取得 */
 	getCurrentValue() {
@@ -58,22 +79,25 @@ export class KssRng {
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
-		return this.randi(8);
+		return this.debugLog('starDirection', this.randi(8), r => `result=${r} (${StarDirectionChars[r]})`);
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
+		this.debugLog('hammerHit', undefined, `hardHit=${hardHit}`);
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
 		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
+		this.debugLog('hammerFlipChargeAndHit');
 	}
 	/** 鬼殺し火炎ハンマーの素振り */
 	hammerFlip() {
 		this.advance(HammerFlipAdvances);
+		this.debugLog('hammerFlip');
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
@@ -88,7 +112,7 @@ export class KssRng {
 		this.advance(1);
 		const b = this.knightAttacksFirst();
 		this.advance(2);
-		return a || b;
+		return this.debugLog('hammerFlipChargeForFastKnight', a || b, r => `attacksFirst=${r}`);
 	}
 	/** レッドドラゴンへの最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
 	hammerFlipChargeForFastDragon() {
@@ -97,7 +121,7 @@ export class KssRng {
 		this.advance(1);
 		const b = this.dragonAttacksFirst();
 		this.advance(4);
-		return a || b;
+		return this.debugLog('hammerFlipChargeForFastDragon', a || b, r => `attacksFirst=${r}`);
 	}
 	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastBattleWindowsPowers() {
@@ -105,15 +129,14 @@ export class KssRng {
 		const powers = this.battleWindowsPowers();
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		return powers;
+		return this.debugLog('hammerFlipHitForFastBattleWindowsPowers', powers, p => `hardHit=${hardHit}, powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
 	}
 	/** 魔法使いでの鬼殺しの溜め中の土煙と、先制されるか */
 	hammerFlipChargeForFastMagician(advances) {
 		// 溜め中の土煙と先制されるか
-		this.advance(advances);
 		const a = this.magicianAttacksFirst();
-		this.advance(HammerFlipChargeAdvances - advances);
-		return a;
+		this.advance(advances);
+		return this.debugLog('hammerFlipChargeForFastMagician', a, r => `attacksFirst=${r}`);
 	}
 	/** 魔法使いでの鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastMagician(hardHitFirst) {
@@ -130,27 +153,27 @@ export class KssRng {
 		}
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		return powers;
+		return this.debugLog('hammerFlipHitForFastMagician', powers, p => `hardHit=${hardHit}, powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
 	}
 
 	// --- バトルウィンドウズ ---
 	slimeAttacksFirst() {
-		return this.randi(4) === 1;
+		return this.debugLog('slimeAttacksFirst', this.randi(4) === 1, a => `attacksFirst=${a}`);
 	}
 	puppetAttacksFirst() {
-		return this.randi(4) === 2;
+		return this.debugLog('puppetAttacksFirst', this.randi(4) === 2, a => `attacksFirst=${a}`);
 	}
 	magicianAttacksFirst() {
-		return this.randi(4) === 1;
+		return this.debugLog('magicianAttacksFirst', this.randi(4) === 1, a => `attacksFirst=${a}`);
 	}
 	knightAttacksFirst() {
-		return this.randi(4) === 2;
+		return this.debugLog('knightAttacksFirst', this.randi(4) === 2, a => `attacksFirst=${a}`);
 	}
 	dragonAttacksFirst() {
-		return this.randi(4) === 3;
+		return this.debugLog('dragonAttacksFirst', this.randi(4) === 3, a => `attacksFirst=${a}`);
 	}
 	dragonActs() {
-		return DragonActionMap[this.randi(10)];
+		return this.debugLog('dragonActs', DragonActionMap[this.randi(10)], r => `acts=${DragonActionNames[r]}`);
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
@@ -177,7 +200,7 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		return { left, right };
+		return this.debugLog('battleWindowsPowers', { left, right }, p => `powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
@@ -190,14 +213,15 @@ export class KssRng {
 		const result = [];
 
 		// --- 魔法使い ---
+		this.advance(magician.advances1);
+		this.debugLog(magician.messageJa);
 		if (magician.fast) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastMagician(magician.advances1)) return result;
+			if (this.hammerFlipChargeForFastMagician(magician.advances2)) return result;
 			const hardHitFirst = magician.advances1 >= 6;
 			result.push(this.hammerFlipHitForFastMagician(hardHitFirst));
 		} else {
 			// Easyモード
-			this.advance(magician.advances1);
 			if (this.magicianAttacksFirst()) return result;
 			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
 			result.push(this.battleWindowsPowers());
@@ -206,6 +230,7 @@ export class KssRng {
 
 		// --- 悪魔の騎士 ---
 		this.advance(actionCombination.knight.advances);
+		this.debugLog(actionCombination.knight.messageJa);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return result;
@@ -222,6 +247,7 @@ export class KssRng {
 
 		// --- レッドドラゴン ---
 		this.advance(actionCombination.dragon.advances);
+		this.debugLog(actionCombination.dragon.messageJa);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return result;
@@ -236,6 +262,7 @@ export class KssRng {
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionCombination.dragonAction.advances);
+		this.debugLog(actionCombination.dragonAction.messageJa);
 		const dragonAction = this.dragonActs();
 		if (dragonAction !== DragonGuard) return result;
 		result.push(this.battleWindowsPowers());
@@ -430,7 +457,7 @@ export class BattleWindowsMWWManipulator {
 			return {
 				difficulty: a.difficulty,
 				advances1: a.advances === undefined ? advances : a.advances,
-				advances2: a.advances === undefined ? 0 : advances - a.advances,
+				advances2: a.advances === undefined ? 0 : (a.hammerFlips ? HammerFlipChargeAdvances : advances) - a.advances,
 				fast: a.hammerFlips !== undefined,
 				actions: a,
 				messageJa: parseMessageJa(a),
