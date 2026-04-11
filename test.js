@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, Actions, BranchTypes, BattleWindowsMWWManipulator } from './rng2.mjs';
+import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, BranchTypes, BattleWindowsMWWManipulator } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -199,42 +199,42 @@ function testNewManipulation(startIdx, endIdx, fastMagician, fastKnight, fastDra
             starsList.push(r.starDirection());
         }
 
-        const {magician, actionsTable, branch} = manipulator.manipulate(starsList);
+        const {magician, actionCombination, branch} = manipulator.manipulate(starsList);
 
         if (magician === null) {
             magicianNGCount++;
             continue;
         }
-        if (actionsTable === null) {
+        if (actionCombination === null) {
             otherNGCount++;
             continue;
         }
 
-        // 分岐が設定されている場合、観測値に基づいてactionsTableを切り替え
-        let chosenActionsTable = actionsTable;
+        // 分岐が設定されている場合、観測値に基づいてactionCombinationを切り替え
+        let chosenActionCombination = actionCombination;
         if (branch) {
             const bt = BranchTypes[branch.type];
-            const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow);
+            const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow);
             if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
-                chosenActionsTable = branch.fallbackActionsTable;
+                chosenActionCombination = branch.fallbackActionCombination;
                 branchCount++;
             }
         }
 
-        const result = r.simulateBattleWindowsMWW(magician, chosenActionsTable, fastKnight, fastDragon, hammerThrow);
+        const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, fastKnight, fastDragon, hammerThrow);
         if (result.length !== 4) { wrongCount++; continue; }
 
         // メッセージ集計
-        const magicianMsg = magician.message;
+        const magicianMsg = magician.messageJa;
         magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
 
-        const knightMsg = actionsTable.knight.message;
+        const knightMsg = actionCombination.knight.messageJa;
         knightCountList[knightMsg] = (knightCountList[knightMsg] || 0) + 1;
 
-        const dragonMsg = actionsTable.dragon.message;
+        const dragonMsg = actionCombination.dragon.messageJa;
         dragonCountList[dragonMsg] = (dragonCountList[dragonMsg] || 0) + 1;
 
-        const dragonActionMsg = actionsTable.dragonAction.message;
+        const dragonActionMsg = actionCombination.dragonAction.messageJa;
         dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
     }
 

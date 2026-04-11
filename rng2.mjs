@@ -184,7 +184,7 @@ export class KssRng {
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
 	 * @returns {Array<{left, right}>} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4になる
 	*/
-	simulateBattleWindowsMWW(magician, actionsTable, fastKnight, fastDragon, hammerThrow) {
+	simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow) {
 		const result = [];
 
 		// --- 魔法使い ---
@@ -203,7 +203,7 @@ export class KssRng {
 		}
 
 		// --- 悪魔の騎士 ---
-		this.advance(actionsTable.knight.advances);
+		this.advance(actionCombination.knight.advances);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return result;
@@ -219,7 +219,7 @@ export class KssRng {
 		this.hammerHit();    // ハンマー投げのヒット
 
 		// --- レッドドラゴン ---
-		this.advance(actionsTable.dragon.advances);
+		this.advance(actionCombination.dragon.advances);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return result;
@@ -233,7 +233,7 @@ export class KssRng {
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
 
 		// --- レッドドラゴン2ターン目 ---
-		this.advance(actionsTable.dragonAction.advances);
+		this.advance(actionCombination.dragonAction.advances);
 		const dragonAction = this.dragonActs();
 		if (dragonAction !== DragonGuard) return result;
 		result.push(this.battleWindowsPowers());
@@ -241,104 +241,6 @@ export class KssRng {
 		return result;
 	}
 }
-
-export class Actions {
-	constructor(t) {
-		const parseAdvances = ({dashes=0, slides=0, hammerFlips=0, stars=0}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
-		const parseMessage = ({dashes, slides, hammerFlips, stars, advances}) => {
-			const a = [];
-			if (advances !== undefined) {
-				if (slides) a.push(["", "", "", "", "準速スライディング", "最速スライディング", ][advances]);
-				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
-			} else {
-				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
-				if (slides) a.push(["", "スライディング", "2スライディング"][slides]);
-				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
-				if (stars) a.push(["", "星", "2星"][stars]);
-			}
-			return a.length ? a.join(" & ") : "待機";
-		};
-
-		this.magicianList = t.magician.toSorted((a, b) => a.difficulty - b.difficulty).map(a => {
-			const advances = parseAdvances(a);
-			return {
-				difficulty: a.difficulty,
-				advances1: a.advances === undefined ? advances : a.advances,
-				advances2: a.advances === undefined ? 0 : advances - a.advances,
-				fast: a.hammerFlips !== undefined,
-				actions: a,
-				message: parseMessage(a),
-			};
-		});
-		this.knightList = t.knight.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
-		this.dragonList = t.dragon.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
-		this.dragonActionList = t.dragonAction.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({difficulty: a.difficulty, advances: parseAdvances(a), actions: a, message: parseMessage(a)}));
-		this.list = [];
-		for (const knight of this.knightList) {
-			for (const dragon of this.dragonList) {
-				for (const dragonAction of this.dragonActionList) {
-					this.list.push({
-						difficulty: knight.difficulty + dragon.difficulty + dragonAction.difficulty,
-						knight, dragon, dragonAction,
-					});
-				}
-			}
-		}
-		this.list.sort((a, b) => a.difficulty - b.difficulty);
-	}
-}
-
-export const DefaultActionsDifficultyTable = {
-    magician: [
-        { difficulty: -4, hammerFlips: 1, advances: 6 },
-        { difficulty: -3, hammerFlips: 1, advances: 4 },
-        { difficulty: -2, hammerFlips: 1, advances: 2 },
-        { difficulty: -1, hammerFlips: 1, advances: 0 },
-        { difficulty: 0 },
-        { difficulty: 201, slides: 1, advances: 4 },
-        { difficulty: 202, dashes: 2 },
-        { difficulty: 203, dashes: 3 },
-        { difficulty: 204, slides: 1, advances: 5 },
-        { difficulty: 205, dashes: 1 },
-    ],
-    knight: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 2, hammerFlips: 1 },
-        { difficulty: 3, slides: 1 },
-        { difficulty: 11, stars: 2 },
-        { difficulty: 12, hammerFlips: 2 },
-        { difficulty: 13, slides: 2 },
-        { difficulty: 21, hammerFlips: 1, stars: 1 },
-        { difficulty: 22, slides: 1, stars: 1 },
-        { difficulty: 23, slides: 1, hammerFlips: 1 },
-        { difficulty: 24, dashes: 3 },
-        { difficulty: 41, dashes: 3, stars: 1 },
-        { difficulty: 42, dashes: 3, hammerFlips: 1 },
-        { difficulty: 43, dashes: 3, slides: 1 },
-    ],
-    dragon: [
-        { difficulty: 0 },
-        { difficulty: 4, stars: 1 },
-        { difficulty: 5, slides: 1 },
-        { difficulty: 16, stars: 2 },
-        { difficulty: 17, slides: 2 },
-        { difficulty: 31, slides: 1, stars: 1 },
-        { difficulty: 32, dashes: 3 },
-        { difficulty: 51, dashes: 3, stars: 1 },
-        { difficulty: 52, dashes: 3, slides: 1 },
-    ],
-    dragonAction: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 1, hammerFlips: 1 },
-        { difficulty: 1, slides: 1 },
-        { difficulty: 1, dashes: 3 },
-        { difficulty: 6, dashes: 2, stars: 1 },
-        { difficulty: 7, dashes: 2, slides: 1 },
-        { difficulty: 8, dashes: 2, hammerFlips: 1 },
-    ],
-};
 
 // --- 分岐方式の定義 ---
 const obsLeft = s => s.left;
@@ -364,21 +266,85 @@ export const BranchTypes = {
 	dragonPowerRight:   createBranchType(2, obsRight),
 	dragonPowers:       createBranchType(2, obsPowers),
 };
-
-export const DefaultBranchPriorities = ['dragonPowerLeft', 'knightPowerLeft'];
-
+// BattleWindowsMWWManipulatorのデフォルト値
+const DefaultBranchPriorities = ['dragonPowerLeft', 'knightPowerLeft'];
+const DefaultActionsDifficultyTable = {
+    magician: [
+        { difficulty: -4, hammerFlips: 1, advances: 6 },
+        { difficulty: -3, hammerFlips: 1, advances: 4 },
+        { difficulty: -2, hammerFlips: 1, advances: 2 },
+        { difficulty: -1, hammerFlips: 1, advances: 0 },
+        { difficulty: 0 },
+        { difficulty: 201, slides: 1, advances: 4 },
+        { difficulty: 202, dashes: 2 },
+        { difficulty: 203, dashes: 3 },
+        { difficulty: 204, slides: 1, advances: 5 },
+        { difficulty: 205, dashes: 1 },
+    ],
+    knight: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 2, hammerFlips: 1 },
+        { difficulty: 3, slides: 1 },
+        { difficulty: 11, stars: 2 },
+        { difficulty: 12, hammerFlips: 2 },
+        { difficulty: 13, slides: 2 },
+        { difficulty: 21, hammerFlips: 1, stars: 1 },
+        { difficulty: 22, stars: 1, slides: 1 },
+        { difficulty: 23, hammerFlips: 1, slides: 1 },
+        { difficulty: 24, dashes: 3 },
+        { difficulty: 41, dashes: 3, stars: 1 },
+        { difficulty: 42, dashes: 3, hammerFlips: 1 },
+        { difficulty: 43, dashes: 3, slides: 1 },
+        { difficulty: 44, dashes: 2, stars: 1, hammerFlips: 1 },
+        { difficulty: 45, dashes: 2, stars: 1, slides: 1 },
+    ],
+    dragon: [
+        { difficulty: 0 },
+        { difficulty: 4, stars: 1 },
+        { difficulty: 5, slides: 1 },
+        { difficulty: 16, stars: 2 },
+        { difficulty: 17, slides: 2 },
+        { difficulty: 31, stars: 1, slides: 1 },
+        { difficulty: 32, dashes: 3 },
+        { difficulty: 51, dashes: 3, stars: 1 },
+        { difficulty: 52, dashes: 3, slides: 1 },
+        { difficulty: 54, dashes: 2, stars: 1, slides: 1 },
+    ],
+    dragonAction: [
+        { difficulty: 0 },
+        { difficulty: 1, stars: 1 },
+        { difficulty: 1, hammerFlips: 1 },
+        { difficulty: 1, slides: 1 },
+        { difficulty: 1, dashes: 3 },
+        { difficulty: 6, dashes: 2, stars: 1 },
+        { difficulty: 7, dashes: 2, slides: 1 },
+        { difficulty: 8, dashes: 2, hammerFlips: 1 },
+    ],
+};
+/** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
+	/**
+	 * @param {Object} options
+	 * @param {Object} [options.actionsDifficultyTable] 行動と難易度の定義テーブル
+	 * @param {boolean} [options.fastMagician] 魔法使いをFastモードで倒すか
+	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
+	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
+	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
+	 * @param {number} [options.minIndex] 探索する乱数の開始位置
+	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
+	 * @param {Array<string>} [options.branchPriorities] 完全一致しない場合にフォールバックとして試す分岐方式の優先順位
+	 */
 	constructor({
-		actionsTable = DefaultActionsDifficultyTable,
+		actionsDifficultyTable = DefaultActionsDifficultyTable,
 		fastMagician = true,
 		fastKnight = true,
 		fastDragon = true,
 		hammerThrow = 1,
-		minIndex = 3000,
-		maxIndex = 3500,
+		minIndex = 3100,
+		maxIndex = 3376,
 		branchPriorities = DefaultBranchPriorities
 	} = {}) {
-		this.actions = actionsTable instanceof Actions ? actionsTable : new Actions(actionsTable);
 		this.fastMagician = fastMagician;
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
@@ -386,6 +352,83 @@ export class BattleWindowsMWWManipulator {
 		this.minIndex = minIndex;
 		this.maxIndex = maxIndex;
 		this.branchPriorities = branchPriorities;
+
+		this._parseActionsDifficultyTable(actionsDifficultyTable);
+	}
+
+	_parseActionsDifficultyTable(table) {
+		const parseAdvances = ({ dashes=0, slides=0, hammerFlips=0, stars=0 }) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
+
+		const parseMessageJa = ({ dashes, slides, hammerFlips, stars, advances }) => {
+			const a = [];
+			if (advances !== undefined) {
+				if (slides) a.push(["", "", "", "", "準速スライディング", "最速スライディング"][advances]);
+				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
+			} else {
+				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
+				if (hammerFlips) a.push(["", "鬼殺し", "2鬼殺し"][hammerFlips]);
+				if (stars) a.push(["", "星", "2星"][stars]);
+				if (slides) a.push(["", "スライディング", "2スライディング"][slides]);
+			}
+			return a.length ? a.join(" & ") : "待機";
+		};
+
+		const parseMessageEn = ({ dashes, slides, hammerFlips, stars, advances }) => {
+			const a = [];
+			if (advances !== undefined) {
+				if (slides) a.push(["", "", "", "", "Sub-optimal Slide", "Optimal Slide"][advances]);
+				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
+			} else {
+				if (dashes) a.push(["", "Short Dash", "Dash", "Long Dash"][dashes]);
+				if (hammerFlips) a.push(["", "Hammer Flip", "2 Hammer Flips"][hammerFlips]);
+				if (stars) a.push(["", "Star", "2 Stars"][stars]);
+				if (slides) a.push(["", "Slide", "2 Slides"][slides]);
+			}
+			return a.length ? a.join(" & ") : "Wait";
+		};
+
+		const parseEnemyActions = (actionsData) => {
+			return actionsData.toSorted((a, b) => a.difficulty - b.difficulty).map(a => ({
+				difficulty: a.difficulty,
+				advances: parseAdvances(a),
+				actions: a,
+				messageJa: parseMessageJa(a),
+				messageEn: parseMessageEn(a),
+			}));
+		};
+
+		this.magicianActions = table.magician.toSorted((a, b) => a.difficulty - b.difficulty).map(a => {
+			const advances = parseAdvances(a);
+			return {
+				difficulty: a.difficulty,
+				advances1: a.advances === undefined ? advances : a.advances,
+				advances2: a.advances === undefined ? 0 : advances - a.advances,
+				fast: a.hammerFlips !== undefined,
+				actions: a,
+				messageJa: parseMessageJa(a),
+				messageEn: parseMessageEn(a),
+			};
+		});
+
+		const knightActions = parseEnemyActions(table.knight);
+		const dragonActions = parseEnemyActions(table.dragon);
+		const dragonActionActions = parseEnemyActions(table.dragonAction);
+
+		// 魔法使い以外の全ての行動の組み合わせを作成し、難易度順にソート
+		this.actionCombinations = [];
+		for (const knight of knightActions) {
+			for (const dragon of dragonActions) {
+				for (const dragonAction of dragonActionActions) {
+					this.actionCombinations.push({
+						difficulty: knight.difficulty + dragon.difficulty + dragonAction.difficulty,
+						knight,
+						dragon,
+						dragonAction,
+					});
+				}
+			}
+		}
+		this.actionCombinations.sort((a, b) => a.difficulty - b.difficulty);
 	}
 
 	/** 部分一致候補から分岐方式を適用して解を探す */
@@ -406,21 +449,21 @@ export class BattleWindowsMWWManipulator {
 			if (unmatched.some(e => bt.getObservable(e) !== failObs)) continue;
 			if (matched.some(e => bt.getObservable(e) === failObs)) continue;
 
-			// 失敗インデックス群に対して機能するactionsTableを探す
-			const actionsTable = list[0].actionsTable;
+			// 失敗インデックス群に対して機能するactionCombinationを探す
+			const actionCombination = list[0].actionCombination;
 			const failIndices = unmatched.map(e => e.index);
-			for (const altActionsTable of this.actions.list) {
-				if (!bt.filterFallback(actionsTable, altActionsTable)) continue;
+			for (const altActionCombination of this.actionCombinations) {
+				if (!bt.filterFallback(actionCombination, altActionCombination)) continue;
 				let allMatch = true;
 				for (const index of failIndices) {
 					r.index = index;
-					const sim = r.simulateBattleWindowsMWW(magician, altActionsTable, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = r.simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 					if (sim.length !== 4) { allMatch = false; break; }
 				}
 				if (allMatch) {
 					return {
-						actionsTable,
-						branch: { type: branchTypeName, value: failObs, fallbackActionsTable: altActionsTable },
+						actionCombination,
+						branch: { type: branchTypeName, value: failObs, fallbackActionCombination: altActionCombination },
 					};
 				}
 			}
@@ -443,8 +486,8 @@ export class BattleWindowsMWWManipulator {
 		const indexArray = new Uint16Array(indexList);
 
 		// 魔法使いに先制されない行動を探す
-		const emptyResult = { magician: null, actionsTable: null, branch: null };
-		const magicianList = this.actions.magicianList.filter(magician => (this.fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
+		const emptyResult = { magician: null, actionCombination: null, branch: null };
+		const magicianList = this.magicianActions.filter(magician => (this.fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
 		if (magicianList.length === 0) return emptyResult;
 
 		let bestPartialResult = { ...emptyResult };
@@ -454,20 +497,20 @@ export class BattleWindowsMWWManipulator {
 			// 難易度の低い順に行動を走査
 			const bestPartialMatches = [];
 			let bestMatchCount = 0;
-			for (const actionsTable of this.actions.list) {
+			for (const actionCombination of this.actionCombinations) {
 				// 可能性のある全ての乱数位置で理想的か確認
 				const list = [];
 				let matchCount = 0;
 				for (const index of indexArray) {
 					r.index = index;
-					const sim = r.simulateBattleWindowsMWW(magician, actionsTable, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = r.simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 					if (sim.length === 4) matchCount++;
-					list.push({ actionsTable, index, sim });
+					list.push({ actionCombination, index, sim });
 				}
 
 				// 全乱数位置で理想的なら確定
 				if (matchCount === indexArray.length) {
-					return { magician, actionsTable, branch: null };
+					return { magician, actionCombination, branch: null };
 				}
 				// 理想的なのが最多の結果を蓄積
 				if (matchCount >= bestMatchCount) {
@@ -483,14 +526,14 @@ export class BattleWindowsMWWManipulator {
 			for (const branchTypeName of this.branchPriorities) {
 				const branchResult = this._tryBranch(branchTypeName, bestPartialMatches, r, magician);
 				if (branchResult) {
-					return { magician, actionsTable: branchResult.actionsTable, branch: branchResult.branch };
+					return { magician, actionCombination: branchResult.actionCombination, branch: branchResult.branch };
 				}
 			}
 
 			// 最良の部分一致を記録
 			if (bestMatchCount > bestMatchCountAll) {
 				bestMatchCountAll = bestMatchCount;
-				bestPartialResult = { magician, actionsTable: bestPartialMatches[0]?.[0]?.actionsTable ?? null, branch: null };
+				bestPartialResult = { magician, actionCombination: bestPartialMatches[0]?.[0]?.actionCombination ?? null, branch: null };
 			}
 		}
 
