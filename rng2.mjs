@@ -230,6 +230,7 @@ export class KssRng {
 			// Easyモード
 			if (this.magicianAttacksFirst()) return result;
 			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
+			if (magician.advances2 > 0) this.debugLog("スライディングの残り");
 			result.push(this.battleWindowsPowers());
 			this.hammerFlipChargeAndHit();
 		}
