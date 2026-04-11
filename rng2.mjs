@@ -2,7 +2,7 @@ export const INITIAL_SEED = 0x7777
 export const CYCLE_LEN = 65534	//乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
 
 /** 乱数のリスト */
-export const RngCycle = new Uint8Array(CYCLE_LEN * 2);	// 一周したとき用に2週分
+export const RngCycle = new Uint16Array(CYCLE_LEN);
 for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 	RngCycle[i] = s;
 	const a = s ^ s>>1;
@@ -46,11 +46,13 @@ export class KssRng {
 	}
 	/** 乱数を1回進めて、0以上max未満の乱数を返す */
 	randi(max) {
-		return (RngCycle[++this.index] * max) >> 8;
+		this.advance(1);
+		return ((RngCycle[this.index] & 0xFF) * max) >> 8;
 	}
 	/** 乱数を指定の回数進める */
 	advance(count) {
 		this.index += count;
+		if (this.index >= CYCLE_LEN) this.index -= CYCLE_LEN;
 	}
 
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
@@ -493,11 +495,11 @@ export class BattleWindowsMWWManipulator {
 	*/
 	manipulate(stars) {
 		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後のインデックスが返る）
-		const indexArray = findIndexesByStars(stars, this.minIndex, this.maxIndex);
+		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す
 		const emptyResult = { magician: null, actionCombination: null, branch: null };
-		const magicianList = this.magicianActions.filter(magician => (this.fastMagician || !magician.fast) && indexArray.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
+		const magicianList = this.magicianActions.filter(magician => (this.fastMagician || !magician.fast) && indexList.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
 		if (magicianList.length === 0) return emptyResult;
 
 		let bestPartialResult = { ...emptyResult };
@@ -511,14 +513,14 @@ export class BattleWindowsMWWManipulator {
 				// 可能性のある全ての乱数位置で理想的か確認
 				const list = [];
 				let matchCount = 0;
-				for (const index of indexArray) {
+				for (const index of indexList) {
 					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 					if (sim.length === 4) matchCount++;
 					list.push({ actionCombination, index, sim });
 				}
 
 				// 全乱数位置で理想的なら確定
-				if (matchCount === indexArray.length) {
+				if (matchCount === indexList.length) {
 					return { magician, actionCombination, branch: null };
 				}
 				// 理想的なのが最多の結果を蓄積
