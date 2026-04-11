@@ -181,7 +181,6 @@ function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastD
     console.log("ハンマー投げのダッシュによる消費数: " + hammerThrow);
     console.log("探索する乱数位置: " + minIndex + " ～ " + maxIndex);
     console.log("星を出す回数: " + stars);
-    console.log("分岐の優先度: " + (branchPriorities ? branchPriorities.join(", ") : "未指定"));
 
     const manipulator = new BattleWindowsMWWManipulator({
         fastMagician, fastKnight, fastDragon, hammerThrow,
@@ -196,8 +195,8 @@ function testNewManipulation(minIndex, maxIndex, fastMagician, fastKnight, fastD
     console.log('敵の行動の組み合わせが存在しない: '+ result.otherNGCount);
     console.log('分岐発生数: '+ result.branchCount);
     if (Object.keys(result.branchGroups).length > 0) {
-        for (const [key, indices] of Object.entries(result.branchGroups)) {
-            console.log(`  ${key}: [${indices.join(', ')}]`);
+        for (const [key, groups] of Object.entries(result.branchGroups)) {
+            console.log(`  ${key} ? [${groups.true.join(', ')}] : [${groups.false.join(', ')}]`);
         }
     }
     console.log('### 行動を適用してシミュレーションした結果');

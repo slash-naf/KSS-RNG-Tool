@@ -316,66 +316,66 @@ export const BranchTypes = {
 // BattleWindowsMWWManipulatorのデフォルト値
 const DefaultBranchPriorities = ['dragonPowers', 'knightPowers', 'magicianPowers'];
 const DefaultActionsDifficultyTable = {
-    magician: [
-        { difficulty: -4, hammerFlips: 1, advances: 6 },
-        { difficulty: -3, hammerFlips: 1, advances: 4 },
-        { difficulty: -2, hammerFlips: 1, advances: 2 },
-        { difficulty: -1, hammerFlips: 1, advances: 0 },
-        { difficulty: 0 },
-        { difficulty: 301, slides: 1, advances: 4 },
-        { difficulty: 302, dashes: 2 },
-        { difficulty: 303, dashes: 3 },
-        { difficulty: 304, slides: 1, advances: 5 },
-        { difficulty: 305, dashes: 1 },
-    ],
-    knight: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 2, hammerFlips: 1 },
-        { difficulty: 3, slides: 1 },
-        { difficulty: 11, stars: 2 },
-        { difficulty: 12, hammerFlips: 2 },
-        { difficulty: 13, slides: 2 },
-        { difficulty: 21, hammerFlips: 1, stars: 1 },
-        { difficulty: 22, stars: 1, slides: 1 },
-        { difficulty: 23, hammerFlips: 1, slides: 1 },
-        { difficulty: 24, dashes: 3 },
-        { difficulty: 41, dashes: 3, stars: 1 },
-        { difficulty: 42, dashes: 3, hammerFlips: 1 },
-        { difficulty: 43, dashes: 3, slides: 1 },
-        { difficulty: 44, dashes: 2, stars: 1, hammerFlips: 1 },
-        { difficulty: 45, dashes: 2, stars: 1, slides: 1 },
-        { difficulty: 150, dashes: 1 },
-        { difficulty: 201, dashes: 1, hammerFlips: 1 },
-        { difficulty: 202, dashes: 1, slides: 1 },
-    ],
-    dragon: [
-        { difficulty: 0 },
-        { difficulty: 4, stars: 1 },
-        { difficulty: 5, slides: 1 },
-        { difficulty: 16, stars: 2 },
-        { difficulty: 17, slides: 2 },
-        { difficulty: 31, stars: 1, slides: 1 },
-        { difficulty: 32, dashes: 3 },
-        { difficulty: 51, dashes: 3, stars: 1 },
-        { difficulty: 52, dashes: 3, slides: 1 },
-        { difficulty: 54, dashes: 2, stars: 1, slides: 1 },
-        { difficulty: 200, dashes: 1 },
-        { difficulty: 251, dashes: 1, slides: 1 },
-    ],
-    dragonAction: [
-        { difficulty: 0 },
-        { difficulty: 1, stars: 1 },
-        { difficulty: 1, hammerFlips: 1 },
-        { difficulty: 1, slides: 1 },
-        { difficulty: 1, dashes: 3 },
-        { difficulty: 6, dashes: 2, stars: 1 },
-        { difficulty: 7, dashes: 2, slides: 1 },
-        { difficulty: 8, dashes: 2, hammerFlips: 1 },
-        { difficulty: 250, dashes: 1 },
-        { difficulty: 351, dashes: 1, hammerFlips: 1 },
-        { difficulty: 352, dashes: 1, slides: 1 },
-    ],
+	magician: [
+		{ difficulty: -4, hammerFlips: 1, advances: 6 },
+		{ difficulty: -3, hammerFlips: 1, advances: 4 },
+		{ difficulty: -2, hammerFlips: 1, advances: 2 },
+		{ difficulty: -1, hammerFlips: 1, advances: 0 },
+		{ difficulty: 0 },
+		{ difficulty: 301, slides: 1, advances: 4 },
+		{ difficulty: 302, dashes: 2 },
+		{ difficulty: 303, dashes: 3 },
+		{ difficulty: 304, slides: 1, advances: 5 },
+		{ difficulty: 305, dashes: 1 },
+	],
+	knight: [
+		{ difficulty: 0 },
+		{ difficulty: 1, stars: 1 },
+		{ difficulty: 2, hammerFlips: 1 },
+		{ difficulty: 3, slides: 1 },
+		{ difficulty: 11, stars: 2 },
+		{ difficulty: 12, hammerFlips: 2 },
+		{ difficulty: 13, slides: 2 },
+		{ difficulty: 21, hammerFlips: 1, stars: 1 },
+		{ difficulty: 22, stars: 1, slides: 1 },
+		{ difficulty: 23, hammerFlips: 1, slides: 1 },
+		{ difficulty: 24, dashes: 3 },
+		{ difficulty: 41, dashes: 3, stars: 1 },
+		{ difficulty: 42, dashes: 3, hammerFlips: 1 },
+		{ difficulty: 43, dashes: 3, slides: 1 },
+		{ difficulty: 44, dashes: 2, stars: 1, hammerFlips: 1 },
+		{ difficulty: 45, dashes: 2, stars: 1, slides: 1 },
+		{ difficulty: 150, dashes: 1 },
+		{ difficulty: 201, dashes: 1, hammerFlips: 1 },
+		{ difficulty: 202, dashes: 1, slides: 1 },
+	],
+	dragon: [
+		{ difficulty: 0 },
+		{ difficulty: 4, stars: 1 },
+		{ difficulty: 5, slides: 1 },
+		{ difficulty: 16, stars: 2 },
+		{ difficulty: 17, slides: 2 },
+		{ difficulty: 31, stars: 1, slides: 1 },
+		{ difficulty: 32, dashes: 3 },
+		{ difficulty: 51, dashes: 3, stars: 1 },
+		{ difficulty: 52, dashes: 3, slides: 1 },
+		{ difficulty: 54, dashes: 2, stars: 1, slides: 1 },
+		{ difficulty: 200, dashes: 1 },
+		{ difficulty: 251, dashes: 1, slides: 1 },
+	],
+	dragonAction: [
+		{ difficulty: 0 },
+		{ difficulty: 1, stars: 1 },
+		{ difficulty: 1, hammerFlips: 1 },
+		{ difficulty: 1, slides: 1 },
+		{ difficulty: 1, dashes: 3 },
+		{ difficulty: 6, dashes: 2, stars: 1 },
+		{ difficulty: 7, dashes: 2, slides: 1 },
+		{ difficulty: 8, dashes: 2, hammerFlips: 1 },
+		{ difficulty: 250, dashes: 1 },
+		{ difficulty: 351, dashes: 1, hammerFlips: 1 },
+		{ difficulty: 352, dashes: 1, slides: 1 },
+	],
 };
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
@@ -609,6 +609,7 @@ export class BattleWindowsMWWManipulator {
 			for (let j = 0; j < stars; j++) {
 				starDirectionList.push(r.starDirection());
 			}
+			const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
 
 			// 乱数調整のための行動を計算
 			const { magician, actionCombination, branch } = this.manipulate(starDirectionList);
@@ -621,17 +622,29 @@ export class BattleWindowsMWWManipulator {
 				continue;
 			}
 			let chosenActionCombination = actionCombination;
+			let branchStr = "なし";
 			if (branch) {
-				branchCount++;
-				const starKey = starDirectionList.map(v => StarDirectionChars[v]).join('');
-				if (!branchGroups[starKey]) branchGroups[starKey] = [];
-				branchGroups[starKey].push(i);
-
 				const bt = BranchTypes[branch.type];
 				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
-				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
+				const isEqual = tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value;
+				if (isEqual) {
 					chosenActionCombination = branch.fallbackActionCombination;
 				}
+
+				// 分岐のカウント
+				branchCount++;
+				const formatVal = (type, val) => {
+					if (type.endsWith('Powers')) {
+						const left = Math.floor(val / BattleWindowsPowerMap.length);
+						const right = val % BattleWindowsPowerMap.length;
+						return `${BattleWindowsPowerNames[left]}-${BattleWindowsPowerNames[right]}`;
+					}
+					return BattleWindowsPowerNames[val];
+				};
+				branchStr = `${branch.type} = ${formatVal(branch.type, branch.value)}`
+				const key = `${starStr} ${branchStr}`;
+				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [] };
+				branchGroups[key][isEqual].push(i);
 			}
 
 			// 行動を適用
