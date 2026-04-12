@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>KSS RNG Manipulation RTA 2</title>
+<style>
+body {
+	font-family: sans-serif;
+	background-color: lightblue;
+	color: #000;
+	font-size: 26px;
+	margin: 30px;
+}
+h1 {
+	text-align: center;
+}
+.links {
+	float: right;
+	text-align: right;
+	line-height: 150%;
+}
+input[type='text'] {
+	transform: scale(1.4);
+	margin-left: 8px;
+	margin-right: 8px;
+}
+input[type='radio'] {
+	transform: scale(1.5);
+	margin-right: 8px;
+}
+input[type='checkbox'] {
+	transform: scale(1.2);
+	margin-right: 10px;
+}
+details summary {
+	cursor: pointer;
+}
+
+.star-input-area {
+	margin: 10px 0;
+}
+.star-box {
+	display: inline-block;
+	width: 40px;
+	height: 40px;
+	border: 1px solid #666;
+	text-align: center;
+	line-height: 40px;
+	font-size: 22px;
+	background: white;
+	margin-right: 2px;
+	vertical-align: middle;
+}
+.star-box.filled {
+	background-color: #98fb98;
+}
+
+.result-table {
+	border-collapse: collapse;
+	margin: 10px 0;
+}
+.result-table th, .result-table td {
+	border: 1px solid #38008080;
+	padding: 6px 12px;
+	text-align: center;
+	vertical-align: middle;
+}
+.result-table th {
+	background-color: rgb(176, 198, 255);
+}
+.result-table td {
+	background-color: rgb(213, 225, 255);
+}
+.result-table td img, .result-table th img {
+	vertical-align: middle;
+}
+.result-table td.enemy-cell {
+	padding: 4px;
+}
+.result-table td.enemy-cell img {
+	height: 50px;
+}
+
+#status-message {
+	margin: 10px 0;
+	font-size: 22px;
+}
+
+.settings-area {
+	line-height: 180%;
+}
+.settings-area label {
+	margin-right: 10px;
+}
+</style>
+</head>
+<body class="ubuntu-font">
+
+<h1>KSS RNG Manipulation RTA 2</h1>
+
+<div class="links">
+	<span>Main Page</span><br>
+	<a href="rta_manipulator.html">Old Version</a><br>
+	<a href="manual2.md">Manual</a>
+</div>
+
+<div class="settings-area">
+	<label id="label-lang">Language:</label>
+	<select id="lang" onchange="switchLang(this.value)">
+		<option value="en">English</option>
+		<option value="ja">日本語</option>
+	</select>
+	<br>
+
+	<label>Min:</label>
+	<input style="width: 50px" maxlength="5" type="text" id="min" value="3100">
+	<label>Max:</label>
+	<input style="width: 50px" maxlength="5" type="text" id="max" value="3376">
+	<br>
+
+	<label id="label-magician">Magician:</label>
+	<select id="difficulty-magician">
+		<option value="true">Easy</option>
+		<option value="false" selected>Fast</option>
+	</select>
+
+	<label id="label-knight">Knight:</label>
+	<select id="difficulty-knight">
+		<option value="true">Easy</option>
+		<option value="false" selected>Fast</option>
+	</select>
+
+	<label id="label-dragon">Dragon:</label>
+	<select id="difficulty-dragon">
+		<option value="true">Easy</option>
+		<option value="false" selected>Fast</option>
+	</select>
+	<br>
+
+	<label id="label-hammer-throw">Hammer throw dash advances:</label>
+	<input type="radio" name="hammer-throw" value="0"><label>0</label>
+	<input type="radio" name="hammer-throw" value="1" checked><label>1</label>
+	<input type="radio" name="hammer-throw" value="2"><label>2</label>
+	<br>
+
+	<details>
+		<summary id="label-settings">Settings</summary>
+		<ul>
+			<li><label><input type="checkbox" id="no-numpad"> <span id="label-no-numpad">No Numpad</span></label></li>
+			<li><label><input type="checkbox" id="show-arrival-index"> <span id="label-show-arrival">Show arrival RNG index</span></label></li>
+		</ul>
+	</details>
+</div>
+
+<div class="star-input-area">
+	<div id="star-boxes"></div>
+	<div style="font-size:16px; margin-top:4px" id="input-hint">numpad: input - enter: reset - backspace: go back</div>
+</div>
+
+<div id="status-message"></div>
+<div id="result-area"></div>
+
+<div style="height: 300px;"></div>
+
+<script type="module">
+import {
+	BattleWindowsMWWManipulator, BranchTypes,
+	BattleWindowsPowerNames, BattleWindowsPowerNone,
+	StarDirectionChars, findIndexesByStars, KssRng,
+	CYCLE_LEN
+} from './rng2.mjs';
+
+// --- テンキー→星の方向の変換 ---
+const NumpadToStarIndex = { 8: 0, 9: 1, 6: 2, 3: 3, 2: 4, 1: 5, 4: 6, 7: 7 };
+const NoNumpadMap = { 'w': 8, 'e': 9, 'd': 6, 'c': 3, 'x': 2, 'z': 1, 'a': 4, 'q': 7 };
+
+// BattleWindowsPowerMap の長さ（obsPowers のエンコードに使用）
+const POWER_MAP_LEN = BattleWindowsPowerNames.length;
+
+// --- 多言語テキスト ---
+const L = {
+	en: {
+		langLabel: 'Language:',
+		magician: 'Magician:',
+		knight: 'Knight:',
+		dragon: 'Dragon:',
+		hammerThrow: 'Hammer throw dash advances:',
+		settings: 'Settings',
+		noNumpad: 'No Numpad',
+		showArrival: 'Show arrival RNG index',
+		inputHint: 'numpad: input - enter: reset - backspace: go back',
+		pressToStart: 'Press on Numpad to start',
+		notInRange: 'Not in range.',
+		rngIndex: 'RNG index: ',
+		thAction: 'Action',
+		thBranch: 'Branch',
+		noMagicianAction: 'No valid action found for Magician.',
+		noActionCombination: 'No valid action combination found.',
+	},
+	ja: {
+		langLabel: '言語:',
+		magician: '魔法使い:',
+		knight: '悪魔の騎士:',
+		dragon: 'レッドドラゴン:',
+		hammerThrow: 'ハンマー投げのダッシュ消費数:',
+		settings: '設定',
+		noNumpad: 'テンキーなし',
+		showArrival: '到着時の乱数位置を表示',
+		inputHint: 'テンキー: 入力 - Enter: リセット - Backspace: 戻る',
+		pressToStart: 'テンキーで入力開始',
+		notInRange: '範囲内に一致する乱数がありません。',
+		rngIndex: '乱数位置: ',
+		thAction: '行動',
+		thBranch: '分岐',
+		noMagicianAction: '魔法使いの条件に合う行動が見つかりません。',
+		noActionCombination: '行動の組み合わせが見つかりません。',
+	}
+};
+
+let lang = 'en';
+function t(key) { return L[lang][key] || L.en[key] || key; }
+
+// --- 状態 ---
+let stars = [];
+
+// --- DOM ---
+const starBoxesEl = document.getElementById('star-boxes');
+const statusEl = document.getElementById('status-message');
+const resultEl = document.getElementById('result-area');
+
+// --- 星ボックスの描画 ---
+function renderStarBoxes() {
+	starBoxesEl.innerHTML = '';
+	const count = Math.max(stars.length + 1, 3);
+	for (let i = 0; i < count; i++) {
+		const box = document.createElement('span');
+		box.className = 'star-box' + (i < stars.length ? ' filled' : '');
+		box.textContent = i < stars.length ? StarDirectionChars[stars[i]] : (i + 1);
+		starBoxesEl.appendChild(box);
+	}
+}
+
+// --- 設定値の取得 ---
+function getSettings() {
+	return {
+		minIndex: parseInt(document.getElementById('min').value, 10) || 3100,
+		maxIndex: parseInt(document.getElementById('max').value, 10) || 3376,
+		fastMagician: document.getElementById('difficulty-magician').value === 'false',
+		fastKnight: document.getElementById('difficulty-knight').value === 'false',
+		fastDragon: document.getElementById('difficulty-dragon').value === 'false',
+		hammerThrow: parseInt(document.querySelector('input[name="hammer-throw"]:checked').value, 10),
+	};
+}
+
+// --- コピーの元の画像タグ（Noneも表示する） ---
+function powerImg(powerIndex) {
+	const name = BattleWindowsPowerNames[powerIndex].toLowerCase();
+	return `<img src="images/abilities/${name}.png" title="${BattleWindowsPowerNames[powerIndex]}">`;
+}
+
+// --- 分岐の観測値を左右のコピーの元画像として表示 ---
+function formatBranchPowers(type, val) {
+	if (type.endsWith('Powers')) {
+		const left = Math.floor(val / POWER_MAP_LEN);
+		const right = val % POWER_MAP_LEN;
+		return powerImg(left) + ' ' + powerImg(right);
+	}
+	if (type.endsWith('Left')) {
+		return powerImg(val) + ' ?';
+	}
+	if (type.endsWith('Right')) {
+		return '? ' + powerImg(val);
+	}
+	return String(val);
+}
+
+// --- メッセージの取得（言語切替対応） ---
+function msg(actionObj) {
+	return lang === 'ja' ? actionObj.messageJa : actionObj.messageEn;
+}
+
+// --- 敵の画像パス ---
+const EnemyImages = [
+	'images/magician.png',
+	'images/knight.png',
+	'images/dragon.png',
+	'images/dragonshield.png',
+];
+
+// --- 結果表示 ---
+function displayResult() {
+	resultEl.innerHTML = '';
+	statusEl.innerHTML = '';
+
+	if (stars.length < 3) {
+		statusEl.innerHTML = t('pressToStart');
+		return;
+	}
+
+	const settings = getSettings();
+	const manipulator = new BattleWindowsMWWManipulator(settings);
+
+	// 到着時の乱数位置（星消費前）を計算
+	const starIndices = findIndexesByStars(stars, settings.minIndex, settings.maxIndex);
+
+	if (starIndices.length === 0) {
+		statusEl.innerHTML = t('notInRange');
+		return;
+	}
+
+	// 到着時の乱数位置の表示（設定がオンの場合のみ）
+	if (document.getElementById('show-arrival-index').checked) {
+		const arrivalIndices = Array.from(starIndices).map(idx => idx - stars.length * 2);
+		statusEl.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
+	}
+
+	// manipulate は全候補を同時に考慮して1つの結果を返す
+	const result = manipulator.manipulate(stars);
+
+	if (result.magician === null) {
+		resultEl.innerHTML = `<p>${t('noMagicianAction')}</p>`;
+		return;
+	}
+	if (result.actionCombination === null) {
+		resultEl.innerHTML = `<p>${t('noActionCombination')}</p>`;
+		return;
+	}
+
+	const { magician, actionCombination, branch } = result;
+	const hasBranch = branch !== null;
+
+	// 分岐がある場合、どの敵のターンで観測するか (simIndex)
+	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
+	const branchSimIndex = hasBranch ? BranchTypes[branch.type].minSimLength - 1 : -1;
+
+	// テーブル構築
+	const table = document.createElement('table');
+	table.className = 'result-table';
+
+	// ヘッダー
+	const thead = document.createElement('thead');
+	let headerHtml = `<tr><th></th><th>${t('thAction')}</th>`;
+	if (hasBranch) headerHtml += `<th>${t('thBranch')}</th>`;
+	headerHtml += '</tr>';
+	thead.innerHTML = headerHtml;
+	table.appendChild(thead);
+
+	const tbody = document.createElement('tbody');
+
+	// 各ターンの行データ
+	// [0]=magician, [1]=knight, [2]=dragon, [3]=dragonAction
+	const mainActions = [magician, actionCombination.knight, actionCombination.dragon, actionCombination.dragonAction];
+	const fallbackActions = hasBranch
+		? [null, branch.fallbackActionCombination.knight, branch.fallbackActionCombination.dragon, branch.fallbackActionCombination.dragonAction]
+		: null;
+
+	for (let i = 0; i < 4; i++) {
+		const tr = document.createElement('tr');
+		let html = '';
+
+		// 敵の画像
+		html += `<td class="enemy-cell"><img src="${EnemyImages[i]}"></td>`;
+
+		// メイン行動
+		html += `<td>${msg(mainActions[i])}</td>`;
+
+		// 分岐列
+		if (hasBranch) {
+			if (i === branchSimIndex) {
+				// この行で観測が行われる → コピーの元を表示
+				html += `<td>${formatBranchPowers(branch.type, branch.value)}</td>`;
+			} else if (i > branchSimIndex && fallbackActions[i]) {
+				// 観測後の行 → 分岐先の行動を表示
+				html += `<td>${msg(fallbackActions[i])}</td>`;
+			} else {
+				html += '<td></td>';
+			}
+		}
+
+		tr.innerHTML = html;
+		tbody.appendChild(tr);
+	}
+
+	table.appendChild(tbody);
+	resultEl.appendChild(table);
+}
+
+// --- 入力リセット ---
+function resetInputs() {
+	stars = [];
+	renderStarBoxes();
+	resultEl.innerHTML = '';
+	statusEl.innerHTML = t('pressToStart');
+}
+
+// --- 言語切替 ---
+window.switchLang = function(val) {
+	lang = val;
+	document.getElementById('label-magician').textContent = t('magician');
+	document.getElementById('label-knight').textContent = t('knight');
+	document.getElementById('label-dragon').textContent = t('dragon');
+	document.getElementById('label-hammer-throw').textContent = t('hammerThrow');
+	document.getElementById('label-settings').textContent = t('settings');
+	document.getElementById('label-no-numpad').textContent = t('noNumpad');
+	document.getElementById('label-show-arrival').textContent = t('showArrival');
+	document.getElementById('input-hint').textContent = t('inputHint');
+	if (stars.length < 3) statusEl.innerHTML = t('pressToStart');
+	else displayResult();
+};
+
+// --- キーボードイベント ---
+window.addEventListener('keydown', (event) => {
+	if (event.target.tagName?.toUpperCase() === 'INPUT' || event.target.tagName?.toUpperCase() === 'SELECT') return;
+
+	const key = event.key;
+	const noNumpad = document.getElementById('no-numpad').checked;
+
+	let numpadKey = null;
+	if (noNumpad) {
+		numpadKey = NoNumpadMap[key.toLowerCase()] || null;
+	} else {
+		const n = parseInt(key, 10);
+		if (n === n && n !== 0 && n !== 5) numpadKey = n;
+	}
+
+	if (numpadKey !== null && NumpadToStarIndex[numpadKey] !== undefined) {
+		stars.push(NumpadToStarIndex[numpadKey]);
+		renderStarBoxes();
+		displayResult();
+	} else if (key === 'Enter') {
+		resetInputs();
+	} else if (key === 'Backspace') {
+		if (stars.length > 0) {
+			stars.pop();
+			renderStarBoxes();
+			displayResult();
+		}
+	}
+}, true);
+
+// --- 設定変更時に再計算 ---
+for (const id of ['difficulty-magician', 'difficulty-knight', 'difficulty-dragon']) {
+	document.getElementById(id).addEventListener('change', displayResult);
+}
+for (const radio of document.querySelectorAll('input[name="hammer-throw"]')) {
+	radio.addEventListener('change', displayResult);
+}
+document.getElementById('show-arrival-index').addEventListener('change', displayResult);
+document.getElementById('min').addEventListener('change', displayResult);
+document.getElementById('max').addEventListener('change', displayResult);
+
+// --- 初期化 ---
+renderStarBoxes();
+statusEl.innerHTML = t('pressToStart');
+
+</script>
+</body>
+</html>
