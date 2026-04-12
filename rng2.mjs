@@ -321,7 +321,7 @@ export const BranchTypes = {
 	dragonPowers:       createBranchType(2, obsPowers),
 };
 // BattleWindowsMWWManipulatorのデフォルト値
-const DefaultBranchPriorities = ['dragonPowers', 'knightPowers', 'magicianPowers'];
+const DefaultBranchPriorities = ['knightPowers', 'dragonPowers', 'magicianPowers'];
 const DefaultActionsDifficultyTable = {
 	magician: [
 		{ difficulty: { true: -4, false: 1000-4 }, hammerFlips: 1, advances: 6 },
