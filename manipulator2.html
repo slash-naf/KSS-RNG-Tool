@@ -5,7 +5,7 @@
 <title>KSS RNG Manipulation RTA 2</title>
 <style>
 body {
-	font-family: sans-serif;
+	font-family: Arial, Helvetica, sans-serif;
 	background-color: lightblue;
 	color: #000;
 	font-size: 26px;
@@ -92,6 +92,24 @@ details summary {
 .settings-area label {
 	margin-right: 10px;
 }
+
+.test-table {
+	border-collapse: collapse;
+	font-size: 18px;
+}
+.test-table th, .test-table td {
+	border: 1px solid #38008080;
+	padding: 3px 10px;
+	text-align: center;
+	vertical-align: middle;
+	line-height: 1em;
+}
+.test-table th {
+	background-color: rgb(176, 198, 255);
+}
+.test-table td {
+	background-color: rgb(213, 225, 255);
+}
 </style>
 </head>
 <body class="ubuntu-font">
@@ -145,10 +163,20 @@ details summary {
 
 	<details>
 		<summary id="label-settings">Settings</summary>
-		<ul>
+		<ul style="padding-left: 2em">
 			<li><label><input type="checkbox" id="no-numpad"> <span id="label-no-numpad">No Numpad</span></label></li>
 			<li><label><input type="checkbox" id="show-arrival-index"> <span id="label-show-arrival">Show arrival RNG index</span></label></li>
 		</ul>
+	</details>
+
+	<details>
+		<summary id="label-test">Test</summary>
+		<div style="padding-left: 2em">
+			<label id="label-test-stars">Stars:</label>
+			<input type="number" id="test-stars" value="3" min="1" max="10" style="width:50px; font-size:20px">
+			<button id="test-run-btn" style="font-size:20px; padding:4px 12px; cursor:pointer">Run</button>
+			<div id="test-result"></div>
+		</div>
 	</details>
 </div>
 
@@ -196,6 +224,28 @@ const L = {
 		thBranch: 'Branch',
 		noMagicianAction: 'No valid action found for Magician.',
 		noActionCombination: 'No valid action combination found.',
+		test: 'Test',
+		testStars: 'Stars:',
+		testRun: 'Run',
+		testSummary: 'Summary',
+		testBranchDetails: 'Branch Details',
+		noMagicianActionCount: 'No valid Magician action',
+		noActionCombinationCount: 'No valid action combination',
+		branchOccurrences: 'Branch occurrences',
+		failMagician: 'Magician fail',
+		failKnight: 'Knight fail',
+		failDragon: 'Dragon fail',
+		failDragonTurn2: 'Dragon turn 2 fail',
+		thStars: 'Stars',
+		thEnemy: 'Enemy',
+		thPowers: 'Copy Powers',
+		thMatch: 'Match (=)',
+		thNoMatch: 'No Match (≠)',
+		thCount: 'Count',
+		magicianActions: 'Magician Actions',
+		knightActions: 'Knight Actions',
+		dragonActions: 'Dragon Actions',
+		dragonTurn2Actions: 'Dragon Turn 2 Actions',
 	},
 	ja: {
 		langLabel: '言語:',
@@ -214,6 +264,28 @@ const L = {
 		thBranch: '分岐',
 		noMagicianAction: '魔法使いの条件に合う行動が見つかりません。',
 		noActionCombination: '行動の組み合わせが見つかりません。',
+		test: 'テスト',
+		testStars: '星の回数:',
+		testRun: '実行',
+		testSummary: '統計',
+		testBranchDetails: '分岐発生詳細',
+		noMagicianActionCount: '魔法使いの条件に合う行動なし',
+		noActionCombinationCount: '行動の組み合わせなし',
+		branchOccurrences: '分岐発生数',
+		failMagician: '魔法使いで失敗',
+		failKnight: '悪魔の騎士で失敗',
+		failDragon: 'レッドドラゴンで失敗',
+		failDragonTurn2: 'レッドドラゴン2ターン目で失敗',
+		thStars: '星',
+		thEnemy: '敵',
+		thPowers: 'コピーの元',
+		thMatch: '一致(=)',
+		thNoMatch: '不一致(≠)',
+		thCount: '回数',
+		magicianActions: '魔法使いでの行動',
+		knightActions: '悪魔の騎士での行動',
+		dragonActions: 'レッドドラゴンでの行動',
+		dragonTurn2Actions: 'レッドドラゴン2ターン目での行動',
 	}
 };
 
@@ -393,6 +465,87 @@ function resetInputs() {
 	statusEl.innerHTML = t('pressToStart');
 }
 
+// --- テスト関数 ---
+const BranchEnemyNames = {
+	en: { magician: 'Magician', knight: 'Knight', dragon: 'Dragon' },
+	ja: { magician: '魔法使い', knight: '悪魔の騎士', dragon: 'レッドドラゴン' },
+};
+
+function branchTypeToEnemy(type) {
+	if (type.startsWith('magician')) return BranchEnemyNames[lang].magician;
+	if (type.startsWith('knight')) return BranchEnemyNames[lang].knight;
+	if (type.startsWith('dragon')) return BranchEnemyNames[lang].dragon;
+	return type;
+}
+
+function runTest() {
+	const testResultEl = document.getElementById('test-result');
+	const starsCount = parseInt(document.getElementById('test-stars').value, 10) || 3;
+	const settings = getSettings();
+	const manipulator = new BattleWindowsMWWManipulator(settings);
+	const result = manipulator.test(starsCount);
+
+	let html = '';
+
+	// 統計テーブル
+	html += `<b>${t('testSummary')}</b>`;
+	html += '<table class="test-table"><tbody>';
+	const summaryRows = [
+		[t('noMagicianActionCount'), result.magicianNGCount],
+		[t('noActionCombinationCount'), result.otherNGCount],
+		[t('branchOccurrences'), result.branchCount],
+		[t('failMagician'), result.wrongCounts[0]],
+		[t('failKnight'), result.wrongCounts[1]],
+		[t('failDragon'), result.wrongCounts[2]],
+		[t('failDragonTurn2'), result.wrongCounts[3]],
+	];
+	for (const [label, val] of summaryRows) {
+		html += `<tr><td style="text-align:left">${label}</td><td>${val}</td></tr>`;
+	}
+	html += '</tbody></table>';
+
+	// 分岐発生詳細
+	const branchEntries = Object.entries(result.branchGroups);
+	if (branchEntries.length > 0) {
+		html += `<b>${t('testBranchDetails')}</b>`;
+		html += '<table class="test-table"><thead><tr>';
+		html += `<th>${t('thStars')}</th><th>${t('thEnemy')}</th><th>${t('thPowers')}</th><th>${t('thMatch')}</th><th>${t('thNoMatch')}</th>`;
+		html += '</tr></thead><tbody>';
+		for (const [, g] of branchEntries) {
+			html += '<tr>';
+			html += `<td>${g.starStr}</td>`;
+			html += `<td>${branchTypeToEnemy(g.type)}</td>`;
+			html += `<td>${g.valStr}</td>`;
+			html += `<td>${g.true.length > 0 ? g.true.join(', ') : '-'}</td>`;
+			html += `<td>${g.false.length > 0 ? g.false.join(', ') : '-'}</td>`;
+			html += '</tr>';
+		}
+		html += '</tbody></table>';
+	}
+
+	// 行動テーブル（回数降順）
+	const renderActionTable = (title, countList) => {
+		const sorted = Object.entries(countList).sort((a, b) => b[1] - a[1]);
+		if (sorted.length === 0) return '';
+		let s = `<b>${title}</b>`;
+		s += `<table class="test-table"><thead><tr><th>${t('thAction')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
+		for (const [action, count] of sorted) {
+			s += `<tr><td>${action}</td><td>${count}</td></tr>`;
+		}
+		s += '</tbody></table>';
+		return s;
+	};
+
+	html += renderActionTable(t('magicianActions'), result.magicianCountList);
+	html += renderActionTable(t('knightActions'), result.knightCountList);
+	html += renderActionTable(t('dragonActions'), result.dragonCountList);
+	html += renderActionTable(t('dragonTurn2Actions'), result.dragonActionCountList);
+
+	testResultEl.innerHTML = html;
+}
+
+document.getElementById('test-run-btn').addEventListener('click', runTest);
+
 // --- 言語切替 ---
 window.switchLang = function(val) {
 	lang = val;
@@ -404,6 +557,9 @@ window.switchLang = function(val) {
 	document.getElementById('label-no-numpad').textContent = t('noNumpad');
 	document.getElementById('label-show-arrival').textContent = t('showArrival');
 	document.getElementById('input-hint').textContent = t('inputHint');
+	document.getElementById('label-test').textContent = t('test');
+	document.getElementById('label-test-stars').textContent = t('testStars');
+	document.getElementById('test-run-btn').textContent = t('testRun');
 	if (stars.length < 3) statusEl.innerHTML = t('pressToStart');
 	else displayResult();
 };

@@ -425,7 +425,7 @@ export class BattleWindowsMWWManipulator {
 			const a = [];
 			if (advances !== undefined) {
 				if (slides) a.push(["", "", "", "", "準速スライディング", "最速スライディング"][advances]);
-				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
+				if (hammerFlips) a.push(["Fast4", "", "Fast3", "", "Fast2", "", "Fast1"][advances]);
 			} else {
 				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
 				if (stars) a.push(["", "星", "2星"][stars]);
@@ -439,7 +439,7 @@ export class BattleWindowsMWWManipulator {
 			const a = [];
 			if (advances !== undefined) {
 				if (slides) a.push(["", "", "", "", "Sub-optimal Slide", "Optimal Slide"][advances]);
-				if (hammerFlips) a.push(["fast4", "", "fast3", "", "fast2", "", "fast1"][advances]);
+				if (hammerFlips) a.push(["Fast4", "", "Fast3", "", "Fast2", "", "Fast1"][advances]);
 			} else {
 				if (dashes) a.push(["", "Short Dash", "Dash", "Long Dash"][dashes]);
 				if (stars) a.push(["", "Star", "2 Stars"][stars]);
@@ -649,9 +649,10 @@ export class BattleWindowsMWWManipulator {
 					}
 					return BattleWindowsPowerNames[val];
 				};
-				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${formatVal(branch.type, branch.value)}`;
-				const key = `${starStr} ${branchStr.replace("≠", "=")}`;
-				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [] };
+				const valStr = formatVal(branch.type, branch.value);
+				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${valStr}`;
+				const key = `${starStr} ${branch.type} = ${valStr}`;
+				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [], starStr, type: branch.type, valStr };
 				branchGroups[key][isEqual].push(i);
 			}
 			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐", branchStr);
