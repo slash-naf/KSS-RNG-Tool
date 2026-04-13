@@ -117,8 +117,6 @@ details summary {
 <h1>KSS RNG Manipulation RTA 2</h1>
 
 <div class="links">
-	<span>Main Page</span><br>
-	<a href="rta_manipulator.html">Old Version</a><br>
 	<a href="manual2.md">Manual</a>
 </div>
 
@@ -131,9 +129,9 @@ details summary {
 	<br>
 
 	<label>Min:</label>
-	<input style="width: 50px" maxlength="5" type="text" id="min" value="3100">
+	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="min" value="3100">
 	<label>Max:</label>
-	<input style="width: 50px" maxlength="5" type="text" id="max" value="3376">
+	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="max" value="3376">
 	<br>
 
 	<label id="label-magician">Magician:</label>
@@ -163,10 +161,10 @@ details summary {
 
 	<details>
 		<summary id="label-settings">Settings</summary>
-		<ul style="padding-left: 2em">
-			<li><label><input type="checkbox" id="no-numpad"> <span id="label-no-numpad">No Numpad</span></label></li>
-			<li><label><input type="checkbox" id="show-arrival-index"> <span id="label-show-arrival">Show arrival RNG index</span></label></li>
-		</ul>
+		<div style="padding-left: 2em">
+			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad">No Numpad</span></label></div>
+			<div><label><input type="checkbox" id="show-arrival-index"><span id="label-show-arrival">Show arrival RNG index</span></label></div>
+		</div>
 	</details>
 
 	<details>
@@ -182,7 +180,6 @@ details summary {
 
 <div class="star-input-area">
 	<div id="star-boxes"></div>
-	<div style="font-size:16px; margin-top:4px" id="input-hint">numpad: input - enter: reset - backspace: go back</div>
 </div>
 
 <div id="status-message"></div>
@@ -217,7 +214,7 @@ const L = {
 		noNumpad: 'No Numpad',
 		showArrival: 'Show arrival RNG index',
 		inputHint: 'numpad: input - enter: reset - backspace: go back',
-		pressToStart: 'Press on Numpad to start',
+		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">numpad: input - enter: reset - backspace: go back</span>',
 		notInRange: 'Not in range.',
 		rngIndex: 'RNG index: ',
 		thAction: 'Action',
@@ -257,7 +254,7 @@ const L = {
 		noNumpad: 'テンキーなし',
 		showArrival: '到着時の乱数位置を表示',
 		inputHint: 'テンキー: 入力 - Enter: リセット - Backspace: 戻る',
-		pressToStart: 'テンキーで入力開始',
+		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">テンキー: 入力 - Enter: リセット - Backspace: 戻る</span>',
 		notInRange: '範囲内に一致する乱数がありません。',
 		rngIndex: '乱数位置: ',
 		thAction: '行動',
@@ -556,7 +553,6 @@ window.switchLang = function(val) {
 	document.getElementById('label-settings').textContent = t('settings');
 	document.getElementById('label-no-numpad').textContent = t('noNumpad');
 	document.getElementById('label-show-arrival').textContent = t('showArrival');
-	document.getElementById('input-hint').textContent = t('inputHint');
 	document.getElementById('label-test').textContent = t('test');
 	document.getElementById('label-test-stars').textContent = t('testStars');
 	document.getElementById('test-run-btn').textContent = t('testRun');
