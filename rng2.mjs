@@ -323,18 +323,48 @@ export const BranchTypes = {
 // BattleWindowsMWWManipulatorのデフォルト値
 const DefaultBranchPriorities = ['knightPowers', 'dragonPowers', 'magicianPowers'];
 const DefaultActionsDifficultyTable = {
-	magician: [
-		{ difficulty: { true: -4, false: 1000-4 }, hammerFlips: 1, advances: 6 },
-		{ difficulty: { true: -3, false: 1000-3 }, hammerFlips: 1, advances: 4 },
-		{ difficulty: { true: -2, false: 1000-2 }, hammerFlips: 1, advances: 2 },
-		{ difficulty: { true: -1, false: 1000-1 }, hammerFlips: 1, advances: 0 },
-		{ difficulty: { true: 0, false: 0 } },
-		{ difficulty: { true: 301, false: 301 }, dashes: 2 },
-		{ difficulty: { true: 302, false: 302 }, dashes: 3 },
-		{ difficulty: { true: 303, false: 303 }, slides: 1, advances: 4 },
-		{ difficulty: { true: 304, false: 304 }, slides: 1, advances: 5 },
-		{ difficulty: { true: 305, false: 305 }, dashes: 1 },
-	],
+	magician: {
+		easy: [
+			{ },
+			{ stars: 1 },
+			{ hammerFlips: 1 },
+			{ slides: 1 },
+			{ dashes: 3 },
+			{ dashes: 2, stars: 1 },
+			{ dashes: 2, slides: 1 },
+			{ dashes: 2, hammerFlips: 1 },
+			{ dashes: 3, stars: 1 },
+			{ dashes: 3, slides: 1 },
+			{ slides: 2 },
+			{ dashes: 1 },
+			{ dashes: 1, slides: 1 },
+			{ dashes: 1, hammerFlips: 1 },
+		],
+		conservativeFast: [
+			{ },
+			{ dashes: 2 },
+			{ dashes: 3 },
+			{ slides: 1, advances: 4 },
+			{ slides: 1, advances: 5 },
+			{ dashes: 1 },
+			{ hammerFlips: 1, advances: 6 },
+			{ hammerFlips: 1, advances: 4 },
+			{ hammerFlips: 1, advances: 2 },
+			{ hammerFlips: 1, advances: 0 },
+		],
+		aggressiveFast: [
+			{ hammerFlips: 1, advances: 6 },
+			{ hammerFlips: 1, advances: 4 },
+			{ hammerFlips: 1, advances: 2 },
+			{ hammerFlips: 1, advances: 0 },
+			{ },
+			{ dashes: 2 },
+			{ dashes: 3 },
+			{ slides: 1, advances: 4 },
+			{ slides: 1, advances: 5 },
+			{ dashes: 1 },
+		],
+	},
 	knight: [
 		{ difficulty: 0 },
 		{ difficulty: 1, stars: 1 },
@@ -343,7 +373,7 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 11, stars: 2 },
 		{ difficulty: 12, hammerFlips: 2 },
 		{ difficulty: 13, slides: 2 },
-		{ difficulty: 21, hammerFlips: 1, stars: 1 },
+		{ difficulty: 21, stars: 1, hammerFlips: 1 },
 		{ difficulty: 22, stars: 1, slides: 1 },
 		{ difficulty: 23, hammerFlips: 1, slides: 1 },
 		{ difficulty: 24, dashes: 3 },
@@ -380,8 +410,8 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 7, dashes: 2, slides: 1 },
 		{ difficulty: 8, dashes: 2, hammerFlips: 1 },
 		{ difficulty: 250, dashes: 1 },
-		{ difficulty: 351, dashes: 1, hammerFlips: 1 },
-		{ difficulty: 352, dashes: 1, slides: 1 },
+		{ difficulty: 351, dashes: 1, slides: 1 },
+		{ difficulty: 352, dashes: 1, hammerFlips: 1 },
 	],
 };
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
@@ -389,7 +419,7 @@ export class BattleWindowsMWWManipulator {
 	/**
 	 * @param {Object} options
 	 * @param {Object} [options.actionsDifficultyTable] 行動と難易度の定義テーブル
-	 * @param {boolean} [options.fastMagician] 魔法使いをFastモードで倒すか
+	 * @param {string} [options.magicianDifficulty] 魔法使いの難易度 ('easy' | 'conservativeFast' | 'aggressiveFast')
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
 	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
@@ -399,7 +429,7 @@ export class BattleWindowsMWWManipulator {
 	 */
 	constructor({
 		actionsDifficultyTable = DefaultActionsDifficultyTable,
-		fastMagician = true,
+		magicianDifficulty = 'conservativeFast',
 		fastKnight = true,
 		fastDragon = true,
 		hammerThrow = 1,
@@ -407,7 +437,7 @@ export class BattleWindowsMWWManipulator {
 		maxIndex = 3376,
 		branchPriorities = DefaultBranchPriorities
 	} = {}) {
-		this.fastMagician = fastMagician;
+		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
 		this.hammerThrow = hammerThrow;
@@ -459,13 +489,13 @@ export class BattleWindowsMWWManipulator {
 			}));
 		};
 
-		this.magicianActions = table.magician.toSorted((a, b) => a.difficulty[this.fastMagician] - b.difficulty[this.fastMagician]).map(a => {
+		const magicianActionList = table.magician[this.magicianDifficulty] || table.magician.easy;
+		this.magicianActions = magicianActionList.map(a => {
 			const advances = parseAdvances(a);
 			return {
-				difficulty: a.difficulty,
 				advances1: a.advances === undefined ? advances : a.advances,
 				advances2: a.advances === undefined ? 0 : (a.hammerFlips ? HammerFlipChargeAdvances : advances) - a.advances,
-				fast: a.hammerFlips !== undefined,
+				fast: a.advances !== undefined && a.hammerFlips,
 				actions: a,
 				messageJa: parseMessageJa(a),
 				messageEn: parseMessageEn(a),

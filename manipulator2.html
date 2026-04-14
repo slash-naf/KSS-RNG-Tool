@@ -136,8 +136,9 @@ details summary {
 
 	<label id="label-magician">Magician:</label>
 	<select id="difficulty-magician">
-		<option value="true">Easy</option>
-		<option value="false" selected>Fast</option>
+		<option value="easy">Easy</option>
+		<option value="conservativeFast" selected>Conservative Fast</option>
+		<option value="aggressiveFast">Aggressive Fast</option>
 	</select>
 
 	<label id="label-knight">Knight:</label>
@@ -314,7 +315,7 @@ function getSettings() {
 	return {
 		minIndex: parseInt(document.getElementById('min').value, 10) || 3100,
 		maxIndex: parseInt(document.getElementById('max').value, 10) || 3376,
-		fastMagician: document.getElementById('difficulty-magician').value === 'false',
+		magicianDifficulty: document.getElementById('difficulty-magician').value,
 		fastKnight: document.getElementById('difficulty-knight').value === 'false',
 		fastDragon: document.getElementById('difficulty-dragon').value === 'false',
 		hammerThrow: parseInt(document.querySelector('input[name="hammer-throw"]:checked').value, 10),
