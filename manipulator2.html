@@ -136,21 +136,21 @@ details summary {
 
 	<label id="label-magician">Magician:</label>
 	<select id="difficulty-magician">
-		<option value="easy">Easy</option>
-		<option value="conservativeFast" selected>Conservative Fast</option>
+		<option value="easy" selected>Easy</option>
+		<option value="conservativeFast">Conservative Fast</option>
 		<option value="aggressiveFast">Aggressive Fast</option>
 	</select>
 
 	<label id="label-knight">Knight:</label>
 	<select id="difficulty-knight">
-		<option value="true">Easy</option>
-		<option value="false" selected>Fast</option>
+		<option value="true" selected>Easy</option>
+		<option value="false">Fast</option>
 	</select>
 
 	<label id="label-dragon">Dragon:</label>
 	<select id="difficulty-dragon">
-		<option value="true">Easy</option>
-		<option value="false" selected>Fast</option>
+		<option value="true" selected>Easy</option>
+		<option value="false">Fast</option>
 	</select>
 	<br>
 
@@ -165,6 +165,7 @@ details summary {
 		<div style="padding-left: 2em">
 			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad">No Numpad</span></label></div>
 			<div><label><input type="checkbox" id="show-arrival-index"><span id="label-show-arrival">Show arrival RNG index</span></label></div>
+			<button id="btn-default-settings" style="margin-top:4px">Default Settings</button>
 		</div>
 	</details>
 
@@ -214,15 +215,14 @@ const L = {
 		settings: 'Settings',
 		noNumpad: 'No Numpad',
 		showArrival: 'Show arrival RNG index',
-		inputHint: 'numpad: input - enter: reset - backspace: go back',
-		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">numpad: input - enter: reset - backspace: go back</span>',
+		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>',
 		notInRange: 'Not in range.',
 		rngIndex: 'RNG index: ',
 		thAction: 'Action',
 		thBranch: 'Branch',
 		noMagicianAction: 'No valid action found for Magician.',
 		noActionCombination: 'No valid action combination found.',
-		test: 'Test',
+		test: 'Analysis',
 		testStars: 'Stars:',
 		testRun: 'Run',
 		testSummary: 'Summary',
@@ -240,10 +240,12 @@ const L = {
 		thMatch: 'Match (=)',
 		thNoMatch: 'No Match (≠)',
 		thCount: 'Count',
+		thItem: 'Item',
 		magicianActions: 'Magician Actions',
 		knightActions: 'Knight Actions',
 		dragonActions: 'Dragon Actions',
 		dragonTurn2Actions: 'Dragon Turn 2 Actions',
+		defaultSettings: 'Default Settings',
 	},
 	ja: {
 		langLabel: '言語:',
@@ -254,15 +256,14 @@ const L = {
 		settings: '設定',
 		noNumpad: 'テンキーなし',
 		showArrival: '到着時の乱数位置を表示',
-		inputHint: 'テンキー: 入力 - Enter: リセット - Backspace: 戻る',
-		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">テンキー: 入力 - Enter: リセット - Backspace: 戻る</span>',
+		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>',
 		notInRange: '範囲内に一致する乱数がありません。',
 		rngIndex: '乱数位置: ',
 		thAction: '行動',
 		thBranch: '分岐',
 		noMagicianAction: '魔法使いの条件に合う行動が見つかりません。',
 		noActionCombination: '行動の組み合わせが見つかりません。',
-		test: 'テスト',
+		test: '分析',
 		testStars: '星の回数:',
 		testRun: '実行',
 		testSummary: '統計',
@@ -279,15 +280,17 @@ const L = {
 		thPowers: 'コピーの元',
 		thMatch: '一致(=)',
 		thNoMatch: '不一致(≠)',
-		thCount: '回数',
+		thCount: '件数',
+		thItem: '項目',
 		magicianActions: '魔法使いでの行動',
 		knightActions: '悪魔の騎士での行動',
 		dragonActions: 'レッドドラゴンでの行動',
 		dragonTurn2Actions: 'レッドドラゴン2ターン目での行動',
+		defaultSettings: 'デフォルト設定',
 	}
 };
 
-let lang = 'en';
+let lang = (navigator.language || navigator.userLanguage).startsWith('ja') ? 'ja' : 'en';
 function t(key) { return L[lang][key] || L.en[key] || key; }
 
 // --- 状態 ---
@@ -487,7 +490,7 @@ function runTest() {
 
 	// 統計テーブル
 	html += `<b>${t('testSummary')}</b>`;
-	html += '<table class="test-table"><tbody>';
+	html += `<table class="test-table"><thead><tr><th>${t('thItem')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
 	const summaryRows = [
 		[t('noMagicianActionCount'), result.magicianNGCount],
 		[t('noActionCombinationCount'), result.otherNGCount],
@@ -557,6 +560,7 @@ window.switchLang = function(val) {
 	document.getElementById('label-test').textContent = t('test');
 	document.getElementById('label-test-stars').textContent = t('testStars');
 	document.getElementById('test-run-btn').textContent = t('testRun');
+	document.getElementById('btn-default-settings').textContent = t('defaultSettings');
 	if (stars.length < 3) statusEl.innerHTML = t('pressToStart');
 	else displayResult();
 };
@@ -591,18 +595,74 @@ window.addEventListener('keydown', (event) => {
 	}
 }, true);
 
-// --- 設定変更時に再計算 ---
-for (const id of ['difficulty-magician', 'difficulty-knight', 'difficulty-dragon']) {
-	document.getElementById(id).addEventListener('change', displayResult);
+// --- 設定とローカルストレージ ---
+function saveSettings() {
+	const settings = {
+		lang: document.getElementById('lang').value,
+		min: document.getElementById('min').value,
+		max: document.getElementById('max').value,
+		magician: document.getElementById('difficulty-magician').value,
+		knight: document.getElementById('difficulty-knight').value,
+		dragon: document.getElementById('difficulty-dragon').value,
+		hammerThrow: document.querySelector('input[name="hammer-throw"]:checked').value,
+		noNumpad: document.getElementById('no-numpad').checked,
+		showArrival: document.getElementById('show-arrival-index').checked
+	};
+	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
 }
-for (const radio of document.querySelectorAll('input[name="hammer-throw"]')) {
-	radio.addEventListener('change', displayResult);
+
+function loadSettings() {
+	try {
+		const stored = localStorage.getItem('kss-rng-manipulator2');
+		if (stored) {
+			const s = JSON.parse(stored);
+			if (s.lang) { document.getElementById('lang').value = s.lang; lang = s.lang; }
+			if (s.min) document.getElementById('min').value = s.min;
+			if (s.max) document.getElementById('max').value = s.max;
+			if (s.magician) document.getElementById('difficulty-magician').value = s.magician;
+			if (s.knight) document.getElementById('difficulty-knight').value = s.knight;
+			if (s.dragon) document.getElementById('difficulty-dragon').value = s.dragon;
+			if (s.hammerThrow) {
+				const rb = document.querySelector(`input[name="hammer-throw"][value="${s.hammerThrow}"]`);
+				if (rb) rb.checked = true;
+			}
+			if (s.noNumpad !== undefined) document.getElementById('no-numpad').checked = s.noNumpad;
+			if (s.showArrival !== undefined) document.getElementById('show-arrival-index').checked = s.showArrival;
+			return true;
+		}
+	} catch(e) {}
+	return false;
 }
-document.getElementById('show-arrival-index').addEventListener('change', displayResult);
-document.getElementById('min').addEventListener('change', displayResult);
-document.getElementById('max').addEventListener('change', displayResult);
+
+function restoreDefaultSettings() {
+	document.getElementById('min').value = "3100";
+	document.getElementById('max').value = "3376";
+	document.getElementById('difficulty-magician').value = "easy";
+	document.getElementById('difficulty-knight').value = "true";
+	document.getElementById('difficulty-dragon').value = "true";
+	document.querySelector('input[name="hammer-throw"][value="1"]').checked = true;
+	document.getElementById('no-numpad').checked = false;
+	document.getElementById('show-arrival-index').checked = false;
+	saveSettings();
+	displayResult();
+}
+
+document.getElementById('btn-default-settings').addEventListener('click', restoreDefaultSettings);
+
+document.querySelector('.settings-area').addEventListener('change', (e) => {
+	saveSettings();
+	if (e.target.id === 'lang') {
+		switchLang(e.target.value);
+	} else if (e.target.id !== 'no-numpad' && e.target.id !== 'test-stars') {
+		displayResult();
+	}
+});
 
 // --- 初期化 ---
+if (!loadSettings()) {
+	document.getElementById('lang').value = lang; // ブラウザのデフォルト言語を反映
+}
+switchLang(lang); // lang変数を元にUIテキストを更新
 renderStarBoxes();
 statusEl.innerHTML = t('pressToStart');
 

@@ -429,9 +429,9 @@ export class BattleWindowsMWWManipulator {
 	 */
 	constructor({
 		actionsDifficultyTable = DefaultActionsDifficultyTable,
-		magicianDifficulty = 'conservativeFast',
-		fastKnight = true,
-		fastDragon = true,
+		magicianDifficulty = 'easy',
+		fastKnight = false,
+		fastDragon = false,
 		hammerThrow = 1,
 		minIndex = 3100,
 		maxIndex = 3376,
