@@ -332,13 +332,11 @@ const DefaultActionsDifficultyTable = {
 			{ dashes: 3 },
 			{ dashes: 2, stars: 1 },
 			{ dashes: 2, slides: 1 },
-			{ dashes: 2, hammerFlips: 1 },
 			{ dashes: 3, stars: 1 },
 			{ dashes: 3, slides: 1 },
 			{ slides: 2 },
 			{ dashes: 1 },
 			{ dashes: 1, slides: 1 },
-			{ dashes: 1, hammerFlips: 1 },
 		],
 		conservativeFast: [
 			{ },
