@@ -225,8 +225,15 @@ const L = {
 		test: 'Analysis',
 		testStars: 'Stars:',
 		testRun: 'Run',
-		testSummary: 'Summary',
-		testBranchDetails: 'Branch Details',
+		testUnsolvable: 'Unsolvable',
+		testSimulation: 'Simulation Results',
+		testBranches: 'Branch',
+		thSuccessIndices: 'Success',
+		thMagician: 'Magician',
+		thKnight: 'Knight',
+		thDragon: 'Dragon',
+		thDragonTurn2: 'Dragon Turn 2',
+		thFailIndices: 'Fail RNG',
 		noMagicianActionCount: 'No valid Magician action',
 		noActionCombinationCount: 'No valid action combination',
 		branchOccurrences: 'Branch occurrences',
@@ -240,6 +247,7 @@ const L = {
 		thMatch: 'Match (=)',
 		thNoMatch: 'No Match (≠)',
 		thCount: 'Count',
+		thTotal: 'Total',
 		thItem: 'Item',
 		magicianActions: 'Magician Actions',
 		knightActions: 'Knight Actions',
@@ -266,8 +274,15 @@ const L = {
 		test: '分析',
 		testStars: '星の回数:',
 		testRun: '実行',
-		testSummary: '統計',
-		testBranchDetails: '分岐発生詳細',
+		testUnsolvable: '解決不能',
+		testSimulation: 'シミュレーション結果',
+		testBranches: '分岐',
+		thSuccessIndices: '成功',
+		thMagician: '魔法使い',
+		thKnight: '悪魔の騎士',
+		thDragon: 'レッドドラゴン',
+		thDragonTurn2: 'レッドドラゴン2ターン目',
+		thFailIndices: '失敗乱数位置',
 		noMagicianActionCount: '魔法使いの条件に合う行動なし',
 		noActionCombinationCount: '行動の組み合わせなし',
 		branchOccurrences: '分岐発生数',
@@ -281,6 +296,7 @@ const L = {
 		thMatch: '一致(=)',
 		thNoMatch: '不一致(≠)',
 		thCount: '件数',
+		thTotal: '合計',
 		thItem: '項目',
 		magicianActions: '魔法使いでの行動',
 		knightActions: '悪魔の騎士での行動',
@@ -516,27 +532,58 @@ function runTest() {
 
 	let html = '';
 
-	// 統計テーブル
-	html += `<b>${t('testSummary')}</b>`;
+	// 解決不能
+	html += `<b>${t('testUnsolvable')}</b>`;
 	html += `<table class="test-table"><thead><tr><th>${t('thItem')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
-	const summaryRows = [
+	const unsolvableRows = [
 		[t('noMagicianActionCount'), result.magicianNGCount],
 		[t('noActionCombinationCount'), result.otherNGCount],
-		[t('branchOccurrences'), result.branchCount],
-		[t('failMagician'), result.wrongCounts[0]],
-		[t('failKnight'), result.wrongCounts[1]],
-		[t('failDragon'), result.wrongCounts[2]],
-		[t('failDragonTurn2'), result.wrongCounts[3]],
 	];
-	for (const [label, val] of summaryRows) {
+	for (const [label, val] of unsolvableRows) {
 		html += `<tr><td style="text-align:left">${label}</td><td>${val}</td></tr>`;
 	}
 	html += '</tbody></table>';
 
-	// 分岐発生詳細
+	// シミュレーション結果（成否）
+	const simEntries = Object.entries(result.simulationGroups);
+	if (simEntries.length > 0) {
+		html += `<b>${t('testSimulation')}</b>`;
+		html += `<table class="test-table"><thead><tr>`;
+		html += `<th>${t('thStars')}</th><th>${t('thSuccessIndices')}</th>`;
+		html += `<th>${t('thMagician')}</th><th>${t('thKnight')}</th><th>${t('thDragon')}</th><th>${t('thDragonTurn2')}</th>`;
+		html += `</tr></thead><tbody>`;
+
+		for (const [starStr, group] of simEntries) {
+			const hasFails = group.fails.some(arr => arr.length > 0);
+			if (!hasFails) continue;
+
+			html += '<tr>';
+			html += `<td>${starStr}</td>`;
+			html += `<td style="word-break: break-all">${group.success.length > 0 ? group.success.join(', ') : '-'}</td>`;
+			html += `<td style="word-break: break-all">${group.fails[0].length > 0 ? group.fails[0].join(', ') : '-'}</td>`;
+			html += `<td style="word-break: break-all">${group.fails[1].length > 0 ? group.fails[1].join(', ') : '-'}</td>`;
+			html += `<td style="word-break: break-all">${group.fails[2].length > 0 ? group.fails[2].join(', ') : '-'}</td>`;
+			html += `<td style="word-break: break-all">${group.fails[3].length > 0 ? group.fails[3].join(', ') : '-'}</td>`;
+			html += '</tr>';
+		}
+
+		// 合計行
+		html += `<tr style="font-weight:bold; background-color:#e0e8ff">`;
+		html += `<td>${t('thCount')}</td>`;
+		html += `<td>${result.successCount}</td>`;
+		html += `<td>${result.wrongCounts[0]}</td>`;
+		html += `<td>${result.wrongCounts[1]}</td>`;
+		html += `<td>${result.wrongCounts[2]}</td>`;
+		html += `<td>${result.wrongCounts[3]}</td>`;
+		html += `</tr>`;
+
+		html += '</tbody></table>';
+	}
+
+	// 分岐
 	const branchEntries = Object.entries(result.branchGroups);
 	if (branchEntries.length > 0) {
-		html += `<b>${t('testBranchDetails')}</b>`;
+		html += `<b>${t('testBranches')}</b>`;
 		html += '<table class="test-table"><thead><tr>';
 		html += `<th>${t('thStars')}</th><th>${t('thEnemy')}</th><th>${t('thPowers')}</th><th>${t('thMatch')}</th><th>${t('thNoMatch')}</th>`;
 		html += '</tr></thead><tbody>';
@@ -549,6 +596,19 @@ function runTest() {
 			html += `<td>${g.false.length > 0 ? g.false.join(', ') : '-'}</td>`;
 			html += '</tr>';
 		}
+
+		// 合計行 (2行)
+		html += `<tr style="font-weight:bold; background-color:#f0f4ff">`;
+		html += `<td colspan="3">${t('thCount')}</td>`;
+		html += `<td>${result.totalBranchMatch}</td>`;
+		html += `<td>${result.totalBranchNoMatch}</td>`;
+		html += `</tr>`;
+		
+		html += `<tr style="font-weight:bold; background-color:#e0e8ff">`;
+		html += `<td colspan="3">${t('thTotal')}</td>`;
+		html += `<td colspan="2">${result.branchCount}</td>`;
+		html += `</tr>`;
+
 		html += '</tbody></table>';
 	}
 

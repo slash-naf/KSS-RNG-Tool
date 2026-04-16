@@ -629,8 +629,12 @@ export class BattleWindowsMWWManipulator {
 		let magicianNGCount = 0;
 		let otherNGCount = 0;
 		let wrongCounts = [0, 0, 0, 0];
+		let successCount = 0;
 		let branchCount = 0;
+		let totalBranchMatch = 0;
+		let totalBranchNoMatch = 0;
 		let branchGroups = {};
+		let simulationGroups = {};
 
 		let magicianCountList = {};
 		let knightCountList = {};
@@ -682,17 +686,31 @@ export class BattleWindowsMWWManipulator {
 				const key = `${starStr} ${branch.type} = ${valStr}`;
 				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [], starStr, type: branch.type, valStr };
 				branchGroups[key][isEqual].push(i);
+				
+				if (isEqual) totalBranchMatch++;
+				else totalBranchNoMatch++;
 			}
 			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐", branchStr);
 
 			// 行動を適用
 			const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 
+			if (!simulationGroups[starStr]) {
+				simulationGroups[starStr] = {
+					success: [],
+					fails: [[], [], [], []]
+				};
+			}
+
 			// 行動の結果を確認
 			if (result.length !== 4) {
 				wrongCounts[result.length]++;
+				simulationGroups[starStr].fails[result.length].push(i);
 				continue;
 			}
+			
+			simulationGroups[starStr].success.push(i);
+			successCount++;
 
 			const magicianMsg = magician.messageJa;
 			magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
@@ -710,8 +728,12 @@ export class BattleWindowsMWWManipulator {
 		return {
 			magicianNGCount,
 			otherNGCount,
+			successCount,
 			wrongCounts,
+			simulationGroups,
 			branchCount,
+			totalBranchMatch,
+			totalBranchNoMatch,
 			branchGroups,
 			magicianCountList,
 			knightCountList,
