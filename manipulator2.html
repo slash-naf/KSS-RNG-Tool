@@ -214,7 +214,7 @@ const L = {
 		hammerThrow: 'Hammer throw dash advances:',
 		settings: 'Settings',
 		noNumpad: 'No Numpad',
-		showArrival: 'Show arrival RNG index',
+		showArrival: 'Show arrival RNG index and Copy Essences',
 		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>',
 		notInRange: 'Not in range.',
 		rngIndex: 'RNG index: ',
@@ -255,7 +255,7 @@ const L = {
 		hammerThrow: 'ハンマー投げのダッシュ消費数:',
 		settings: '設定',
 		noNumpad: 'テンキーなし',
-		showArrival: '到着時の乱数位置を表示',
+		showArrival: '到着時の乱数位置とコピーの元を表示',
 		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>',
 		notInRange: '範囲内に一致する乱数がありません。',
 		rngIndex: '乱数位置: ',
@@ -381,7 +381,8 @@ function displayResult() {
 	}
 
 	// 到着時の乱数位置の表示（設定がオンの場合のみ）
-	if (document.getElementById('show-arrival-index').checked) {
+	const showArrival = document.getElementById('show-arrival-index').checked;
+	if (showArrival) {
 		const arrivalIndices = Array.from(starIndices).map(idx => idx - stars.length * 2);
 		statusEl.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
 	}
@@ -405,6 +406,25 @@ function displayResult() {
 	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
 	const branchSimIndex = hasBranch ? BranchTypes[branch.type].minSimLength - 1 : -1;
 
+	// 各候補乱数ごとのシミュレーションデータ（到着乱数表示オン時のみ）
+	let arrivalSims = [];
+	if (showArrival) {
+		arrivalSims = Array.from(starIndices).map(index => {
+			let chosenActionCombination = actionCombination;
+			if (hasBranch) {
+				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow);
+				const bt = BranchTypes[branch.type];
+				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
+					chosenActionCombination = branch.fallbackActionCombination;
+				}
+			}
+			return {
+				arrivalIndex: index - stars.length * 2,
+				sim: new KssRng(index).simulateBattleWindowsMWW(magician, chosenActionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow)
+			};
+		});
+	}
+
 	// テーブル構築
 	const table = document.createElement('table');
 	table.className = 'result-table';
@@ -413,6 +433,9 @@ function displayResult() {
 	const thead = document.createElement('thead');
 	let headerHtml = `<tr><th></th><th>${t('thAction')}</th>`;
 	if (hasBranch) headerHtml += `<th>${t('thBranch')}</th>`;
+	for (const s of arrivalSims) {
+		headerHtml += `<th>${s.arrivalIndex}</th>`;
+	}
 	headerHtml += '</tr>';
 	thead.innerHTML = headerHtml;
 	table.appendChild(thead);
@@ -447,6 +470,12 @@ function displayResult() {
 			} else {
 				html += '<td></td>';
 			}
+		}
+
+		// 各乱数ごとのコピーの元
+		for (const s of arrivalSims) {
+			const p = s.sim[i];
+			html += `<td>${p ? powerImg(p.left) + ' ' + powerImg(p.right) : ''}</td>`;
 		}
 
 		tr.innerHTML = html;
