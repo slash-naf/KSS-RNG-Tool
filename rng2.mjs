@@ -569,10 +569,11 @@ export class BattleWindowsMWWManipulator {
 
 		// 魔法使いに先制されない行動を探す
 		const emptyResult = { magician: null, actionCombination: null, branch: null };
-		const magicianList = this.magicianActions.filter(magician => indexList.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
-		if (magicianList.length === 0) return emptyResult;
+		const magicianFilteredList = this.magicianActions.filter(magician => indexList.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
+		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianActions;
 
 		let bestPartialResult = { ...emptyResult };
+		let bestPartialMatchAll = [];
 		let bestMatchCountAll = 0;
 		for (const magician of magicianList) {
 
@@ -612,9 +613,29 @@ export class BattleWindowsMWWManipulator {
 			}
 
 			// 最良の部分一致を記録
-			if (bestMatchCount > bestMatchCountAll) {
-				bestMatchCountAll = bestMatchCount;
-				bestPartialResult = { magician, actionCombination: bestPartialMatches[0]?.[0]?.actionCombination ?? null, branch: null };
+			if (bestMatchCount >= bestMatchCountAll) {
+				for (const list of bestPartialMatches) {
+					if (bestMatchCount > bestMatchCountAll || bestPartialMatchAll.length === 0) {
+						bestMatchCountAll = bestMatchCount;
+						bestPartialMatchAll = list;
+						bestPartialResult = { magician, actionCombination: list[0].actionCombination, branch: null };
+					} else {
+						// 数が同じ場合は、より後ろの乱数位置に失敗があるものを優先
+						let isBetter = false;
+						for (let i = 0; i < list.length; i++) {
+							const newMatch = list[i].sim.length === 4;
+							const oldMatch = bestPartialMatchAll[i].sim.length === 4;
+							if (newMatch !== oldMatch) {
+								isBetter = newMatch;
+								break;
+							}
+						}
+						if (isBetter) {
+							bestPartialMatchAll = list;
+							bestPartialResult = { magician, actionCombination: list[0].actionCombination, branch: null };
+						}
+					}
+				}
 			}
 		}
 
@@ -652,15 +673,12 @@ export class BattleWindowsMWWManipulator {
 			const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
 
 			// 乱数調整のための行動を計算
-			const { magician, actionCombination, branch } = this.manipulate(starDirectionList);
-			if (magician === null) {
-				magicianNGCount++;
-				continue;
-			}
-			if (actionCombination === null) {
-				otherNGCount++;
-				continue;
-			}
+			let { magician, actionCombination, branch } = this.manipulate(starDirectionList);
+			if (magician === null) magicianNGCount++;
+			else if (actionCombination === null) otherNGCount++;
+			magician ??= this.magicianActions[0];
+			actionCombination ??= this.actionCombinations[0];
+
 			let chosenActionCombination = actionCombination;
 			let branchStr = "なし";
 			if (branch) {
