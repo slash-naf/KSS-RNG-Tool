@@ -226,7 +226,6 @@ const L = {
 		testStars: 'Stars:',
 		testRun: 'Run',
 		testUnsolvable: 'Unsolvable',
-		testSimulation: 'Simulation Results',
 		testBranches: 'Branch',
 		thSuccessIndices: 'Success',
 		thMagician: 'Magician',
@@ -248,6 +247,8 @@ const L = {
 		thNoMatch: 'No Match (≠)',
 		thCount: 'Count',
 		thTotal: 'Total',
+		thFailTotal: 'Fail Total',
+		thOverallTotal: 'Overall Total',
 		thItem: 'Item',
 		magicianActions: 'Magician Actions',
 		knightActions: 'Knight Actions',
@@ -275,7 +276,6 @@ const L = {
 		testStars: '星の回数:',
 		testRun: '実行',
 		testUnsolvable: '解決不能',
-		testSimulation: 'シミュレーション結果',
 		testBranches: '分岐',
 		thSuccessIndices: '成功',
 		thMagician: '魔法使い',
@@ -297,6 +297,8 @@ const L = {
 		thNoMatch: '不一致(≠)',
 		thCount: '件数',
 		thTotal: '合計',
+		thFailTotal: '失敗合計',
+		thOverallTotal: '全体合計',
 		thItem: '項目',
 		magicianActions: '魔法使いでの行動',
 		knightActions: '悪魔の騎士での行動',
@@ -532,22 +534,10 @@ function runTest() {
 
 	let html = '';
 
-	// 解決不能
-	html += `<b>${t('testUnsolvable')}</b>`;
-	html += `<table class="test-table"><thead><tr><th>${t('thItem')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
-	const unsolvableRows = [
-		[t('noMagicianActionCount'), result.magicianNGCount],
-		[t('noActionCombinationCount'), result.otherNGCount],
-	];
-	for (const [label, val] of unsolvableRows) {
-		html += `<tr><td style="text-align:left">${label}</td><td>${val}</td></tr>`;
-	}
-	html += '</tbody></table>';
-
-	// シミュレーション結果（成否）
+	// 解決不能（元のシミュレーション結果）
 	const simEntries = Object.entries(result.simulationGroups);
 	if (simEntries.length > 0) {
-		html += `<b>${t('testSimulation')}</b>`;
+		html += `<b>${t('testUnsolvable')}</b>`;
 		html += `<table class="test-table"><thead><tr>`;
 		html += `<th>${t('thStars')}</th><th>${t('thSuccessIndices')}</th>`;
 		html += `<th>${t('thMagician')}</th><th>${t('thKnight')}</th><th>${t('thDragon')}</th><th>${t('thDragonTurn2')}</th>`;
@@ -567,14 +557,28 @@ function runTest() {
 			html += '</tr>';
 		}
 
+		const failTotal = result.wrongCounts[0] + result.wrongCounts[1] + result.wrongCounts[2] + result.wrongCounts[3];
+		const overallTotal = result.successCount + failTotal + result.magicianNGCount + result.otherNGCount;
+
 		// 合計行
 		html += `<tr style="font-weight:bold; background-color:#e0e8ff">`;
 		html += `<td>${t('thCount')}</td>`;
-		html += `<td>${result.successCount}</td>`;
+		html += `<td rowspan="2">${result.successCount}</td>`;
 		html += `<td>${result.wrongCounts[0]}</td>`;
 		html += `<td>${result.wrongCounts[1]}</td>`;
 		html += `<td>${result.wrongCounts[2]}</td>`;
 		html += `<td>${result.wrongCounts[3]}</td>`;
+		html += `</tr>`;
+
+		// 失敗の合計
+		html += `<tr style="font-weight:bold; background-color:#f0f4ff">`;
+		html += `<td>${t('thFailTotal')}</td>`;
+		html += `<td colspan="4">${failTotal}</td>`;
+		html += `</tr>`;
+
+		// 全体の合計
+		html += `<tr style="font-weight:bold; background-color:#e0e8ff">`;
+		html += `<td>${t('thOverallTotal')}</td><td colspan="5">${overallTotal}</td>`;
 		html += `</tr>`;
 
 		html += '</tbody></table>';
