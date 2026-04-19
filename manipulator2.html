@@ -380,6 +380,20 @@ const EnemyImages = [
 	'images/dragonshield.png',
 ];
 
+// --- 画像のプリロード ---
+// 初回表示時に一瞬遅れるのを防ぐために、事前に画像を読み込ませておく
+function preloadImages() {
+	EnemyImages.forEach(src => {
+		const img = new Image();
+		img.src = src;
+	});
+	BattleWindowsPowerNames.forEach(name => {
+		const img = new Image();
+		img.src = `images/abilities/${name.toLowerCase()}.png`;
+	});
+}
+preloadImages();
+
 // --- 結果表示 ---
 function displayResult() {
 	resultEl.innerHTML = '';
