@@ -643,24 +643,31 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
-	 * コンソールへの出力は行わず、結果をオブジェクトとして返す。
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 */
-	test(stars, showsSimulation=false) {
-		let magicianNGCount = 0;
-		let otherNGCount = 0;
-		let wrongCounts = [0, 0, 0, 0];
-		let successCount = 0;
-		let branchCount = 0;
-		let totalBranchMatch = 0;
-		let totalBranchNoMatch = 0;
-		let branchGroups = {};
-		let simulationGroups = {};
+	*testGenerator(stars, showsSimulation=false) {
+		const result = {
+			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
+			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
+			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
+			successCount: 0,         // 全4体を倒せた回数
+			branchCount: 0,          // 分岐が発生した回数
+			totalBranchMatch: 0,     // 分岐が一致した回数（フォールバック行動を使用）
+			totalBranchNoMatch: 0,   // 分岐が不一致だった回数（通常行動を使用）
+			branchGroups: {},        // 分岐の種類・値ごとにグループ化した乱数位置の一覧
+			simulationGroups: {},    // 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧
+			magicianCountList: {},   // 魔法使いの行動ごとの使用回数
+			knightCountList: {},     // 騎士の行動ごとの使用回数
+			dragonCountList: {},     // ドラゴンの行動ごとの使用回数
+			dragonActionCountList: {}, // ドラゴン2ターン目の行動ごとの使用回数
+			totalTime: 0,            // manipulate()の合計計算時間（ms）
+			averageTime: 0,          // manipulate()の平均計算時間（ms）
+			worstTime: 0,            // manipulate()の最悪計算時間（ms）
+		};
 
-		let magicianCountList = {};
-		let knightCountList = {};
-		let dragonCountList = {};
-		let dragonActionCountList = {};
+		const total = this.maxIndex - this.minIndex + 1;
+		let count = 0;
+		let progress = 0;
 
 		for (let i = this.minIndex; i <= this.maxIndex; i++) {
 			// 星の方向を確認
@@ -672,25 +679,38 @@ export class BattleWindowsMWWManipulator {
 			}
 			const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
 
-			// 乱数調整のための行動を計算
+			// 乱数調整の行動探索（処理時間を計測）
+			const t0 = performance.now();
 			let { magician, actionCombination, branch } = this.manipulate(starDirectionList);
-			if (magician === null) magicianNGCount++;
-			else if (actionCombination === null) otherNGCount++;
+			const elapsed = performance.now() - t0;
+
+			// 計算時間の記録
+			count++;
+			result.totalTime += elapsed;
+			result.averageTime = result.totalTime / count;
+			if (elapsed > result.worstTime) result.worstTime = elapsed;
+
+			// 解決不能の場合でもシミュレーションは継続（デフォルト行動で代替）
+			if (magician === null) result.magicianNGCount++;
+			else if (actionCombination === null) result.otherNGCount++;
 			magician ??= this.magicianActions[0];
 			actionCombination ??= this.actionCombinations[0];
 
+			// 分岐が存在する場合は現在の乱数で分岐条件を判定し、使用する行動を選択する
 			let chosenActionCombination = actionCombination;
 			let branchStr = "なし";
 			if (branch) {
 				const bt = BranchTypes[branch.type];
+				// 分岐前の乱数位置からシミュレーションを行い、実際の観測値を取得する
 				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 				const isEqual = tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value;
 				if (isEqual) {
+					// 分岐条件に一致した場合はフォールバック行動を使用する
 					chosenActionCombination = branch.fallbackActionCombination;
 				}
 
-				// 分岐のカウント
-				branchCount++;
+				// 分岐の発生を集計
+				result.branchCount++;
 				const formatVal = (type, val) => {
 					if (type.endsWith('Powers')) {
 						const left = Math.floor(val / BattleWindowsPowerMap.length);
@@ -701,62 +721,61 @@ export class BattleWindowsMWWManipulator {
 				};
 				const valStr = formatVal(branch.type, branch.value);
 				branchStr = `${branch.type} ${isEqual ? "=" : "≠"} ${valStr}`;
+				// 星パターン・分岐種類・値でキーを作り、一致/不一致ごとに乱数位置をグループ化する
 				const key = `${starStr} ${branch.type} = ${valStr}`;
-				if (!branchGroups[key]) branchGroups[key] = { true: [], false: [], starStr, type: branch.type, valStr };
-				branchGroups[key][isEqual].push(i);
+				if (!result.branchGroups[key]) result.branchGroups[key] = { true: [], false: [], starStr, type: branch.type, valStr };
+				result.branchGroups[key][isEqual].push(i);
 				
-				if (isEqual) totalBranchMatch++;
-				else totalBranchNoMatch++;
+				if (isEqual) result.totalBranchMatch++;
+				else result.totalBranchNoMatch++;
 			}
 			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐", branchStr);
 
 			// 行動を適用
-			const result = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
 
-			if (!simulationGroups[starStr]) {
-				simulationGroups[starStr] = {
+			// 星パターンごとにグループを作成（初回のみ）
+			if (!result.simulationGroups[starStr]) {
+				result.simulationGroups[starStr] = {
 					success: [],
 					fails: [[], [], [], []]
 				};
 			}
 
 			// 行動の結果を確認
-			if (result.length !== 4) {
-				wrongCounts[result.length]++;
-				simulationGroups[starStr].fails[result.length].push(i);
-				continue;
+			if (sim.length !== 4) {
+				result.wrongCounts[sim.length]++;
+				result.simulationGroups[starStr].fails[sim.length].push(i);
+			} else {			
+				result.simulationGroups[starStr].success.push(i);
+				result.successCount++;
+
+				// 成功した行動の使用回数を集計する
+				const magicianMsg = magician.messageJa;
+				result.magicianCountList[magicianMsg] = (result.magicianCountList[magicianMsg] || 0) + 1;
+
+				const knightMsg = chosenActionCombination.knight.messageJa;
+				result.knightCountList[knightMsg] = (result.knightCountList[knightMsg] || 0) + 1;
+
+				const dragonMsg = chosenActionCombination.dragon.messageJa;
+				result.dragonCountList[dragonMsg] = (result.dragonCountList[dragonMsg] || 0) + 1;
+
+				const dragonActionMsg = chosenActionCombination.dragonAction.messageJa;
+				result.dragonActionCountList[dragonActionMsg] = (result.dragonActionCountList[dragonActionMsg] || 0) + 1;
 			}
-			
-			simulationGroups[starStr].success.push(i);
-			successCount++;
 
-			const magicianMsg = magician.messageJa;
-			magicianCountList[magicianMsg] = (magicianCountList[magicianMsg] || 0) + 1;
-
-			const knightMsg = chosenActionCombination.knight.messageJa;
-			knightCountList[knightMsg] = (knightCountList[knightMsg] || 0) + 1;
-
-			const dragonMsg = chosenActionCombination.dragon.messageJa;
-			dragonCountList[dragonMsg] = (dragonCountList[dragonMsg] || 0) + 1;
-
-			const dragonActionMsg = chosenActionCombination.dragonAction.messageJa;
-			dragonActionCountList[dragonActionMsg] = (dragonActionCountList[dragonActionMsg] || 0) + 1;
+			// 進捗が1%以上変化したタイミングで呼び出し元に処理を返す
+			const newProgress = Math.floor(count / total * 100);
+			if (newProgress != progress) {
+				progress = newProgress;
+				yield { progress, result };
+			}
 		}
-
-		return {
-			magicianNGCount,
-			otherNGCount,
-			successCount,
-			wrongCounts,
-			simulationGroups,
-			branchCount,
-			totalBranchMatch,
-			totalBranchNoMatch,
-			branchGroups,
-			magicianCountList,
-			knightCountList,
-			dragonCountList,
-			dragonActionCountList
-		};
+	}
+	/** testGeneratorを最後まで回し、最終結果を返す */
+	test(stars, showsSimulation=false) {
+		for (const { progress, result } of this.testGenerator(stars, showsSimulation)) {
+			if (progress === 100) return result;
+		}
 	}
 }

@@ -528,13 +528,38 @@ function branchTypeToEnemy(type) {
 	return type;
 }
 
-function runTest() {
+async function runTest() {
 	const testResultEl = document.getElementById('test-result');
+	const runBtn = document.getElementById('test-run-btn');
 	const starsCount = parseInt(document.getElementById('test-stars').value, 10) || 3;
 	const settings = getSettings();
-	const manipulator = new BattleWindowsMWWManipulator(settings);
-	const result = manipulator.test(starsCount);
 
+	// UIを実行中状態に
+	runBtn.disabled = true;
+	runBtn.textContent = '0%';
+
+	// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
+	let time = performance.now();
+	const manipulator = new BattleWindowsMWWManipulator(settings);
+	for (const { progress, result } of manipulator.testGenerator(starsCount)) {
+		if (progress === 100) {
+			renderTestResult(result, testResultEl); // 結果を表示
+			break;
+		}
+		const newTime = performance.now();
+		if (newTime - time > 20) {
+			time = newTime;
+			runBtn.textContent = `${progress}%`; // 進捗を表示
+			await new Promise(r => setTimeout(r, 0)); // イベントループに制御を返す
+		}
+	}
+
+	// UIを復元
+	runBtn.disabled = false;
+	runBtn.textContent = t('testRun');
+}
+
+function renderTestResult(result, testResultEl) {
 	let html = '';
 
 	// 解決不能
@@ -552,11 +577,11 @@ function runTest() {
 
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
-			html += `<td style="word-break: break-all">${group.success.length > 0 ? group.success.join(', ') : '-'}</td>`;
-			html += `<td style="word-break: break-all">${group.fails[0].length > 0 ? group.fails[0].join(', ') : '-'}</td>`;
-			html += `<td style="word-break: break-all">${group.fails[1].length > 0 ? group.fails[1].join(', ') : '-'}</td>`;
-			html += `<td style="word-break: break-all">${group.fails[2].length > 0 ? group.fails[2].join(', ') : '-'}</td>`;
-			html += `<td style="word-break: break-all">${group.fails[3].length > 0 ? group.fails[3].join(', ') : '-'}</td>`;
+			html += `<td>${group.success.length > 0 ? group.success.join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[0].length > 0 ? group.fails[0].join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[1].length > 0 ? group.fails[1].join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[2].length > 0 ? group.fails[2].join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[3].length > 0 ? group.fails[3].join(', ') : '-'}</td>`;
 			html += '</tr>';
 		}
 
