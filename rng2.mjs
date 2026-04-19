@@ -431,7 +431,7 @@ export class BattleWindowsMWWManipulator {
 		fastKnight = false,
 		fastDragon = false,
 		hammerThrow = 1,
-		minIndex = 3100,
+		minIndex = 2800,
 		maxIndex = 3376,
 		branchPriorities = DefaultBranchPriorities
 	} = {}) {
@@ -651,6 +651,7 @@ export class BattleWindowsMWWManipulator {
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
 			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
 			successCount: 0,         // 全4体を倒せた回数
+			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
 			branchCount: 0,          // 分岐が発生した回数
 			totalBranchMatch: 0,     // 分岐が一致した回数（フォールバック行動を使用）
 			totalBranchNoMatch: 0,   // 分岐が不一致だった回数（通常行動を使用）
@@ -738,7 +739,8 @@ export class BattleWindowsMWWManipulator {
 			if (!result.simulationGroups[starStr]) {
 				result.simulationGroups[starStr] = {
 					success: [],
-					fails: [[], [], [], []]
+					fails: [[], [], [], []],
+					hasFail: false,
 				};
 			}
 
@@ -746,9 +748,16 @@ export class BattleWindowsMWWManipulator {
 			if (sim.length !== 4) {
 				result.wrongCounts[sim.length]++;
 				result.simulationGroups[starStr].fails[sim.length].push(i);
+
+				// これまでに記録されていた現在のパターンの成功回数を解決不能時の成功としてカウント
+				if (!result.simulationGroups[starStr].hasFail) {
+					result.simulationGroups[starStr].hasFail = true;
+					result.unsolvableSuccessCount += result.simulationGroups[starStr].success.length;
+				}
 			} else {			
 				result.simulationGroups[starStr].success.push(i);
 				result.successCount++;
+				if (result.simulationGroups[starStr].hasFail) result.unsolvableSuccessCount++;
 
 				// 成功した行動の使用回数を集計する
 				const magicianMsg = magician.messageJa;

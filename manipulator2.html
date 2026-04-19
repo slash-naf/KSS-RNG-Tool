@@ -132,7 +132,7 @@ details summary {
 	<br>
 
 	<label>Min:</label>
-	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="min" value="3100">
+	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="min" value="2800">
 	<label>Max:</label>
 	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="max" value="3376">
 	<br>
@@ -336,7 +336,7 @@ function renderStarBoxes() {
 // --- 設定値の取得 ---
 function getSettings() {
 	return {
-		minIndex: parseInt(document.getElementById('min').value, 10) || 3100,
+		minIndex: parseInt(document.getElementById('min').value, 10) || 2800,
 		maxIndex: parseInt(document.getElementById('max').value, 10) || 3376,
 		magicianDifficulty: document.getElementById('difficulty-magician').value,
 		fastKnight: document.getElementById('difficulty-knight').value === 'false',
@@ -563,18 +563,15 @@ function renderTestResult(result, testResultEl) {
 	let html = '';
 
 	// 解決不能
-	const simEntries = Object.entries(result.simulationGroups);
-	if (simEntries.length > 0) {
+	const unsolvableEntries = Object.entries(result.simulationGroups).filter(([, group]) => group.hasFail);
+	if (unsolvableEntries.length > 0) {
 		html += `<b>${t('testUnsolvable')}</b>`;
 		html += `<table class="test-table"><thead><tr>`;
 		html += `<th>${t('thStars')}</th><th>${t('thSuccessIndices')}</th>`;
 		html += `<th>${t('thMagician')}</th><th>${t('thKnight')}</th><th>${t('thDragon')}</th><th>${t('thDragonTurn2')}</th>`;
 		html += `</tr></thead><tbody>`;
 
-		for (const [starStr, group] of simEntries) {
-			const hasFails = group.fails.some(arr => arr.length > 0);
-			if (!hasFails) continue;
-
+		for (const [starStr, group] of unsolvableEntries) {
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
 			html += `<td>${group.success.length > 0 ? group.success.join(', ') : '-'}</td>`;
@@ -591,7 +588,7 @@ function renderTestResult(result, testResultEl) {
 		html += `</tbody><tfoot>`;
 		html += `<tr>`;
 		html += `<th rowspan="2">${t('thCount')}</th>`;
-		html += `<td rowspan="2">${result.successCount}</td>`;
+		html += `<td rowspan="2">${result.unsolvableSuccessCount}</td>`;
 		html += `<td>${result.wrongCounts[0]}</td>`;
 		html += `<td>${result.wrongCounts[1]}</td>`;
 		html += `<td>${result.wrongCounts[2]}</td>`;
@@ -752,7 +749,7 @@ function loadSettings() {
 }
 
 function restoreDefaultSettings() {
-	document.getElementById('min').value = "3100";
+	document.getElementById('min').value = "2800";
 	document.getElementById('max').value = "3376";
 	document.getElementById('difficulty-magician').value = "easy";
 	document.getElementById('difficulty-knight').value = "true";
