@@ -37,35 +37,21 @@ export const HammerHardHitAdvances = 9;
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
-	constructor(index=0, debug=false) {
+	constructor(index=0, debug) {
 		this.index = index;
 		this.debug = debug;
 	}
-	/**
-	 * デバッグ結果を出力し、結果の値をそのまま返す
-	 * @param {string} actionName
-	 * @param {*} [result]
-	 * @param {string|Function} [details]
-	 */
-	debugLog(actionName="", result="", details="") {
+	/** デバッグ結果を出力し、結果の値をそのまま返す */
+	debugLog(result="") {
 		if (this.debug) {
-			let msg = "";
-			if (typeof details === "function") {
-				msg = details(result);
-			} else if (details) {
-				msg = details;
-			} else if (result) {
-				msg = result;
-			}
-			const value = this.getCurrentValue()
-			console.log({
-				name: actionName,
-				result: msg,
+			const value = this.getCurrentValue();
+			this.debug({
+				name: new Error().stack.match(/KssRng\.\w+/g).slice(1).reverse().join('/').replaceAll('KssRng.', ''),
+				result,
 				index: this.index,
 				value: `0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]`,
 			});
 		}
-		return result;
 	}
 	/** 現在の乱数値を取得 */
 	getCurrentValue() {
@@ -85,25 +71,27 @@ export class KssRng {
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
-		return this.debugLog('starDirection', this.randi(8), r => `starDirection=${StarDirectionChars[r]}`);
+		const result = this.randi(8);
+		this.debugLog(StarDirectionChars[result]);
+		return result;
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
 		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
-		this.debugLog('hammerHit', undefined, `hardHit=${hardHit}`);
+		this.debugLog();
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
 		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		this.debugLog('hammerFlipChargeAndHit');
+		this.debugLog();
 	}
 	/** 鬼殺し火炎ハンマーの素振り */
 	hammerFlip() {
 		this.advance(HammerFlipAdvances);
-		this.debugLog('hammerFlip');
+		this.debugLog();
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
@@ -118,7 +106,8 @@ export class KssRng {
 		this.advance(1);
 		const b = this.knightAttacksFirst();
 		this.advance(2);
-		return this.debugLog('hammerFlipChargeForFastKnight', a || b, r => `attacksFirst=${r}`);
+		this.debugLog();
+		return a || b;
 	}
 	/** レッドドラゴンへの最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
 	hammerFlipChargeForFastDragon() {
@@ -127,7 +116,8 @@ export class KssRng {
 		this.advance(1);
 		const b = this.dragonAttacksFirst();
 		this.advance(4);
-		return this.debugLog('hammerFlipChargeForFastDragon', a || b, r => `attacksFirst=${r}`);
+		this.debugLog();
+		return a || b;
 	}
 	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastBattleWindowsPowers() {
@@ -135,14 +125,16 @@ export class KssRng {
 		const powers = this.battleWindowsPowers();
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		return this.debugLog('hammerFlipHitForFastBattleWindowsPowers', powers, p => `hardHit=${hardHit}, powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
+		this.debugLog();
+		return powers;
 	}
 	/** 魔法使いでの鬼殺しの溜め中の土煙と、先制されるか */
 	hammerFlipChargeForFastMagician(advances) {
 		// 溜め中の土煙と先制されるか
 		const a = this.magicianAttacksFirst();
 		this.advance(advances);
-		return this.debugLog('hammerFlipChargeForFastMagician', a, r => `attacksFirst=${r}`);
+		this.debugLog();
+		return a;
 	}
 	/** 魔法使いでの鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastMagician(hardHitFirst) {
@@ -159,27 +151,40 @@ export class KssRng {
 		}
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		return this.debugLog('hammerFlipHitForFastMagician', powers, p => `hardHit=${hardHit}, powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
+		this.debugLog();
+		return powers;
 	}
 
 	// --- バトルウィンドウズ ---
 	slimeAttacksFirst() {
-		return this.debugLog('slimeAttacksFirst', this.randi(4) === 1, a => `attacksFirst=${a}`);
+		const result = this.randi(4) === 1;
+		this.debugLog(result);
+		return result;
 	}
 	puppetAttacksFirst() {
-		return this.debugLog('puppetAttacksFirst', this.randi(4) === 2, a => `attacksFirst=${a}`);
+		const result = this.randi(4) === 2;
+		this.debugLog(result);
+		return result;
 	}
 	magicianAttacksFirst() {
-		return this.debugLog('magicianAttacksFirst', this.randi(4) === 1, a => `attacksFirst=${a}`);
+		const result = this.randi(4) === 1;
+		this.debugLog(result);
+		return result;
 	}
 	knightAttacksFirst() {
-		return this.debugLog('knightAttacksFirst', this.randi(4) === 2, a => `attacksFirst=${a}`);
+		const result = this.randi(4) === 2;
+		this.debugLog(result);
+		return result;
 	}
 	dragonAttacksFirst() {
-		return this.debugLog('dragonAttacksFirst', this.randi(4) === 3, a => `attacksFirst=${a}`);
+		const result = this.randi(4) === 3;
+		this.debugLog(result);
+		return result;
 	}
 	dragonActs() {
-		return this.debugLog('dragonActs', DragonActionMap[this.randi(10)], r => `acts=${DragonActionNames[r]}`);
+		const result = DragonActionMap[this.randi(10)];
+		this.debugLog(DragonActionNames[result]);
+		return result;
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
@@ -206,7 +211,8 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		return this.debugLog('battleWindowsPowers', { left, right }, p => `powers={left: ${BattleWindowsPowerNames[p.left]}, right: ${BattleWindowsPowerNames[p.right]}}`);
+		this.debugLog(`${BattleWindowsPowerNames[left]}-${BattleWindowsPowerNames[right]}`);
+		return { left, right };
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
@@ -730,7 +736,7 @@ export class BattleWindowsMWWManipulator {
 				if (isEqual) result.totalBranchMatch++;
 				else result.totalBranchNoMatch++;
 			}
-			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐", branchStr);
+			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐: "+branchStr);
 
 			// 行動を適用
 			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);

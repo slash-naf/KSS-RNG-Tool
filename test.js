@@ -187,7 +187,7 @@ export function testNewManipulation(minIndex, maxIndex, magicianDifficulty, fast
         minIndex, maxIndex
     });
 
-    const result = manipulator.test(stars, true);
+    const result = manipulator.test(stars, e => console.log(e));
 
     console.log("## 統計");
 
