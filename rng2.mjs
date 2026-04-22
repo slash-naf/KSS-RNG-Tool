@@ -230,8 +230,7 @@ export class KssRng {
 		if (magician.fast) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastMagician(magician.advances2)) return result;
-			const hardHitFirst = magician.advances1 >= 6;
-			result.push(this.hammerFlipHitForFastMagician(hardHitFirst));
+			result.push(this.hammerFlipHitForFastMagician(magician.hardHitFirst));
 		} else {
 			// Easyモード
 			if (this.magicianAttacksFirst()) return result;
@@ -351,16 +350,16 @@ const DefaultActionsDifficultyTable = {
 			{ slides: 1, advances: 4 },
 			{ slides: 1, advances: 5 },
 			{ dashes: 1 },
-			{ hammerFlips: 1, advances: 6 },
-			{ hammerFlips: 1, advances: 4 },
-			{ hammerFlips: 1, advances: 2 },
-			{ hammerFlips: 1, advances: 0 },
+			{ hammerFlips: 1, advances: 6, hardHitFirst: true },
+			{ hammerFlips: 1, advances: 4, hardHitFirst: false },
+			{ hammerFlips: 1, advances: 2, hardHitFirst: false },
+			{ hammerFlips: 1, advances: 0, hardHitFirst: false },
 		],
 		aggressiveFast: [
-			{ hammerFlips: 1, advances: 6 },
-			{ hammerFlips: 1, advances: 4 },
-			{ hammerFlips: 1, advances: 2 },
-			{ hammerFlips: 1, advances: 0 },
+			{ hammerFlips: 1, advances: 6, hardHitFirst: true },
+			{ hammerFlips: 1, advances: 4, hardHitFirst: false },
+			{ hammerFlips: 1, advances: 2, hardHitFirst: false },
+			{ hammerFlips: 1, advances: 0, hardHitFirst: false },
 			{ },
 			{ dashes: 2 },
 			{ dashes: 3 },
