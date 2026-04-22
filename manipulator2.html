@@ -8,7 +8,7 @@ body {
 	font-family: Arial, Helvetica, sans-serif;
 	background-color: lightblue;
 	color: #000;
-	font-size: 26px;
+	font-size: 22px;
 	margin: 30px;
 }
 h1 {
@@ -56,6 +56,7 @@ details summary {
 }
 
 .result-table {
+	font-size: 26px;
 	border-collapse: collapse;
 	margin: 10px 0;
 }
@@ -155,6 +156,7 @@ details summary {
 		<option value="true" selected>Easy</option>
 		<option value="false">Fast</option>
 	</select>
+	<label><input type="checkbox" id="allow-dragon-star"><span id="label-dragon-star">Include Star Attack</span></label>
 	<br>
 
 	<label id="label-hammer-throw">Hammer throw dash advances:</label>
@@ -197,6 +199,7 @@ import {
 	BattleWindowsMWWManipulator, BranchTypes,
 	BattleWindowsPowerNames, BattleWindowsPowerNone,
 	StarDirectionChars, findIndexesByStars, KssRng,
+	DragonGuard, DragonStar,
 	CYCLE_LEN
 } from './rng2.mjs';
 
@@ -218,6 +221,7 @@ const L = {
 		settings: 'Settings',
 		noNumpad: 'No Numpad',
 		showArrival: 'Show arrival RNG index and Copy Essences',
+		dragonStar: 'Include Star Attack',
 		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>',
 		notInRange: 'Not in range.',
 		rngIndex: 'RNG index: ',
@@ -268,6 +272,7 @@ const L = {
 		settings: '設定',
 		noNumpad: 'テンキーなし',
 		showArrival: '到着時の乱数位置とコピーの元を表示',
+		dragonStar: '星攻撃あり',
 		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>',
 		notInRange: '範囲内に一致する乱数がありません。',
 		rngIndex: '乱数位置: ',
@@ -341,6 +346,7 @@ function getSettings() {
 		magicianDifficulty: document.getElementById('difficulty-magician').value,
 		fastKnight: document.getElementById('difficulty-knight').value === 'false',
 		fastDragon: document.getElementById('difficulty-dragon').value === 'false',
+		allowDragonStar: document.getElementById('allow-dragon-star').checked,
 		hammerThrow: parseInt(document.querySelector('input[name="hammer-throw"]:checked').value, 10),
 	};
 }
@@ -387,6 +393,7 @@ function preloadImages() {
 		const img = new Image();
 		img.src = src;
 	});
+	new Image().src = 'images/dragonstars.png';
 	BattleWindowsPowerNames.forEach(name => {
 		const img = new Image();
 		img.src = `images/abilities/${name.toLowerCase()}.png`;
@@ -447,7 +454,7 @@ function displayResult() {
 		arrivalSims = Array.from(starIndices).map(index => {
 			let chosenActionCombination = actionCombination;
 			if (hasBranch) {
-				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow);
+				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow, settings.allowDragonStar);
 				const bt = BranchTypes[branch.type];
 				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
 					chosenActionCombination = branch.fallbackActionCombination;
@@ -455,7 +462,7 @@ function displayResult() {
 			}
 			return {
 				arrivalIndex: index - stars.length * 2,
-				sim: new KssRng(index).simulateBattleWindowsMWW(magician, chosenActionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow)
+				sim: new KssRng(index).simulateBattleWindowsMWW(magician, chosenActionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow, settings.allowDragonStar)
 			};
 		});
 	}
@@ -510,7 +517,16 @@ function displayResult() {
 		// 各乱数ごとのコピーの元
 		for (const s of arrivalSims) {
 			const p = s.sim[i];
-			html += `<td>${p ? powerImg(p.left) + ' ' + powerImg(p.right) : ''}</td>`;
+			html += '<td>';
+			if (p) {
+				html += `${powerImg(p.left)} ${powerImg(p.right)}`;
+				if (i === 3 && settings.allowDragonStar) {
+					// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
+					const dragonImg = p.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
+					html += ` <img src="${dragonImg}" style="height:1em;">`;
+				}
+			}
+			html += '</td>';
 		}
 
 		tr.innerHTML = html;
@@ -683,6 +699,7 @@ window.switchLang = function(val) {
 	document.getElementById('label-settings').textContent = t('settings');
 	document.getElementById('label-no-numpad').textContent = t('noNumpad');
 	document.getElementById('label-show-arrival').textContent = t('showArrival');
+	document.getElementById('label-dragon-star').textContent = t('dragonStar');
 	document.getElementById('label-test').textContent = t('test');
 	document.getElementById('label-test-stars').textContent = t('testStars');
 	document.getElementById('test-run-btn').textContent = t('testRun');
@@ -734,7 +751,8 @@ function saveSettings() {
 		dragon: document.getElementById('difficulty-dragon').value,
 		hammerThrow: document.querySelector('input[name="hammer-throw"]:checked').value,
 		noNumpad: document.getElementById('no-numpad').checked,
-		showArrival: document.getElementById('show-arrival-index').checked
+		showArrival: document.getElementById('show-arrival-index').checked,
+		allowDragonStar: document.getElementById('allow-dragon-star').checked,
 	};
 	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
 }
@@ -756,6 +774,7 @@ function loadSettings() {
 			}
 			if (s.noNumpad !== undefined) document.getElementById('no-numpad').checked = s.noNumpad;
 			if (s.showArrival !== undefined) document.getElementById('show-arrival-index').checked = s.showArrival;
+			if (s.allowDragonStar !== undefined) document.getElementById('allow-dragon-star').checked = s.allowDragonStar;
 			return true;
 		}
 	} catch(e) {}
@@ -771,6 +790,7 @@ function restoreDefaultSettings() {
 	document.querySelector('input[name="hammer-throw"][value="1"]').checked = true;
 	document.getElementById('no-numpad').checked = false;
 	document.getElementById('show-arrival-index').checked = false;
+	document.getElementById('allow-dragon-star').checked = false;
 	saveSettings();
 	displayResult();
 }

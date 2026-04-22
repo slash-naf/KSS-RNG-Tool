@@ -219,9 +219,10 @@ export class KssRng {
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュの乱数消費数
-	 * @returns {Array<{left, right}>} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4になる
+	 * @param {boolean} [allowDragonStar=false] レッドドラゴンの星攻撃も成功として扱うか
+	 * @returns {Array<{left, right, dragonAction?}>} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4になる
 	*/
-	simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow) {
+	simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow, allowDragonStar=false) {
 		const result = [];
 
 		// --- 魔法使い ---
@@ -276,8 +277,9 @@ export class KssRng {
 		this.advance(actionCombination.dragonAction.advances);
 		this.debugLog(actionCombination.dragonAction.messageJa);
 		const dragonAction = this.dragonActs();
-		if (dragonAction !== DragonGuard) return result;
-		result.push(this.battleWindowsPowers());
+		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
+			result.push({ ...this.battleWindowsPowers(), dragonAction });
+		}
 
 		return result;
 	}
@@ -425,6 +427,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {string} [options.magicianDifficulty] 魔法使いの難易度 ('easy' | 'conservativeFast' | 'aggressiveFast')
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
+	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃も成功として扱うか
 	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
@@ -435,6 +438,7 @@ export class BattleWindowsMWWManipulator {
 		magicianDifficulty = 'easy',
 		fastKnight = false,
 		fastDragon = false,
+		allowDragonStar = false,
 		hammerThrow = 1,
 		minIndex = 2800,
 		maxIndex = 3376,
@@ -443,6 +447,7 @@ export class BattleWindowsMWWManipulator {
 		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
+		this.allowDragonStar = allowDragonStar;
 		this.hammerThrow = hammerThrow;
 		this.minIndex = minIndex;
 		this.maxIndex = maxIndex;
@@ -551,7 +556,7 @@ export class BattleWindowsMWWManipulator {
 				if (!bt.filterFallback(actionCombination, altActionCombination)) continue;
 				let allMatch = true;
 				for (const index of failIndices) {
-					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
 					if (sim.length !== 4) { allMatch = false; break; }
 				}
 				if (allMatch) {
@@ -590,7 +595,7 @@ export class BattleWindowsMWWManipulator {
 				const list = [];
 				let matchCount = 0;
 				for (const index of indexList) {
-					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
 					if (sim.length === 4) matchCount++;
 					list.push({ actionCombination, index, sim });
 				}
@@ -708,7 +713,7 @@ export class BattleWindowsMWWManipulator {
 			if (branch) {
 				const bt = BranchTypes[branch.type];
 				// 分岐前の乱数位置からシミュレーションを行い、実際の観測値を取得する
-				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
 				const isEqual = tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value;
 				if (isEqual) {
 					// 分岐条件に一致した場合はフォールバック行動を使用する
@@ -738,7 +743,7 @@ export class BattleWindowsMWWManipulator {
 			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐: "+branchStr);
 
 			// 行動を適用
-			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow);
+			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
 
 			// 星パターンごとにグループを作成（初回のみ）
 			if (!result.simulationGroups[starStr]) {
