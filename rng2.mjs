@@ -77,9 +77,14 @@ export class KssRng {
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
-		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
+		const hardHit = this.checkHammerHardHit();	//ハードヒットの判定
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.debugLog();
+	}
+	checkHammerHardHit() {
+		const result = this.randi(4) === 0;
+		this.debugLog(result)
+		return result;
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
@@ -121,7 +126,7 @@ export class KssRng {
 	}
 	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastBattleWindowsPowers() {
-		const hardHit = this.randi(4) === 0;	//ハードヒットの判定
+		const hardHit = this.checkHammerHardHit();	//ハードヒットの判定
 		const powers = this.battleWindowsPowers();
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
@@ -142,12 +147,12 @@ export class KssRng {
 		let hardHit, powers;
 		if (hardHitFirst) {
 			// 先にハードヒットの判定
-			hardHit = this.randi(4) === 0;
+			hardHit = this.checkHammerHardHit();
 			powers = this.battleWindowsPowers();
 		} else {
 			// 後にハードヒットの判定
 			powers = this.battleWindowsPowers();
-			hardHit = this.randi(4) === 0;
+			hardHit = this.checkHammerHardHit();
 		}
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
@@ -231,7 +236,7 @@ export class KssRng {
 		if (magician.fast) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastMagician(magician.advances2)) return result;
-			result.push(this.hammerFlipHitForFastMagician(magician.hardHitFirst));
+			result.push(this.hammerFlipHitForFastMagician(magician.actions.hardHitFirst));
 		} else {
 			// Easyモード
 			if (this.magicianAttacksFirst()) return result;
@@ -652,10 +657,59 @@ export class BattleWindowsMWWManipulator {
 		return bestPartialResult;
 	}
 
+	/** 魔法使いのFastの各タイミングの結果 */
+	simulationsForFastMagician(index) {
+		return [
+			{ advances1: 8, hardHitFirst: true,  frames: 1 },
+			{ advances1: 6, hardHitFirst: true,  frames: 3 },
+			{ advances1: 6, hardHitFirst: false, frames: 1 },
+			{ advances1: 4, hardHitFirst: false, frames: 4 },
+			{ advances1: 2, hardHitFirst: false, frames: 4 },
+			{ advances1: 0, hardHitFirst: false, frames: 4 },
+		].map(v => {
+			const r = new KssRng(index + v.advances1);
+			const kirbyAttacksFirst = !r.magicianAttacksFirst();
+			const advances2 = HammerFlipChargeAdvances - v.advances1;
+			r.advance(advances2);
+
+			let hardHitIndex, hardHit;
+			if (v.hardHitFirst) {
+				hardHitIndex = r.index;
+				hardHit = r.checkHammerHardHit();
+			}
+
+			const powersStartingIndex = r.index;
+			const powers = r.battleWindowsPowers();
+			const powersEndingIndex = r.index;
+
+			if (!v.hardHitFirst) {
+				hardHitIndex = r.index;
+				hardHit = r.checkHammerHardHit();
+			}
+
+			const hardHitStartingIndex = r.index;
+			if (hardHit) r.advance(HammerHardHitAdvances);
+			const hardHitEndingIndex = r.index;
+
+			r.advance(HammerFlipFinishAdvances);
+			const endingIndex = r.index;
+
+			return {
+				...v,
+				kirbyAttacksFirst,
+				advances2,
+				hardHitIndex, hardHit,
+				powersStartingIndex, powers, powersEndingIndex,
+				hardHitStartingIndex, hardHitEndingIndex,
+				endingIndex,
+			};
+		});
+	}
+
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 */
-	*testGenerator(stars, showsSimulation=false) {
+	*testGenerator(stars, showsSimulation) {
 		const result = {
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
@@ -792,7 +846,7 @@ export class BattleWindowsMWWManipulator {
 		}
 	}
 	/** testGeneratorを最後まで回し、最終結果を返す */
-	test(stars, showsSimulation=false) {
+	test(stars, showsSimulation) {
 		for (const { progress, result } of this.testGenerator(stars, showsSimulation)) {
 			if (progress === 100) return result;
 		}
