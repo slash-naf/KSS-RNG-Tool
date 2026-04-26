@@ -310,24 +310,26 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
 /** 魔法使いのFastの各タイミングの結果 */
 export function simulateAllTimingsForFastMagician(index) {
 	return [
-		{ advances1: 8, hardHitFirst: true,  frames: 1, seg: "1", name: "1st frame" },
+		{ advances1: 8, hardHitFirst: true,  frames: 1, seg: "", name: "1st frame" },
 		{ advances1: 6, hardHitFirst: true,  frames: 3, seg: "1", name: "Fast1" },
-		{ advances1: 6, hardHitFirst: false, frames: 1, seg: "1", name: "5th frame" },
+		{ advances1: 6, hardHitFirst: false, frames: 1, seg: "", name: "5th frame" },
 		{ advances1: 4, hardHitFirst: false, frames: 4, seg: "2", name: "Fast2" },
 		{ advances1: 2, hardHitFirst: false, frames: 4, seg: "3", name: "Fast3" },
 		{ advances1: 0, hardHitFirst: false, frames: 4, seg: "4", name: "Fast4" },
+		{ advances3: 2, hardHitFirst: false, frames: 4, seg: "", name: "Over1" },
+		{ advances3: 12, hardHitFirst: false, frames: 0, seg: "", name: "Easy" },
 	].map(v => {
 		const r = new KssRng(index);
 		
 		const advances1StartingIndex = r.index;
-		r.advance(v.advances1);
+		if (v.advances1) r.advance(v.advances1);
 		const advances1EndingIndex = r.index;
 
 		const kirbyAttacksFirstIndex = r.index;
 		const kirbyAttacksFirst = !r.magicianAttacksFirst();
 		
 		const advances2StartingIndex = r.index;
-		const advances2 = HammerFlipChargeAdvances - v.advances1;
+		const advances2 = HammerFlipChargeAdvances - (v.advances1 ?? v.advances3);
 		r.advance(advances2);
 		const advances2EndingIndex = r.index;
 
@@ -343,6 +345,10 @@ export function simulateAllTimingsForFastMagician(index) {
 		const powers = r.battleWindowsPowers();
 		const powersEndingIndex = r.index;
 		const powersAdvances = powersEndingIndex - powersStartingIndex;
+
+		const advances3StartingIndex = r.index;
+		if (v.advances3) r.advance(v.advances3);
+		const advances3EndingIndex = r.index;
 
 		if (!v.hardHitFirst) {
 			hardHitIndex2 = r.index;
@@ -365,6 +371,7 @@ export function simulateAllTimingsForFastMagician(index) {
 			advances2StartingIndex, advances2EndingIndex, advances2,
 			hardHitIndex1, hardHit1,
 			powersStartingIndex, powers, powersEndingIndex, powersAdvances,
+			advances3StartingIndex, advances3EndingIndex,
 			hardHitIndex2, hardHit2,
 			hardHit, hardHitStartingIndex, hardHitEndingIndex,
 			finishStartingIndex, endingIndex,

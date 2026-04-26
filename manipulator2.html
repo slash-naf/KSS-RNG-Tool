@@ -456,6 +456,7 @@ function displayResult() {
 					<th>${t('thSmoke')}</th>
 					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
 					<th>${t('thPowersCheck')}</th>
+					<th>${t('thSmoke')}</th>
 					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
 					<th><span style="font-size: 8px">${t('thHardHit')}</span><br>(+9)</th>
 					<th>${t('thSmoke')}<br>(+2)</th>
@@ -468,28 +469,38 @@ function displayResult() {
 					const hh1 = row.hardHitFirst ? `${row.hardHitIndex1+1}<br>(${s[row.hardHit1]})` : '-';
 					const hh2 = !row.hardHitFirst ? `${row.hardHitIndex2+1}<br>(${s[row.hardHit2]})` : '-';
 					const powersStr = `+${row.powersAdvances}<br>${row.powersEndingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
+					const adv3Smoke = row.advances3 ? `+${row.advances3}` : '-';
 					const hhSmoke = row.hardHit ? `${row.hardHitEndingIndex}` : '-';
 					const finishSmoke = `${row.endingIndex}`;
 					
 					extraHtml += `<tr>
 						<td>${row.name}</td>
 						<td>${index}</td>
-						<td>+${row.advances1}</td>
+						<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
 						<td>${row.kirbyAttacksFirstIndex+1}<br>(${s[row.kirbyAttacksFirst]})</td>
-						<td>+${row.advances2}</td>`;
+						<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
 						
 					if (i === 0) {
 						extraHtml += `<td rowspan="2">${hh1}</td>
 						<td rowspan="2">${powersStr}</td>
+						<td rowspan="2">${adv3Smoke}</td>
 						<td rowspan="2">${hh2}</td>
 						<td rowspan="2">${hhSmoke}</td>
 						<td rowspan="2">${finishSmoke}</td>`;
 					} else if (i === 2) {
 						extraHtml += `<td rowspan="4">${hh1}</td>
 						<td rowspan="4">${powersStr}</td>
+						<td rowspan="4">${adv3Smoke}</td>
 						<td rowspan="4">${hh2}</td>
 						<td rowspan="4">${hhSmoke}</td>
 						<td rowspan="4">${finishSmoke}</td>`;
+					} else if (i >= 6) {
+						extraHtml += `<td>${hh1}</td>
+						<td>${powersStr}</td>
+						<td>${adv3Smoke}</td>
+						<td>${hh2}</td>
+						<td>${hhSmoke}</td>
+						<td>${finishSmoke}</td>`;
 					}
 					extraHtml += `</tr>`;
 				}
