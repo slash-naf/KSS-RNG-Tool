@@ -193,6 +193,7 @@ export class KssRng {
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
+		const startingIndex = this.index;
 		//右の出現
 		let right;
 		if (this.randi(4) === 1) {
@@ -217,7 +218,7 @@ export class KssRng {
 		} while (left === right);
 
 		this.debugLog(`${BattleWindowsPowerNames[left]}-${BattleWindowsPowerNames[right]}`);
-		return { left, right };
+		return { left, right, startingIndex };
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す

@@ -600,6 +600,15 @@ function displayResult() {
 			html += '<td>';
 			if (p) {
 				html += `${powerImg(p.left)} ${powerImg(p.right)}`;
+
+				// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
+				if ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon)) {
+					// 本来より1つ前のインデックスからコピーの元判定が始まる
+					const failRng = new KssRng(p.startingIndex - 1);
+					const failPowers = failRng.battleWindowsPowers();
+					html += `<span style="opacity: 0.5;">(${powerImg(failPowers.left)} ${powerImg(failPowers.right)})</span>`;
+				}
+
 				if (i === 3 && settings.allowDragonStar) {
 					// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
 					const dragonImg = p.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
