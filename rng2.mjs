@@ -307,6 +307,70 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
 	}
 	return new Uint16Array(indexList);
 }
+/** 魔法使いのFastの各タイミングの結果 */
+export function simulateAllTimingsForFastMagician(index) {
+	return [
+		{ advances1: 8, hardHitFirst: true,  frames: 1, seg: "1", name: "1st frame" },
+		{ advances1: 6, hardHitFirst: true,  frames: 3, seg: "1", name: "Fast1" },
+		{ advances1: 6, hardHitFirst: false, frames: 1, seg: "1", name: "5th frame" },
+		{ advances1: 4, hardHitFirst: false, frames: 4, seg: "2", name: "Fast2" },
+		{ advances1: 2, hardHitFirst: false, frames: 4, seg: "3", name: "Fast3" },
+		{ advances1: 0, hardHitFirst: false, frames: 4, seg: "4", name: "Fast4" },
+	].map(v => {
+		const r = new KssRng(index);
+		
+		const advances1StartingIndex = r.index;
+		r.advance(v.advances1);
+		const advances1EndingIndex = r.index;
+
+		const kirbyAttacksFirstIndex = r.index;
+		const kirbyAttacksFirst = !r.magicianAttacksFirst();
+		
+		const advances2StartingIndex = r.index;
+		const advances2 = HammerFlipChargeAdvances - v.advances1;
+		r.advance(advances2);
+		const advances2EndingIndex = r.index;
+
+		let hardHitIndex1 = null, hardHit1 = null;
+		let hardHitIndex2 = null, hardHit2 = null;
+
+		if (v.hardHitFirst) {
+			hardHitIndex1 = r.index;
+			hardHit1 = r.checkHammerHardHit();
+		}
+
+		const powersStartingIndex = r.index;
+		const powers = r.battleWindowsPowers();
+		const powersEndingIndex = r.index;
+		const powersAdvances = powersEndingIndex - powersStartingIndex;
+
+		if (!v.hardHitFirst) {
+			hardHitIndex2 = r.index;
+			hardHit2 = r.checkHammerHardHit();
+		}
+
+		const hardHit = v.hardHitFirst ? hardHit1 : hardHit2;
+		const hardHitStartingIndex = r.index;
+		if (hardHit) r.advance(HammerHardHitAdvances);
+		const hardHitEndingIndex = r.index;
+
+		const finishStartingIndex = r.index;
+		r.advance(HammerFlipFinishAdvances);
+		const endingIndex = r.index;
+
+		return {
+			...v,
+			advances1StartingIndex, advances1EndingIndex,
+			kirbyAttacksFirstIndex, kirbyAttacksFirst,
+			advances2StartingIndex, advances2EndingIndex, advances2,
+			hardHitIndex1, hardHit1,
+			powersStartingIndex, powers, powersEndingIndex, powersAdvances,
+			hardHitIndex2, hardHit2,
+			hardHit, hardHitStartingIndex, hardHitEndingIndex,
+			finishStartingIndex, endingIndex,
+		};
+	});
+}
 
 // --- 分岐方式の定義 ---
 const obsLeft = s => s.left;
@@ -583,10 +647,10 @@ export class BattleWindowsMWWManipulator {
 		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す
-		const emptyResult = { magician: null, actionCombination: null, branch: null };
 		const magicianFilteredList = this.magicianActions.filter(magician => indexList.every(v => !new KssRng(v + magician.advances1).magicianAttacksFirst()));
 		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianActions;
 
+		const emptyResult = { magician: null, actionCombination: null, branch: null };
 		let bestPartialResult = { ...emptyResult };
 		let bestPartialMatchAll = [];
 		let bestMatchCountAll = 0;
@@ -655,55 +719,6 @@ export class BattleWindowsMWWManipulator {
 		}
 
 		return bestPartialResult;
-	}
-
-	/** 魔法使いのFastの各タイミングの結果 */
-	simulationsForFastMagician(index) {
-		return [
-			{ advances1: 8, hardHitFirst: true,  frames: 1 },
-			{ advances1: 6, hardHitFirst: true,  frames: 3 },
-			{ advances1: 6, hardHitFirst: false, frames: 1 },
-			{ advances1: 4, hardHitFirst: false, frames: 4 },
-			{ advances1: 2, hardHitFirst: false, frames: 4 },
-			{ advances1: 0, hardHitFirst: false, frames: 4 },
-		].map(v => {
-			const r = new KssRng(index + v.advances1);
-			const kirbyAttacksFirst = !r.magicianAttacksFirst();
-			const advances2 = HammerFlipChargeAdvances - v.advances1;
-			r.advance(advances2);
-
-			let hardHitIndex, hardHit;
-			if (v.hardHitFirst) {
-				hardHitIndex = r.index;
-				hardHit = r.checkHammerHardHit();
-			}
-
-			const powersStartingIndex = r.index;
-			const powers = r.battleWindowsPowers();
-			const powersEndingIndex = r.index;
-
-			if (!v.hardHitFirst) {
-				hardHitIndex = r.index;
-				hardHit = r.checkHammerHardHit();
-			}
-
-			const hardHitStartingIndex = r.index;
-			if (hardHit) r.advance(HammerHardHitAdvances);
-			const hardHitEndingIndex = r.index;
-
-			r.advance(HammerFlipFinishAdvances);
-			const endingIndex = r.index;
-
-			return {
-				...v,
-				kirbyAttacksFirst,
-				advances2,
-				hardHitIndex, hardHit,
-				powersStartingIndex, powers, powersEndingIndex,
-				hardHitStartingIndex, hardHitEndingIndex,
-				endingIndex,
-			};
-		});
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する

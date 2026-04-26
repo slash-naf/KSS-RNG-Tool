@@ -200,7 +200,8 @@ import {
 	BattleWindowsPowerNames, BattleWindowsPowerNone,
 	StarDirectionChars, findIndexesByStars, KssRng,
 	DragonGuard, DragonStar,
-	CYCLE_LEN
+	CYCLE_LEN,
+	simulateAllTimingsForFastMagician,
 } from './rng2.mjs';
 
 // --- テンキー→星の方向の変換 ---
@@ -262,6 +263,12 @@ const L = {
 		dragonActions: 'Dragon',
 		dragonTurn2Actions: 'Dragon Turn 2',
 		defaultSettings: 'Default Settings',
+		thTiming: 'Timing',
+		thSmoke: 'Smoke',
+		thKirbyFirst: 'Kirby 1st',
+		thHardHitCheck: 'Hard Hit Check',
+		thPowersCheck: 'Powers Check',
+		thHardHit: 'Hard Hit',
 	},
 	ja: {
 		langLabel: '言語:',
@@ -313,6 +320,12 @@ const L = {
 		dragonActions: 'レッドドラゴン',
 		dragonTurn2Actions: 'レッドドラゴン2ターン目',
 		defaultSettings: 'デフォルト設定',
+		thTiming: 'タイミング',
+		thSmoke: '煙',
+		thKirbyFirst: 'カービィ先制',
+		thHardHitCheck: 'ハードヒット判定',
+		thPowersCheck: 'コピーの元判定',
+		thHardHit: 'ハードヒット',
 	}
 };
 
@@ -424,9 +437,65 @@ function displayResult() {
 
 	// 到着時の乱数位置の表示（設定がオンの場合のみ）
 	const showArrival = document.getElementById('show-arrival-index').checked;
+	let extraHtml = '';
 	if (showArrival) {
-		const arrivalIndices = Array.from(starIndices).map(idx => idx - stars.length * 2);
+		const starsAdvances = stars.length * 2;
+		const arrivalIndices = Array.from(starIndices).map(idx => idx - starsAdvances);
 		statusEl.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
+
+		// 魔法使いがFastの場合の各タイミングのシミュレーション結果
+		if (settings.magicianDifficulty !== 'easy') {
+			for (const index of starIndices) {
+				const arrivalIndex = index - stars.length * 2;
+				extraHtml += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${arrivalIndex}</b>`;
+				extraHtml += `<table class="test-table" style="font-size: 14px"><thead><tr>
+					<th>${t('thTiming')}</th>
+					<th>${t('thStars')}<br>(+${starsAdvances})</th>
+					<th>${t('thSmoke')}</th>
+					<th>${t('thKirbyFirst')}<br>(+1)</th>
+					<th>${t('thSmoke')}</th>
+					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
+					<th>${t('thPowersCheck')}</th>
+					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
+					<th><span style="font-size: 8px">${t('thHardHit')}</span><br>(+9)</th>
+					<th>${t('thSmoke')}<br>(+2)</th>
+				</tr></thead><tbody>`;
+
+				const s = { true: '<b style="color: green">✓</b>', false: '<b style="color: red">✕</b>'}
+				const timings = simulateAllTimingsForFastMagician(index);
+				for (let i = 0; i < timings.length; i++) {
+					const row = timings[i];
+					const hh1 = row.hardHitFirst ? `${row.hardHitIndex1+1}<br>(${s[row.hardHit1]})` : '-';
+					const hh2 = !row.hardHitFirst ? `${row.hardHitIndex2+1}<br>(${s[row.hardHit2]})` : '-';
+					const powersStr = `+${row.powersAdvances}<br>${row.powersEndingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
+					const hhSmoke = row.hardHit ? `${row.hardHitEndingIndex}` : '-';
+					const finishSmoke = `${row.endingIndex}`;
+					
+					extraHtml += `<tr>
+						<td>${row.name}</td>
+						<td>${index}</td>
+						<td>+${row.advances1}</td>
+						<td>${row.kirbyAttacksFirstIndex+1}<br>(${s[row.kirbyAttacksFirst]})</td>
+						<td>+${row.advances2}</td>`;
+						
+					if (i === 0) {
+						extraHtml += `<td rowspan="2">${hh1}</td>
+						<td rowspan="2">${powersStr}</td>
+						<td rowspan="2">${hh2}</td>
+						<td rowspan="2">${hhSmoke}</td>
+						<td rowspan="2">${finishSmoke}</td>`;
+					} else if (i === 2) {
+						extraHtml += `<td rowspan="4">${hh1}</td>
+						<td rowspan="4">${powersStr}</td>
+						<td rowspan="4">${hh2}</td>
+						<td rowspan="4">${hhSmoke}</td>
+						<td rowspan="4">${finishSmoke}</td>`;
+					}
+					extraHtml += `</tr>`;
+				}
+				extraHtml += `</tbody></table></div>`;
+			}
+		}
 	}
 
 	// manipulate は全候補を同時に考慮して1つの結果を返す
@@ -535,6 +604,12 @@ function displayResult() {
 
 	table.appendChild(tbody);
 	resultEl.appendChild(table);
+
+	if (extraHtml) {
+		const extraDiv = document.createElement('div');
+		extraDiv.innerHTML = extraHtml;
+		resultEl.appendChild(extraDiv);
+	}
 }
 
 // --- 入力リセット ---
