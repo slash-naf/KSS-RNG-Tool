@@ -41,23 +41,27 @@ export class KssRng {
 		this.index = index;
 		this.debug = debug;
 	}
-	/** デバッグ結果を出力し、結果の値をそのまま返す */
+	/** デバッグ結果を渡す */
 	debugLog(result="") {
 		if (this.debug) {
-			const value = this.getCurrentValue();
+			const value = this.getValue();
 			this.debug({
 				name: new Error().stack.match(/KssRng\.\w+/g).slice(1).reverse().join('/').replaceAll('KssRng.', ''),
 				result,
-				index: this.index,
+				index: this.getIndex(),
 				value: `0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]`,
 			});
 		}
 	}
+	/** 現在の乱数位置を取得 */
+	getIndex() {
+		return this.index;
+	}
 	/** 現在の乱数値を取得 */
-	getCurrentValue() {
+	getValue() {
 		return RngCycle[this.index];
 	}
-	/** 乱数を1回進めて、0以上max未満の乱数を返す */
+	/** 乱数を1回進めて、0以上max未満の整数を返す */
 	randi(max) {
 		this.advance(1);
 		return ((RngCycle[this.index] & 0xFF) * max) >> 8;
@@ -91,11 +95,6 @@ export class KssRng {
 		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		this.debugLog();
-	}
-	/** 鬼殺し火炎ハンマーの素振り */
-	hammerFlip() {
-		this.advance(HammerFlipAdvances);
 		this.debugLog();
 	}
 
@@ -193,7 +192,7 @@ export class KssRng {
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
-		const startingIndex = this.index;
+		const startingIndex = this.getIndex();
 		//右の出現
 		let right;
 		if (this.randi(4) === 1) {
@@ -206,7 +205,7 @@ export class KssRng {
 
 		//左の出現 (左右とも出現して同じ種類だったら再抽選)
 		let left;
-		do{
+		do {
 			if (this.randi(4) === 2) {
 				const poolIdx = this.randi(4) & 1;
 				const pwrIdx = this.randi(12);
@@ -303,7 +302,7 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
 	for (let i = minIndex; i <= maxIndex; i++) {
 		const r = new KssRng(i);
 		if (stars.every(v => r.starDirection() === v)) {
-			indexList.push(r.index);
+			indexList.push(r.getIndex());
 		}
 	}
 	return new Uint16Array(indexList);
@@ -790,7 +789,7 @@ export class BattleWindowsMWWManipulator {
 			if (branch) {
 				const bt = BranchTypes[branch.type];
 				// 分岐前の乱数位置からシミュレーションを行い、実際の観測値を取得する
-				const tempSim = new KssRng(r.index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
+				const tempSim = new KssRng(r.getIndex()).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
 				const isEqual = tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value;
 				if (isEqual) {
 					// 分岐条件に一致した場合はフォールバック行動を使用する
