@@ -232,7 +232,7 @@ export class KssRng {
 
 		// --- 魔法使い ---
 		this.advance(magician.advances1);
-		this.debugLog(magician.messageJa);
+		this.label(magician.messageJa);
 		if (magician.fast) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastMagician(magician.advances2)) return result;
@@ -241,14 +241,14 @@ export class KssRng {
 			// Easyモード
 			if (this.magicianAttacksFirst()) return result;
 			this.advance(magician.advances2);	// スライディングは間に合わないから先制判定は間に挟まる
-			if (magician.advances2 > 0) this.debugLog("スライディングの残り");
+			if (magician.advances2 > 0) this.label("スライディングの残り");
 			result.push(this.battleWindowsPowers());
 			this.hammerFlipChargeAndHit();
 		}
 
 		// --- 悪魔の騎士 ---
 		this.advance(actionCombination.knight.advances);
-		this.debugLog(actionCombination.knight.messageJa);
+		this.label(actionCombination.knight.messageJa);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return result;
@@ -265,7 +265,7 @@ export class KssRng {
 
 		// --- レッドドラゴン ---
 		this.advance(actionCombination.dragon.advances);
-		this.debugLog(actionCombination.dragon.messageJa);
+		this.label(actionCombination.dragon.messageJa);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return result;
@@ -280,13 +280,17 @@ export class KssRng {
 
 		// --- レッドドラゴン2ターン目 ---
 		this.advance(actionCombination.dragonAction.advances);
-		this.debugLog(actionCombination.dragonAction.messageJa);
+		this.label(actionCombination.dragonAction.messageJa);
 		const dragonAction = this.dragonActs();
 		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
 			result.push({ ...this.battleWindowsPowers(), dragonAction });
 		}
 
 		return result;
+	}
+
+	label(text) {
+		return text;
 	}
 }
 
@@ -757,9 +761,25 @@ export class BattleWindowsMWWManipulator {
 		let progress = 0;
 
 		for (let i = this.minIndex; i <= this.maxIndex; i++) {
+			const internal = new Set(['randi', 'advance', 'getIndex', 'getValue', 'debugLog']);
+			const stack = [];
+			const r = new Proxy(new KssRng(i), {
+				get(target, p, receiver) {
+					const v = target[p];
+					if (typeof v !== 'function' || internal.has(p)) return v;
+					return function(...args) {
+						stack.push(p);
+						const result = v.call(receiver, ...args);
+						const index = target.getIndex();
+						showsSimulation({ stack, index, result });
+						stack.pop();
+						return result;
+					}
+				}
+			});
+
 			// 星の方向を確認
-			const r = new KssRng(i, showsSimulation);
-			if (showsSimulation) r.debugLog("## 開始乱数")
+			if (showsSimulation) r.label("## 開始乱数")
 			const starDirectionList = [];
 			for (let j = 0; j < stars; j++) {
 				starDirectionList.push(r.starDirection());
@@ -816,7 +836,7 @@ export class BattleWindowsMWWManipulator {
 				if (isEqual) result.totalBranchMatch++;
 				else result.totalBranchNoMatch++;
 			}
-			if (showsSimulation && branchStr !== "なし") r.debugLog("分岐: "+branchStr);
+			if (showsSimulation && branchStr !== "なし") r.label("分岐: "+branchStr);
 
 			// 行動を適用
 			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
