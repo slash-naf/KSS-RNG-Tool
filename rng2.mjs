@@ -37,21 +37,8 @@ export const HammerHardHitAdvances = 9;
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
 export class KssRng {
-	constructor(index=0, debug) {
+	constructor(index=0) {
 		this.index = index;
-		this.debug = debug;
-	}
-	/** デバッグ結果を渡す */
-	debugLog(result="") {
-		if (this.debug) {
-			const value = this.getValue();
-			this.debug({
-				name: new Error().stack.match(/KssRng\.\w+/g).slice(1).reverse().join('/').replaceAll('KssRng.', ''),
-				result,
-				index: this.getIndex(),
-				value: `0x${value.toString(16)}=[${value & 0xFF}, ${value >>> 8}]`,
-			});
-		}
 	}
 	/** 現在の乱数位置を取得 */
 	getIndex() {
@@ -75,27 +62,21 @@ export class KssRng {
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
 	starDirection() {
 		this.advance(1);
-		const result = this.randi(8);
-		this.debugLog(StarDirectionChars[result]);
-		return result;
+		return this.randi(8);
 	}
 	/** ハンマーのヒット */
 	hammerHit() {
 		const hardHit = this.checkHammerHardHit();	//ハードヒットの判定
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
-		this.debugLog();
 	}
 	checkHammerHardHit() {
-		const result = this.randi(4) === 0;
-		this.debugLog(result)
-		return result;
+		return this.randi(4) === 0;
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
 		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		this.debugLog();
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
@@ -110,7 +91,6 @@ export class KssRng {
 		this.advance(1);
 		const b = this.knightAttacksFirst();
 		this.advance(2);
-		this.debugLog();
 		return a || b;
 	}
 	/** レッドドラゴンへの最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
@@ -120,7 +100,6 @@ export class KssRng {
 		this.advance(1);
 		const b = this.dragonAttacksFirst();
 		this.advance(4);
-		this.debugLog();
 		return a || b;
 	}
 	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
@@ -129,20 +108,16 @@ export class KssRng {
 		const powers = this.battleWindowsPowers();
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		this.debugLog();
 		return powers;
 	}
 	/** 魔法使いでの鬼殺しの溜め中の土煙と、先制されるか */
 	hammerFlipChargeForFastMagician(advances) {
-		// 溜め中の土煙と先制されるか
 		const a = this.magicianAttacksFirst();
 		this.advance(advances);
-		this.debugLog();
 		return a;
 	}
 	/** 魔法使いでの鬼殺しのヒットと、出現するコピーの元 */
 	hammerFlipHitForFastMagician(hardHitFirst) {
-		// ヒットと出現するコピーの元
 		let hardHit, powers;
 		if (hardHitFirst) {
 			// 先にハードヒットの判定
@@ -155,40 +130,27 @@ export class KssRng {
 		}
 		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		this.debugLog();
 		return powers;
 	}
 
 	// --- バトルウィンドウズ ---
 	slimeAttacksFirst() {
-		const result = this.randi(4) === 1;
-		this.debugLog(result);
-		return result;
+		return this.randi(4) === 1;
 	}
 	puppetAttacksFirst() {
-		const result = this.randi(4) === 2;
-		this.debugLog(result);
-		return result;
+		return this.randi(4) === 2;
 	}
 	magicianAttacksFirst() {
-		const result = this.randi(4) === 1;
-		this.debugLog(result);
-		return result;
+		return this.randi(4) === 1;
 	}
 	knightAttacksFirst() {
-		const result = this.randi(4) === 2;
-		this.debugLog(result);
-		return result;
+		return this.randi(4) === 2;
 	}
 	dragonAttacksFirst() {
-		const result = this.randi(4) === 3;
-		this.debugLog(result);
-		return result;
+		return this.randi(4) === 3;
 	}
 	dragonActs() {
-		const result = DragonActionMap[this.randi(10)];
-		this.debugLog(DragonActionNames[result]);
-		return result;
+		return DragonActionMap[this.randi(10)];
 	}
 	/** バトルウィンドウズのコピーの元の出現 */
 	battleWindowsPowers() {
@@ -216,7 +178,6 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		this.debugLog(`${BattleWindowsPowerNames[left]}-${BattleWindowsPowerNames[right]}`);
 		return { left, right, startingIndex };
 	}
 
@@ -760,26 +721,31 @@ export class BattleWindowsMWWManipulator {
 		let count = 0;
 		let progress = 0;
 
-		for (let i = this.minIndex; i <= this.maxIndex; i++) {
-			const internal = new Set(['randi', 'advance', 'getIndex', 'getValue', 'debugLog']);
-			const stack = [];
-			const r = new Proxy(new KssRng(i), {
-				get(target, p, receiver) {
-					const v = target[p];
-					if (typeof v !== 'function' || internal.has(p)) return v;
-					return function(...args) {
-						stack.push(p);
-						const result = v.call(receiver, ...args);
-						const index = target.getIndex();
-						showsSimulation({ stack, index, result });
-						stack.pop();
-						return result;
-					}
-				}
-			});
+		// Proxy でフックしない内部メソッド
+		const internal = new Set(['randi', 'advance', 'getIndex', 'getValue']);
 
-			// 星の方向を確認
-			if (showsSimulation) r.label("## 開始乱数")
+		for (let i = this.minIndex; i <= this.maxIndex; i++) {
+			// showsSimulation が指定されている場合のみ Proxy でメソッド呼び出しをフックする
+			const r = showsSimulation ? (() => {
+				const stack = [];
+				return new Proxy(new KssRng(i), {
+					get(target, p, receiver) {
+						const v = target[p];
+						if (typeof v !== 'function' || internal.has(p)) return v;
+						return function(...args) {
+							stack.push(p);
+							const result = v.call(receiver, ...args);
+							const index = target.getIndex();
+							showsSimulation({ stack: [...stack], index, result });
+							stack.pop();
+							return result;
+						}
+					}
+				});
+			})() : new KssRng(i);
+			r.label("## 開始乱数");
+
+			// 星の方向の確認
 			const starDirectionList = [];
 			for (let j = 0; j < stars; j++) {
 				starDirectionList.push(r.starDirection());
