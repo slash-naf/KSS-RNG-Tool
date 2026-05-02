@@ -197,7 +197,7 @@ details summary {
 <script type="module">
 import {
 	BattleWindowsMWWManipulator, BranchTypes,
-	BattleWindowsPowerNames, BattleWindowsPowerNone,
+	BattleWindowsPowerTable, BattleWindowsPowerNone,
 	StarDirectionChars, findIndexesByStars, KssRng,
 	DragonGuard, DragonStar,
 	CYCLE_LEN,
@@ -207,9 +207,6 @@ import {
 // --- テンキー→星の方向の変換 ---
 const NumpadToStarIndex = { 8: 0, 9: 1, 6: 2, 3: 3, 2: 4, 1: 5, 4: 6, 7: 7 };
 const NoNumpadMap = { 'w': 8, 'e': 9, 'd': 6, 'c': 3, 'x': 2, 'z': 1, 'a': 4, 'q': 7 };
-
-// BattleWindowsPowerMap の長さ（obsPowers のエンコードに使用）
-const POWER_MAP_LEN = BattleWindowsPowerNames.length;
 
 // --- 多言語テキスト ---
 const L = {
@@ -365,16 +362,14 @@ function getSettings() {
 }
 
 // --- コピーの元の画像タグ（Noneも表示する） ---
-function powerImg(powerIndex) {
-	const name = BattleWindowsPowerNames[powerIndex].toLowerCase();
-	return `<img src="images/abilities/${name}.png" title="${BattleWindowsPowerNames[powerIndex]}">`;
+function powerImg(powerName) {
+	return `<img src="images/abilities/${powerName.toLowerCase()}.png" title="${powerName}">`;
 }
 
 // --- 分岐の観測値を左右のコピーの元画像として表示 ---
 function formatBranchPowers(type, val) {
 	if (type.endsWith('Powers')) {
-		const left = Math.floor(val / POWER_MAP_LEN);
-		const right = val % POWER_MAP_LEN;
+		const [left, right] = val.split('-');
 		return powerImg(left) + ' ' + powerImg(right);
 	}
 	if (type.endsWith('Left')) {
@@ -407,7 +402,7 @@ function preloadImages() {
 		img.src = src;
 	});
 	new Image().src = 'images/dragonstars.png';
-	BattleWindowsPowerNames.forEach(name => {
+	[...new Set(BattleWindowsPowerTable), BattleWindowsPowerNone].forEach(name => {
 		const img = new Image();
 		img.src = `images/abilities/${name.toLowerCase()}.png`;
 	});

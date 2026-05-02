@@ -1,4 +1,4 @@
-import { KssRng, BattleWindowsPowerNames, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, BranchTypes, BattleWindowsMWWManipulator, DragonActionNames } from './rng2.mjs';
+import { KssRng, DragonStar, DragonGuard, SlideAdvances, HammerFlipAdvances, StarDirectionAdvances, BranchTypes, BattleWindowsMWWManipulator } from './rng2.mjs';
 
 
 /** 銀河に願いをのバトルウィンドウズ戦の乱数調整をする従来の処理 */
@@ -45,8 +45,8 @@ async function manipulateBattleWindowsMWWOld(startIndex, fastKnight, fastDragon,
     };
     const parseAdvances = ({dashes=0, slides=0, hammerFlips=0}) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances;
     const parsePowers = enemy => ({
-        left: BattleWindowsPowerNames.indexOf(enemy.leftPower),
-        right: BattleWindowsPowerNames.indexOf(enemy.rightPower),
+        left: enemy.leftPower,
+        right: enemy.rightPower,
     });
 
     const magicianActions = parseActions(magician.message);
@@ -124,18 +124,18 @@ async function compareManipulationAndSimulation(startIndex, fastKnight, fastDrag
 
         // コピーの元の比較
         if (mPowers.right !== sPowers.right) {
-            console.log(`[DIFF] ${name} right: manipulate=${BattleWindowsPowerNames[mPowers.right]}, simulate=${BattleWindowsPowerNames[sPowers.right]}`);
+            console.log(`[DIFF] ${name} right: manipulate=${mPowers.right}, simulate=${sPowers.right}`);
             return {sim, manip};
         }
         if (mPowers.left !== sPowers.left) {
-            console.log(`[DIFF] ${name} left: manipulate=${BattleWindowsPowerNames[mPowers.left]}, simulate=${BattleWindowsPowerNames[sPowers.left]}`);
+            console.log(`[DIFF] ${name} left: manipulate=${mPowers.left}, simulate=${sPowers.left}`);
             return {sim, manip};
         }
     }
 
     // レッドドラゴンの行動の比較
     if (manip.dragonAction === DragonGuard && sim.length !== 4) {
-        console.log(`[DIFF] dragonAction: manipulate dragonAction=${DragonActionNames[manip.dragonAction]}, simulate length=${sim.length}`);
+        console.log(`[DIFF] dragonAction: manipulate dragonAction=${manip.dragonAction}, simulate length=${sim.length}`);
         return {sim, manip};
     }
 
