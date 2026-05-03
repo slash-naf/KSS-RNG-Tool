@@ -66,8 +66,7 @@ export class KssRng {
 	constructor(index=0) {
 		this.index = index;
 	}
-	/** 現在の乱数位置を取得
-	 * @returns {number} */
+	/** 現在の乱数位置を取得 */
 	getIndex() {
 		return this.index;
 	}
@@ -98,7 +97,7 @@ export class KssRng {
 		const hardHit = this.checkHammerHardHit();
 		if (hardHit) this.advance(HammerHardHitAdvances);
 	}
-	/** @returns {boolean} ハードヒットかどうか（1/4の確率） */
+	/** ハンマーがハードヒットするかどうか */
 	checkHammerHardHit() {
 		return this.randi(4) === 0;
 	}
@@ -542,7 +541,7 @@ export class BattleWindowsMWWManipulator {
 		this.maxIndex = maxIndex;
 		this.branchPriorities = branchPriorities;
 
-		// 行動のテーブル作成
+		// --- 行動のテーブルを変換 ---
 		const table = actionsDifficultyTable;
 
 		/** @param {ActionTableEntry} a */
@@ -608,7 +607,7 @@ export class BattleWindowsMWWManipulator {
 		const dragonActions = parseEnemyActions(table.dragon);
 		const dragonActionActions = parseEnemyActions(table.dragonAction);
 
-		// 魔法使い以外の全ての行動の組み合わせを作成し、難易度順にソート
+		// 魔法使い以外の全ての行動の組み合わせを作成し、難易度の昇順にソート
 		/** @type {ActionCombination[]} */
 		this.actionCombinations = [];
 		for (const knight of knightActions) {
