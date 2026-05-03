@@ -1,18 +1,11 @@
 // @ts-check
 
 /**
- * @typedef {'Star' | 'Guard' | 'Other'} DragonAction レッドドラゴンの行動
- * @typedef {'Fighter' | 'Plasma' | 'Hammer' | 'Beam' | 'Bomb' | 'Sword' | 'Stone' | 'Cutter' | 'Wheel' | 'Jet' | 'Ice' | 'Parasol' | 'Fire' | 'Suplex' | 'Ninja' | 'Yo-yo' | 'Mirror' | 'Wing' | 'None'} PowerName コピーの元の名前
  * @typedef {{ left: PowerName, right: PowerName, startingIndex: number }} BattleWindowsPowersResult コピーの元判定の結果
- * @typedef {{ dashes?: number, slides?: number, hammerFlips?: number, stars?: number, advances?: number, hardHitFirst?: boolean, difficulty?: number }} ActionTableEntry 行動テーブルのエントリ
+ * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, advances?: number, hardHitFirst?: boolean }} ActionTableEntry 行動テーブルのエントリ
  * @typedef {{ advances: number, messageJa: string, messageEn: string, difficulty: number, actions: ActionTableEntry }} EnemyAction 敵に対する行動
  * @typedef {{ advances1: number, advances2: number, fast: boolean, actions: ActionTableEntry, messageJa: string, messageEn: string }} MagicianAction 魔法使いに対する行動
  * @typedef {{ knight: EnemyAction, dragon: EnemyAction, dragonAction: EnemyAction, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
- * @typedef {{ type: string, value: string, fallbackActionCombination: ActionCombination }} Branch 分岐情報
- * @typedef {{ magician: MagicianAction | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult manipulate() の戻り値
- * @typedef {{ getObservable: function({sim: BattleWindowsPowersResult[]}): string, minSimLength: number, filterFallback: function(ActionCombination, ActionCombination): boolean }} BranchType 分岐方式
- * @typedef {{ actionCombination: ActionCombination, index: number, sim: BattleWindowsPowersResult[] }} SimulationEntry シミュレーション結果エントリ
- * @typedef {function({stack: string[], index: number, result: *}): void} DebugCallback デバッグコールバック
  */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
@@ -34,19 +27,18 @@ for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 /** 星の方向を表す文字（randi(8)に対応） */
 export const StarDirectionChars =  "↑↗→↘↓↙←↖";
 
-/** レッドドラゴンの行動テーブル（randi(10)に対応）
- * @type {DragonAction[]} */
+/** @typedef {'Star' | 'Guard' | 'Other'} DragonAction レッドドラゴンの行動 */
+/** @type {DragonAction[]}  レッドドラゴンの行動テーブル（randi(10)に対応）*/
 export const DragonActionTable = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
 /** @type {DragonAction} */
 export const DragonStar = "Star";
 /** @type {DragonAction} */
 export const DragonGuard = "Guard";
 
-/** コピーの元の名前テーブル（12個×2プール）
- * @type {PowerName[]} */
+/** @typedef {'Fighter' | 'Plasma' | 'Hammer' | 'Beam' | 'Bomb' | 'Sword' | 'Stone' | 'Cutter' | 'Wheel' | 'Jet' | 'Ice' | 'Parasol' | 'Fire' | 'Suplex' | 'Ninja' | 'Yo-yo' | 'Mirror' | 'Wing' | 'None'} PowerName コピーの元の名前 */
+/** @type {PowerName[]} コピーの元の名前テーブル（12個×2プール） */
 export const BattleWindowsPowerTable = ["Fighter", "Plasma", "Hammer", "Beam", "Bomb", "Sword", "Hammer", "Bomb", "Plasma", "Sword", "Beam", "Fighter", "Stone", "Cutter", "Wheel", "Jet", "Ice", "Parasol", "Fire", "Suplex", "Ninja", "Yo-yo", "Mirror", "Wing"];
-/** コピーの元が出現しない場合の値
- * @type {PowerName} */
+/** @type {PowerName} コピーの元が出現しない場合の値 */
 export const BattleWindowsPowerNone = "None";
 
 // --- 乱数消費数 --
@@ -389,6 +381,7 @@ const obsLeft = s => s.left;
 const obsRight = s => s.right;
 /** @param {BattleWindowsPowersResult} s */
 const obsPowers = s => s.left + "-" + s.right;
+/** @typedef {{ getObservable: function({sim: BattleWindowsPowersResult[]}): string, minSimLength: number, filterFallback: function(ActionCombination, ActionCombination): boolean }} BranchType */
 /**
  * @param {number} simIndex
  * @param {function(BattleWindowsPowersResult): string} observableFn
@@ -403,7 +396,6 @@ const createBranchType = (simIndex, observableFn) => ({
 		(/** @type {ActionCombination} */ p, /** @type {ActionCombination} */ a) => p.knight.advances === a.knight.advances && p.dragon.advances === a.dragon.advances
 	][simIndex])
 });
-/** @type {Record<string, BranchType>} */
 export const BranchTypes = {
 	magicianPowerLeft:  createBranchType(0, obsLeft),
 	magicianPowerRight: createBranchType(0, obsRight),
@@ -415,49 +407,12 @@ export const BranchTypes = {
 	dragonPowerRight:   createBranchType(2, obsRight),
 	dragonPowers:       createBranchType(2, obsPowers),
 };
-// BattleWindowsMWWManipulatorのデフォルト値
-const DefaultBranchPriorities = ['knightPowers', 'dragonPowers', 'magicianPowers'];
+
+/** BattleWindowsMWWManipulatorのactionsDifficultyTableデフォルト値
+ * @typedef {{ knight: ActionTableEntry[], dragon: ActionTableEntry[], dragonAction: ActionTableEntry[] }} ActionsDifficultyTable 
+ * @type {ActionsDifficultyTable}
+*/
 const DefaultActionsDifficultyTable = {
-	magician: {
-		easy: [
-			{ },
-			{ stars: 1 },
-			{ hammerFlips: 1 },
-			{ slides: 1 },
-			{ dashes: 3 },
-			{ dashes: 2, stars: 1 },
-			{ dashes: 2, slides: 1 },
-			{ dashes: 3, stars: 1 },
-			{ dashes: 3, slides: 1 },
-			{ slides: 2 },
-			{ dashes: 1 },
-			{ dashes: 1, slides: 1 },
-		],
-		conservativeFast: [
-			{ },
-			{ dashes: 2 },
-			{ dashes: 3 },
-			{ slides: 1, advances: 4 },
-			{ slides: 1, advances: 5 },
-			{ dashes: 1 },
-			{ hammerFlips: 1, advances: 6, hardHitFirst: true },
-			{ hammerFlips: 1, advances: 4, hardHitFirst: false },
-			{ hammerFlips: 1, advances: 2, hardHitFirst: false },
-			{ hammerFlips: 1, advances: 0, hardHitFirst: false },
-		],
-		aggressiveFast: [
-			{ hammerFlips: 1, advances: 6, hardHitFirst: true },
-			{ hammerFlips: 1, advances: 4, hardHitFirst: false },
-			{ hammerFlips: 1, advances: 2, hardHitFirst: false },
-			{ hammerFlips: 1, advances: 0, hardHitFirst: false },
-			{ },
-			{ dashes: 2 },
-			{ dashes: 3 },
-			{ slides: 1, advances: 4 },
-			{ slides: 1, advances: 5 },
-			{ dashes: 1 },
-		],
-	},
 	knight: [
 		{ difficulty: 0 },
 		{ difficulty: 1, stars: 1 },
@@ -507,19 +462,64 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 352, dashes: 1, hammerFlips: 1 },
 	],
 };
+
+/** 魔法使いでの行動の優先順位
+ * @type {{ easy: ActionTableEntry[], conservativeFast: ActionTableEntry[], aggressiveFast: ActionTableEntry[] }}
+*/
+const MagicianPrioritiesTable = {
+	easy: [
+		{ },
+		{ stars: 1 },
+		{ hammerFlips: 1 },
+		{ slides: 1 },
+		{ dashes: 3 },
+		{ dashes: 2, stars: 1 },
+		{ dashes: 2, slides: 1 },
+		{ dashes: 3, stars: 1 },
+		{ dashes: 3, slides: 1 },
+		{ slides: 2 },
+		{ dashes: 1 },
+		{ dashes: 1, slides: 1 },
+	],
+	conservativeFast: [
+		{ },
+		{ dashes: 2 },
+		{ dashes: 3 },
+		{ slides: 1, advances: 4 },
+		{ slides: 1, advances: 5 },
+		{ dashes: 1 },
+		{ hammerFlips: 1, advances: 6, hardHitFirst: true },
+		{ hammerFlips: 1, advances: 4, hardHitFirst: false },
+		{ hammerFlips: 1, advances: 2, hardHitFirst: false },
+		{ hammerFlips: 1, advances: 0, hardHitFirst: false },
+	],
+	aggressiveFast: [
+		{ hammerFlips: 1, advances: 6, hardHitFirst: true },
+		{ hammerFlips: 1, advances: 4, hardHitFirst: false },
+		{ hammerFlips: 1, advances: 2, hardHitFirst: false },
+		{ hammerFlips: 1, advances: 0, hardHitFirst: false },
+		{ },
+		{ dashes: 2 },
+		{ dashes: 3 },
+		{ slides: 1, advances: 4 },
+		{ slides: 1, advances: 5 },
+		{ dashes: 1 },
+	],
+};
+
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
 	/**
 	 * @param {Object} options
-	 * @param {*} [options.actionsDifficultyTable] 行動と難易度の定義テーブル
-	 * @param {string} [options.magicianDifficulty] 魔法使いの難易度 ('easy' | 'conservativeFast' | 'aggressiveFast')
+	 * @param {ActionsDifficultyTable} [options.actionsDifficultyTable] 行動と難易度の定義テーブル
+	 * @param {keyof MagicianPrioritiesTable} [options.magicianDifficulty] 魔法使いの難易度
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
 	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃も成功として扱うか
 	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
-	 * @param {Array<string>} [options.branchPriorities] 完全一致しない場合にフォールバックとして試す分岐方式の優先順位
+	 * @param {Array<keyof BranchTypes>} [options.branchPriorities] 完全一致しない場合にフォールバックとして試す分岐方式の優先順位
 	 */
 	constructor({
 		actionsDifficultyTable = DefaultActionsDifficultyTable,
@@ -530,7 +530,7 @@ export class BattleWindowsMWWManipulator {
 		hammerThrow = 1,
 		minIndex = 2800,
 		maxIndex = 3376,
-		branchPriorities = DefaultBranchPriorities
+		branchPriorities = ['knightPowers', 'dragonPowers', 'magicianPowers'],
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
@@ -542,8 +542,6 @@ export class BattleWindowsMWWManipulator {
 		this.branchPriorities = branchPriorities;
 
 		// --- 行動のテーブルを変換 ---
-		const table = actionsDifficultyTable;
-
 		/** @param {ActionTableEntry} a */
 		const parseAdvances = ({ dashes=0, slides=0, hammerFlips=0, stars=0 }) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
 
@@ -579,7 +577,7 @@ export class BattleWindowsMWWManipulator {
 
 		/** @param {ActionTableEntry[]} actionsData */
 		const parseEnemyActions = (actionsData) => {
-			return actionsData.toSorted((a, b) => (a.difficulty ?? 0) - (b.difficulty ?? 0)).map(a => ({
+			return actionsData.map(a => ({
 				difficulty: a.difficulty ?? 0,
 				advances: parseAdvances(a),
 				actions: a,
@@ -589,7 +587,7 @@ export class BattleWindowsMWWManipulator {
 		};
 
 		/** @type {ActionTableEntry[]} */
-		const magicianActionList = table.magician[this.magicianDifficulty] || table.magician.easy;
+		const magicianActionList = MagicianPrioritiesTable[this.magicianDifficulty];
 		/** @type {MagicianAction[]} */
 		this.magicianActions = magicianActionList.map(a => {
 			const advances = parseAdvances(a);
@@ -603,9 +601,9 @@ export class BattleWindowsMWWManipulator {
 			};
 		});
 
-		const knightActions = parseEnemyActions(table.knight);
-		const dragonActions = parseEnemyActions(table.dragon);
-		const dragonActionActions = parseEnemyActions(table.dragonAction);
+		const knightActions = parseEnemyActions(actionsDifficultyTable.knight);
+		const dragonActions = parseEnemyActions(actionsDifficultyTable.dragon);
+		const dragonActionActions = parseEnemyActions(actionsDifficultyTable.dragonAction);
 
 		// 魔法使い以外の全ての行動の組み合わせを作成し、難易度の昇順にソート
 		/** @type {ActionCombination[]} */
@@ -626,13 +624,15 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 部分一致候補から分岐方式を適用して解を探す
-	 * @param {string} branchTypeName
+	 * @typedef {{ actionCombination: ActionCombination, index: number, sim: BattleWindowsPowersResult[] }} SimulationEntry シミュレーション結果エントリ
+ 	 * @typedef {{ type: keyof BranchTypes, value: string, fallbackActionCombination: ActionCombination }} Branch 分岐情報
+	 * @param {keyof BranchTypes} branchTypeName
 	 * @param {SimulationEntry[][]} bestPartialMatches
 	 * @param {MagicianAction} magician
+	 * @returns {{actionCombination: ActionCombination, branch: Branch} | null}
 	 */
 	_tryBranch(branchTypeName, bestPartialMatches, magician) {
 		const bt = BranchTypes[branchTypeName];
-		if (!bt) return null;
 
 		for (const list of bestPartialMatches) {
 			const matched   = list.filter(e => e.sim.length === 4);
@@ -669,6 +669,7 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
+	 * @typedef {{ magician: MagicianAction | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
 	 */
@@ -755,6 +756,7 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
+	 * @typedef {function({stack: string[], index: number, result: any}): void} DebugCallback デバッグコールバック
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 * @param {DebugCallback} [debugCallback]
 	 */
@@ -895,16 +897,16 @@ export class BattleWindowsMWWManipulator {
 
 				// 成功した行動の使用回数を集計する
 				const magicianMsg = magician.messageJa;
-				result.magicianCountList[magicianMsg] = (result.magicianCountList[magicianMsg] || 0) + 1;
+				result.magicianCountList[magicianMsg] = (result.magicianCountList[magicianMsg] ?? 0) + 1;
 
 				const knightMsg = chosenActionCombination.knight.messageJa;
-				result.knightCountList[knightMsg] = (result.knightCountList[knightMsg] || 0) + 1;
+				result.knightCountList[knightMsg] = (result.knightCountList[knightMsg] ?? 0) + 1;
 
 				const dragonMsg = chosenActionCombination.dragon.messageJa;
-				result.dragonCountList[dragonMsg] = (result.dragonCountList[dragonMsg] || 0) + 1;
+				result.dragonCountList[dragonMsg] = (result.dragonCountList[dragonMsg] ?? 0) + 1;
 
 				const dragonActionMsg = chosenActionCombination.dragonAction.messageJa;
-				result.dragonActionCountList[dragonActionMsg] = (result.dragonActionCountList[dragonActionMsg] || 0) + 1;
+				result.dragonActionCountList[dragonActionMsg] = (result.dragonActionCountList[dragonActionMsg] ?? 0) + 1;
 			}
 
 			// 進捗が1%以上変化したタイミングで呼び出し元に処理を返す
