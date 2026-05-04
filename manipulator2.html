@@ -461,8 +461,8 @@ function displayResult() {
 				const timings = simulateAllTimingsForFastMagician(index);
 				for (let i = 0; i < timings.length; i++) {
 					const row = timings[i];
-					const hh1 = row.hardHitFirst ? `${row.hardHitIndex1+1}<br>(${s[row.hardHit1]})` : '-';
-					const hh2 = !row.hardHitFirst ? `${row.hardHitIndex2+1}<br>(${s[row.hardHit2]})` : '-';
+					const hh1 = row.earlyHardHitCheck ? `${row.hardHitIndex1+1}<br>(${s[row.hardHit1]})` : '-';
+					const hh2 = !row.earlyHardHitCheck ? `${row.hardHitIndex2+1}<br>(${s[row.hardHit2]})` : '-';
 					const powersStr = `+${row.powersAdvances}<br>${row.powersEndingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
 					const adv3Smoke = row.advances3 ? `+${row.advances3}` : '-';
 					const hhSmoke = row.hardHit ? `${row.hardHitEndingIndex}` : '-';

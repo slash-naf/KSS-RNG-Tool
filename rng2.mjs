@@ -2,9 +2,9 @@
 
 /**
  * @typedef {{ left: PowerName, right: PowerName, startingIndex: number }} BattleWindowsPowersResult コピーの元判定の結果
- * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, advances?: number, hardHitFirst?: boolean }} ActionTableEntry 行動テーブルのエントリ
- * @typedef {{ advances: number, messageJa: string, messageEn: string, difficulty: number, actions: ActionTableEntry }} EnemyAction 敵に対する行動
- * @typedef {{ advances1: number, advances2: number, fast: boolean, actions: ActionTableEntry, messageJa: string, messageEn: string }} MagicianAction 魔法使いに対する行動
+ * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, frames?: number, name?: string }} ActionTableEntry 行動テーブルのエントリ
+ * @typedef {{ difficulty: number, advances: number, actions: ActionTableEntry, messageJa: string, messageEn: string }} EnemyAction 敵に対する行動
+ * @typedef {{ advances1: number, advances2: number, advances3: number, earlyHardHitCheck: boolean, actions: ActionTableEntry, messageJa: string, messageEn: string }} MagicianAction 魔法使いに対する行動
  * @typedef {{ knight: EnemyAction, dragon: EnemyAction, dragonAction: EnemyAction, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
  */
 
@@ -139,10 +139,10 @@ export class KssRng {
 		return a;
 	}
 	/** 魔法使いでの鬼殺しのヒットと、出現するコピーの元
-	 * @param {boolean} hardHitFirst */
-	hammerFlipHitForFastMagician(hardHitFirst) {
+	 * @param {boolean} earlyHardHitCheck */
+	hammerFlipHitForFastMagician(earlyHardHitCheck) {
 		let hardHit, powers;
-		if (hardHitFirst) {
+		if (earlyHardHitCheck) {
 			// 先にハードヒットの判定
 			hardHit = this.checkHammerHardHit();
 			powers = this.battleWindowsPowers();
@@ -207,25 +207,26 @@ export class KssRng {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
+	 * @typedef {Array<{left: PowerName, right: PowerName, startingIndex: number, dragonAction?: DragonAction}>} simulateBattleWindowsMWWResult
 	 * @param {MagicianAction} magician 魔法使いに対する行動
 	 * @param {ActionCombination} actionCombination 魔法使い以外の行動の組み合わせ
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュによる乱数消費数
 	 * @param {boolean} [allowDragonStar=false] レッドドラゴンの星攻撃も成功として扱うか
-	 * @returns {BattleWindowsPowersResult[]} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4
+	 * @returns {simulateBattleWindowsMWWResult} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4
 	 */
 	simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow, allowDragonStar=false) {
-		/** @type {BattleWindowsPowersResult[]} */
+		/** @type {simulateBattleWindowsMWWResult} */
 		const result = [];
 
 		// --- 魔法使い ---
 		this.advance(magician.advances1);
 		this.label(magician.messageJa);
-		if (magician.fast) {
+		if (magician.advances3 === 0) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastMagician(magician.advances2)) return result;
-			result.push(this.hammerFlipHitForFastMagician(magician.actions.hardHitFirst));
+			result.push(this.hammerFlipHitForFastMagician(magician.earlyHardHitCheck));
 		} else {
 			// Easyモード
 			if (this.magicianAttacksFirst()) return result;
@@ -305,14 +306,14 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
  * @param {number} index */
 export function simulateAllTimingsForFastMagician(index) {
 	return [
-		{ advances1: 8, hardHitFirst: true,  frames: 1, seg: "", name: "1st frame" },
-		{ advances1: 6, hardHitFirst: true,  frames: 3, seg: "1", name: "Fast1" },
-		{ advances1: 6, hardHitFirst: false, frames: 1, seg: "", name: "5th frame" },
-		{ advances1: 4, hardHitFirst: false, frames: 4, seg: "2", name: "Fast2" },
-		{ advances1: 2, hardHitFirst: false, frames: 4, seg: "3", name: "Fast3" },
-		{ advances1: 0, hardHitFirst: false, frames: 4, seg: "4", name: "Fast4" },
-		{ advances3: 2, hardHitFirst: false, frames: 4, seg: "", name: "Over1" },
-		{ advances3: 12, hardHitFirst: false, frames: 0, seg: "", name: "Easy" },
+		{ advances1: 8, earlyHardHitCheck: true,  frames: 1, seg: "", name: "1st frame" },
+		{ advances1: 6, earlyHardHitCheck: true,  frames: 3, seg: "1", name: "Fast1" },
+		{ advances1: 6, earlyHardHitCheck: false, frames: 1, seg: "", name: "5th frame" },
+		{ advances1: 4, earlyHardHitCheck: false, frames: 4, seg: "2", name: "Fast2" },
+		{ advances1: 2, earlyHardHitCheck: false, frames: 4, seg: "3", name: "Fast3" },
+		{ advances1: 0, earlyHardHitCheck: false, frames: 4, seg: "4", name: "Fast4" },
+		{ advances3: 2, earlyHardHitCheck: false, frames: 4, seg: "", name: "Over1" },
+		{ advances3: 12, earlyHardHitCheck: false, frames: 0, seg: "", name: "Easy" },
 	].map(v => {
 		const r = new KssRng(index);
 		
@@ -331,7 +332,7 @@ export function simulateAllTimingsForFastMagician(index) {
 		let hardHitIndex1 = null, hardHit1 = null;
 		let hardHitIndex2 = null, hardHit2 = null;
 
-		if (v.hardHitFirst) {
+		if (v.earlyHardHitCheck) {
 			hardHitIndex1 = r.index;
 			hardHit1 = r.checkHammerHardHit();
 		}
@@ -345,12 +346,12 @@ export function simulateAllTimingsForFastMagician(index) {
 		if (v.advances3) r.advance(v.advances3);
 		const advances3EndingIndex = r.index;
 
-		if (!v.hardHitFirst) {
+		if (!v.earlyHardHitCheck) {
 			hardHitIndex2 = r.index;
 			hardHit2 = r.checkHammerHardHit();
 		}
 
-		const hardHit = v.hardHitFirst ? hardHit1 : hardHit2;
+		const hardHit = v.earlyHardHitCheck ? hardHit1 : hardHit2;
 		const hardHitStartingIndex = r.index;
 		if (hardHit) r.advance(HammerHardHitAdvances);
 		const hardHitEndingIndex = r.index;
@@ -463,6 +464,17 @@ const DefaultActionsDifficultyTable = {
 	],
 };
 
+/** 魔法使いのFast
+ * @type {ActionTableEntry[]}
+*/
+const FastMagicianList = [
+	{ lateAdvances: -8, frames: 1, name: "1st frame", earlyHardHitCheck: true },
+	{ lateAdvances: -6, frames: 3, name: "Fast1",     earlyHardHitCheck: true },
+	{ lateAdvances: -6, frames: 1, name: "5th frame" },
+	{ lateAdvances: -4, frames: 4, name: "Fast2" },
+	{ lateAdvances: -2, frames: 4, name: "Fast3" },
+	{ lateAdvances:  0, frames: 4, name: "Fast4" },
+];
 /** 魔法使いでの行動の優先順位
  * @type {{ easy: ActionTableEntry[], conservativeFast: ActionTableEntry[], aggressiveFast: ActionTableEntry[] }}
 */
@@ -485,24 +497,24 @@ const MagicianPrioritiesTable = {
 		{ },
 		{ dashes: 2 },
 		{ dashes: 3 },
-		{ slides: 1, advances: 4 },
-		{ slides: 1, advances: 5 },
+		{ slides: 1, lateAdvances: 2 },
+		{ slides: 1, lateAdvances: 1 },
 		{ dashes: 1 },
-		{ hammerFlips: 1, advances: 6, hardHitFirst: true },
-		{ hammerFlips: 1, advances: 4, hardHitFirst: false },
-		{ hammerFlips: 1, advances: 2, hardHitFirst: false },
-		{ hammerFlips: 1, advances: 0, hardHitFirst: false },
+		FastMagicianList[1],
+		FastMagicianList[3],
+		FastMagicianList[4],
+		FastMagicianList[5],
 	],
 	aggressiveFast: [
-		{ hammerFlips: 1, advances: 6, hardHitFirst: true },
-		{ hammerFlips: 1, advances: 4, hardHitFirst: false },
-		{ hammerFlips: 1, advances: 2, hardHitFirst: false },
-		{ hammerFlips: 1, advances: 0, hardHitFirst: false },
+		FastMagicianList[1],
+		FastMagicianList[3],
+		FastMagicianList[4],
+		FastMagicianList[5],
 		{ },
 		{ dashes: 2 },
 		{ dashes: 3 },
-		{ slides: 1, advances: 4 },
-		{ slides: 1, advances: 5 },
+		{ slides: 1, lateAdvances: 2 },
+		{ slides: 1, lateAdvances: 1 },
 		{ dashes: 1 },
 	],
 };
@@ -546,11 +558,11 @@ export class BattleWindowsMWWManipulator {
 		const parseAdvances = ({ dashes=0, slides=0, hammerFlips=0, stars=0 }) => dashes + slides*SlideAdvances + hammerFlips*HammerFlipAdvances + stars*StarDirectionAdvances;
 
 		/** @param {ActionTableEntry} a */
-		const parseMessageJa = ({ dashes, slides, hammerFlips, stars, advances }) => {
+		const parseMessageJa = ({ dashes, slides, hammerFlips, stars, lateAdvances, name }) => {
 			const a = [];
-			if (advances !== undefined) {
-				if (slides) a.push(["", "", "", "", "準速スライディング", "最速スライディング"][advances]);
-				if (hammerFlips) a.push(["Fast4", "", "Fast3", "", "Fast2", "", "Fast1"][advances]);
+			if (lateAdvances !== undefined) {
+				if (slides) a.push(["", "最速スライディング", "準速スライディング"][lateAdvances]);
+				if (lateAdvances <= 0) a.push(name ?? "");
 			} else {
 				if (dashes) a.push(["", "短ダッシュ", "ダッシュ", "長ダッシュ"][dashes]);
 				if (stars) a.push(["", "星", "2星"][stars]);
@@ -561,11 +573,11 @@ export class BattleWindowsMWWManipulator {
 		};
 
 		/** @param {ActionTableEntry} a */
-		const parseMessageEn = ({ dashes, slides, hammerFlips, stars, advances }) => {
+		const parseMessageEn = ({ dashes, slides, hammerFlips, stars, lateAdvances, name }) => {
 			const a = [];
-			if (advances !== undefined) {
-				if (slides) a.push(["", "", "", "", "Sub-optimal Slide", "Optimal Slide"][advances]);
-				if (hammerFlips) a.push(["Fast4", "", "Fast3", "", "Fast2", "", "Fast1"][advances]);
+			if (lateAdvances !== undefined) {
+				if (slides) a.push(["", "Optimal Slide", "Sub-optimal Slide"][lateAdvances]);
+				if (lateAdvances <= 0) a.push(name ?? "");
 			} else {
 				if (dashes) a.push(["", "Short Dash", "Dash", "Long Dash"][dashes]);
 				if (stars) a.push(["", "Star", "2 Stars"][stars]);
@@ -590,11 +602,20 @@ export class BattleWindowsMWWManipulator {
 		const magicianActionList = MagicianPrioritiesTable[this.magicianDifficulty];
 		/** @type {MagicianAction[]} */
 		this.magicianActions = magicianActionList.map(a => {
-			const advances = parseAdvances(a);
+			let advances1 = parseAdvances(a);
+			let advances2 = 0;
+			let advances3 = HammerFlipChargeAdvances;
+			if (a.lateAdvances !== undefined) {
+				advances1 -= a.lateAdvances;
+				advances2 += a.lateAdvances;
+				if (advances2 <= 0) {
+					advances2 += HammerFlipChargeAdvances;
+					advances3 -= HammerFlipChargeAdvances;
+				}
+			}
 			return {
-				advances1: a.advances === undefined ? advances : a.advances,
-				advances2: a.advances === undefined ? 0 : (a.hammerFlips ? HammerFlipChargeAdvances : advances) - a.advances,
-				fast: a.advances !== undefined && a.hammerFlips !== undefined,
+				advances1, advances2, advances3,
+				earlyHardHitCheck: a.earlyHardHitCheck ?? false,
 				actions: a,
 				messageJa: parseMessageJa(a),
 				messageEn: parseMessageEn(a),
