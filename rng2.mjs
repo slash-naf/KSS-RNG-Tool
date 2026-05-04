@@ -756,11 +756,13 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
-	 * @typedef {function({stack: string[], index: number, result: any}): void} DebugCallback デバッグコールバック
+	 * @typedef {function({depth: number, p: keyof KssRng, index: number, result: any, args: any[]}): void} DebugCallback デバッグコールバック
+	 * @typedef {(p: keyof KssRng) => boolean} DebugIgnore 関数名に無視するか返す
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 * @param {DebugCallback} [debugCallback]
+	 * @param {DebugIgnore} [ignore]
 	 */
-	*testGenerator(stars, debugCallback) {
+	*testGenerator(stars, debugCallback, ignore = p => ['randi', 'advance', 'getIndex', 'getValue'].includes(p) ) {
 		const result = {
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
@@ -791,25 +793,21 @@ export class BattleWindowsMWWManipulator {
 		let count = 0;
 		let progress = 0;
 
-		// Proxy でフックしない内部メソッド
-		const internal = new Set(['randi', 'advance', 'getIndex', 'getValue']);
-
 		for (let i = this.minIndex; i <= this.maxIndex; i++) {
 			// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
 			const r = debugCallback ? (() => {
-				/** @type {string[]} */
-				const stack = [];
+				let depth = -1;
 				return new Proxy(new KssRng(i), {
-					get(target, p, receiver) {
+					get(target, /** @type {keyof KssRng} */ p, receiver) {
 						if (typeof p !== 'string') return Reflect.get(target, p, receiver);
-						const v = /** @type {Function} */ (target[/** @type {keyof KssRng} */ (p)]);
-						if (typeof v !== 'function' || internal.has(p)) return v;
+						const v = /** @type {Function} */ (target[p]);
+						if (typeof v !== 'function' || ignore(p)) return v;
 						return function(/** @type {any[]} */...args) {
-							stack.push(p);
+							depth++;
 							const result = v.call(receiver, ...args);
 							const index = target.getIndex();
-							debugCallback({ stack: [...stack], index, result });
-							stack.pop();
+							debugCallback({ depth, p, index, result, args });
+							depth--;
 							return result;
 						}
 					}
@@ -920,9 +918,10 @@ export class BattleWindowsMWWManipulator {
 	/** testGeneratorを最後まで回し、最終結果を返す
 	 * @param {number} stars
 	 * @param {DebugCallback} [debugCallback]
+	 * @param {DebugIgnore} [ignore]
 	 */
-	test(stars, debugCallback) {
-		for (const { progress, result } of this.testGenerator(stars, debugCallback)) {
+	test(stars, debugCallback, ignore) {
+		for (const { progress, result } of this.testGenerator(stars, debugCallback, ignore)) {
 			if (progress === 100) return result;
 		}
 	}

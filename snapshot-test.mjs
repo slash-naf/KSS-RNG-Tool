@@ -42,9 +42,9 @@ async function main() {
 	const results = settingsList.map(v => {
 		const manipulator = new BattleWindowsMWWManipulator(v);
 		const a = [];
-		manipulator.test(3, ({stack, result, index}) => {
+		manipulator.test(3, ({p, result, index}) => {
 			if (result === "## 開始乱数") a.push([]);
-			a.at(-1).push([stack, result, index]);
+			a.at(-1).push([p, result, index]);
 		});
 		return a;
 	});
