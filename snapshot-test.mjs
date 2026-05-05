@@ -39,13 +39,16 @@ const settingsList = [
 ];
 
 async function main() {
-	const results = settingsList.map(v => {
+	const newData = settingsList.map(v => {
 		const manipulator = new BattleWindowsMWWManipulator(v);
 		const a = [];
-		manipulator.test(3, ({p, result, index}) => {
-			if (result === "## 開始乱数") a.push([]);
-			a.at(-1).push([p, result, index]);
-		});
+		let b;
+		let n = 0x10000;
+		manipulator.test(3, ({index, args}) => {
+			if (index <= n) a.push(b = []);
+			b.push([args[0], index]);
+			n = index;
+		}, p => p !== 'randi');
 		return a;
 	});
 
@@ -55,11 +58,11 @@ async function main() {
 		const oldData = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8'));
 
 		for (let settings_index = 0; settings_index < oldData.length; settings_index++) {
-			for (let i = 0; i < oldData[settings_index].length; i++) {
-				const oldChunk = oldData[settings_index][i].map(v => v[2]);
-				const newChunk = results[settings_index][i].map(v => v[2]);
-				newChunk.length = oldChunk.length
-
+			const oldChunks = oldData[settings_index];
+			const newChunks = newData[settings_index];
+			for (let i = 0; i < oldChunks.length; i++) {
+				const oldChunk = oldChunks[i];
+				const newChunk = newChunks[i];
 				const oldJson = JSON.stringify(oldChunk);
 				const newJson = JSON.stringify(newChunk);
 				if (oldJson !== newJson) {
@@ -67,12 +70,12 @@ async function main() {
 					console.log(JSON.stringify(settingsList[settings_index]));
 
 					for (let i = 0; i < oldChunk.length; i++) {
-						const oldJson = JSON.stringify(oldChunk[i]);
-						const newJson = JSON.stringify(newChunk[i]);
-						if (oldJson === newJson) {
-							console.log(oldJson);
+						const oldLine = JSON.stringify(oldChunk[i]);
+						const newLine = JSON.stringify(newChunk[i]);
+						if (oldLine === newLine) {
+							console.log(oldLine);
 						} else {
-							console.log(oldJson +" -> "+ newJson);
+							console.log(oldLine +" -> "+ newLine);
 						}
 					}
 
@@ -84,7 +87,7 @@ async function main() {
 		console.log("✅ 差異は見つかりませんでした。結果はスナップショットと一致します。");
 	} else {
 		console.log(`\nスナップショットが見つかりませんでした。初期結果を ${SNAPSHOT_FILE} に保存します...`);
-		fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(results));
+		fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(newData));
 		console.log("✅ スナップショットが正常に保存されました。");
 	}
 }
