@@ -201,7 +201,7 @@ import {
 	StarDirectionChars, findIndexesByStars, KssRng,
 	DragonGuard, DragonStar,
 	CYCLE_LEN,
-	simulateAllTimingsForFastMagician,
+	FastMagicianList,
 } from './rng2.mjs';
 
 // --- テンキー→星の方向の変換 ---
@@ -383,7 +383,18 @@ function formatBranchPowers(type, val) {
 
 // --- メッセージの取得（言語切替対応） ---
 function msg(actionObj) {
-	return lang === 'ja' ? actionObj.messageJa : actionObj.messageEn;
+	if (!actionObj) return lang === 'ja' ? '待機' : 'Wait';
+	const a = [];
+	if (actionObj.lateAdvances !== undefined) {
+		if (actionObj.slides) a.push(lang === 'ja' ? ["", "最速スライディング", "準速スライディング"][actionObj.lateAdvances] : ["", "Optimal Slide", "Sub-optimal Slide"][actionObj.lateAdvances]);
+		if (actionObj.lateAdvances <= 0) a.push(actionObj.name ?? "");
+	} else {
+		if (actionObj.dashes) a.push(lang === 'ja' ? ["", "短ダッシュ", "ダッシュ", "長ダッシュ"][actionObj.dashes] : ["", "Short Dash", "Dash", "Long Dash"][actionObj.dashes]);
+		if (actionObj.stars) a.push(lang === 'ja' ? ["", "星", "2星"][actionObj.stars] : ["", "Star", "2 Stars"][actionObj.stars]);
+		if (actionObj.hammerFlips) a.push(lang === 'ja' ? ["", "鬼殺し", "2鬼殺し"][actionObj.hammerFlips] : ["", "Flip", "2 Flips"][actionObj.hammerFlips]);
+		if (actionObj.slides) a.push(lang === 'ja' ? ["", "スライディング", "2スライディング"][actionObj.slides] : ["", "Slide", "2 Slides"][actionObj.slides]);
+	}
+	return a.length ? a.join(" & ") : (lang === 'ja' ? "待機" : "Wait");
 }
 
 // --- 敵の画像パス ---
@@ -451,51 +462,45 @@ function displayResult() {
 					<th>${t('thSmoke')}</th>
 					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
 					<th>${t('thPowersCheck')}</th>
-					<th>${t('thSmoke')}</th>
 					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
 					<th><span style="font-size: 8px">${t('thHardHit')}</span><br>(+9)</th>
 					<th>${t('thSmoke')}<br>(+2)</th>
 				</tr></thead><tbody>`;
 
 				const s = { true: '<b style="color: green">✓</b>', false: '<b style="color: red">✕</b>'}
-				const timings = simulateAllTimingsForFastMagician(index);
+				const timings = FastMagicianList.map(v => {
+					const rng = new KssRng(index);
+					return { name: v.name, ...rng.simulateMagician(v) };
+				});
 				for (let i = 0; i < timings.length; i++) {
+					const v = FastMagicianList[i];
 					const row = timings[i];
-					const hh1 = row.earlyHardHitCheck ? `${row.hardHitIndex1+1}<br>(${s[row.hardHit1]})` : '-';
-					const hh2 = !row.earlyHardHitCheck ? `${row.hardHitIndex2+1}<br>(${s[row.hardHit2]})` : '-';
-					const powersStr = `+${row.powersAdvances}<br>${row.powersEndingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
-					const adv3Smoke = row.advances3 ? `+${row.advances3}` : '-';
-					const hhSmoke = row.hardHit ? `${row.hardHitEndingIndex}` : '-';
+					const hh1 = v.earlyHardHitCheck ? `${row.hardHitCheckEndingIndex}<br>(${s[row.hardHitCheck]})` : '-';
+					const hh2 = !v.earlyHardHitCheck ? `${row.hardHitCheckEndingIndex}<br>(${s[row.hardHitCheck]})` : '-';
+					const powersAdvances = row.powers.endingIndex - row.powers.startingIndex;
+					const powersStr = `+${powersAdvances}<br>${row.powers.endingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
+					const hhSmoke = row.hardHitCheck ? `${row.endingIndex - 2}` : '-';
 					const finishSmoke = `${row.endingIndex}`;
 					
 					extraHtml += `<tr>
 						<td>${row.name}</td>
 						<td>${index}</td>
 						<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
-						<td>${row.kirbyAttacksFirstIndex+1}<br>(${s[row.kirbyAttacksFirst]})</td>
+						<td>${row.magicianAttacksFirstEndingIndex}<br>(${s[!row.magicianAttacksFirst]})</td>
 						<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
 						
 					if (i === 0) {
 						extraHtml += `<td rowspan="2">${hh1}</td>
 						<td rowspan="2">${powersStr}</td>
-						<td rowspan="2">${adv3Smoke}</td>
 						<td rowspan="2">${hh2}</td>
 						<td rowspan="2">${hhSmoke}</td>
 						<td rowspan="2">${finishSmoke}</td>`;
 					} else if (i === 2) {
 						extraHtml += `<td rowspan="4">${hh1}</td>
 						<td rowspan="4">${powersStr}</td>
-						<td rowspan="4">${adv3Smoke}</td>
 						<td rowspan="4">${hh2}</td>
 						<td rowspan="4">${hhSmoke}</td>
 						<td rowspan="4">${finishSmoke}</td>`;
-					} else if (i >= 6) {
-						extraHtml += `<td>${hh1}</td>
-						<td>${powersStr}</td>
-						<td>${adv3Smoke}</td>
-						<td>${hh2}</td>
-						<td>${hhSmoke}</td>
-						<td>${finishSmoke}</td>`;
 					}
 					extraHtml += `</tr>`;
 				}
@@ -661,8 +666,9 @@ async function runTest() {
 	// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
 	let time = performance.now();
 	const manipulator = new BattleWindowsMWWManipulator(settings);
-	for (const { progress, result } of manipulator.testGenerator(starsCount)) {
-		if (progress === 100) {
+	for (const result of manipulator.testGenerator(starsCount)) {
+		const progress = Math.floor(result.count / result.total * 100);
+		if (result.count === result.total) {
 			renderTestResult(result, testResultEl); // 結果を表示
 			break;
 		}
@@ -760,8 +766,9 @@ function renderTestResult(result, testResultEl) {
 		if (sorted.length === 0) return '';
 		let s = `<div><b>${title}</b>`;
 		s += `<table class="test-table" style="margin-top: 5px;"><thead><tr><th>${t('thAction')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
-		for (const [action, count] of sorted) {
-			s += `<tr><td>${action}</td><td>${count}</td></tr>`;
+		for (const [actionJson, count] of sorted) {
+			const actionObj = JSON.parse(actionJson);
+			s += `<tr><td>${msg(actionObj)}</td><td>${count}</td></tr>`;
 		}
 		s += '</tbody></table></div>';
 		return s;
