@@ -2,11 +2,11 @@
 
 /**
  * @typedef {{ left: PowerName, right: PowerName, startingIndex: number, endingIndex: number }} BattleWindowsPowersResult コピーの元判定の結果
- * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, frames?: number, name?: string }} ActionTableEntry 行動テーブルのエントリ
- * @typedef {{ knight: ActionTableEntry, dragon: ActionTableEntry, dragonAction: ActionTableEntry, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
+ * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, frames?: number, name?: string }} ActionTable 行動テーブルのエントリ
+ * @typedef {{ knight: ActionTable, dragon: ActionTable, dragonAction: ActionTable, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
  */
 
-/** @param {ActionTableEntry} a */
+/** @param {ActionTable} a */
 export function getActionAdvances({ dashes=0, slides=0, hammerFlips=0, stars=0 }) {
 	return dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances);
 }
@@ -158,7 +158,7 @@ export class KssRng {
 	/** バトルウィンドウズのコピーの元の出現
 	 * @returns {BattleWindowsPowersResult} */
 	battleWindowsPowers() {
-		const startingIndex = this.getIndex();
+		const startingIndex = this.index;
 		//右の出現
 		let right;
 		if (this.randi(4) === 1) {
@@ -182,12 +182,12 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		return { left, right, startingIndex, endingIndex: this.getIndex() };
+		return { left, right, startingIndex, endingIndex: this.index };
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
 	 * @typedef {Array<{left: PowerName, right: PowerName, startingIndex: number, endingIndex: number, dragonAction?: DragonAction}>} simulateBattleWindowsMWWResult
-	 * @param {ActionTableEntry} magician 魔法使いに対する行動
+	 * @param {ActionTable} magician 魔法使いに対する行動
 	 * @param {ActionCombination} actionCombination 魔法使い以外の行動の組み合わせ
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
 	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
@@ -246,8 +246,8 @@ export class KssRng {
 
 	/** 魔法使い戦の乱数消費シミュレーションを統合した処理
 	 * @typedef {{ advances1: number, advances2: number, advances3: number, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number, powers: BattleWindowsPowersResult, hardHitCheck: boolean, hardHitCheckEndingIndex: number, endingIndex: number }} SimulateMagicianResult 魔法使い戦のシミュレーション結果
-	 * @param {ActionTableEntry} magician 魔法使いに対する行動
-	 * @returns {SimulateMagicianResult | {magicianAttacksFirst: true}}
+	 * @param {ActionTable} magician 魔法使いに対する行動
+	 * @returns {SimulateMagicianResult}
 	 */
 	simulateMagician(magician) {
 		// 行動設定から煙による各待機フレームでの乱数消費数を算出
@@ -364,7 +364,7 @@ export const BranchTypes = {
 };
 
 /** BattleWindowsMWWManipulatorのactionsDifficultyTableデフォルト値
- * @typedef {{ knight: ActionTableEntry[], dragon: ActionTableEntry[], dragonAction: ActionTableEntry[] }} ActionsDifficultyTable 
+ * @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonAction: ActionTable[] }} ActionsDifficultyTable 
  * @type {ActionsDifficultyTable}
 */
 const DefaultActionsDifficultyTable = {
@@ -419,7 +419,7 @@ const DefaultActionsDifficultyTable = {
 };
 
 /** 魔法使いのFast
- * @type {ActionTableEntry[]}
+ * @type {ActionTable[]}
 */
 export const FastMagicianList = [
 	{ lateAdvances: -8, frames: 1, name: "1st frame", earlyHardHitCheck: true },
@@ -430,7 +430,7 @@ export const FastMagicianList = [
 	{ lateAdvances:  0, frames: 4, name: "Fast4" },
 ];
 /** 魔法使いでの行動の優先順位
- * @type {{ easy: ActionTableEntry[], conservativeFast: ActionTableEntry[], aggressiveFast: ActionTableEntry[] }}
+ * @type {{ easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[] }}
 */
 const MagicianPrioritiesTable = {
 	easy: [
@@ -533,7 +533,7 @@ export class BattleWindowsMWWManipulator {
  	 * @typedef {{ type: keyof BranchTypes, value: string, fallbackActionCombination: ActionCombination }} Branch 分岐情報
 	 * @param {keyof BranchTypes} branchTypeName
 	 * @param {SimulationEntry[][]} bestPartialMatches
-	 * @param {ActionTableEntry} magician
+	 * @param {ActionTable} magician
 	 * @returns {{actionCombination: ActionCombination, branch: Branch} | null}
 	 */
 	_tryBranch(branchTypeName, bestPartialMatches, magician) {
@@ -574,7 +574,7 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
-	 * @typedef {{ magician: ActionTableEntry | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
+	 * @typedef {{ magician: ActionTable | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
 	 */
@@ -584,10 +584,7 @@ export class BattleWindowsMWWManipulator {
 
 		// 魔法使いに先制されない行動を探す
 		// 先制されない行動があればそれだけ使う。なければ全行動を候補とする（全て先制される場合のフォールバック）
-		const magicianFilteredList = this.magicianActions.filter(magician => {
-			const advances1 = getActionAdvances(magician) - (magician.lateAdvances !== undefined ? magician.lateAdvances : 0);
-			return indexList.every(v => !new KssRng(v + advances1).magicianAttacksFirst());
-		});
+		const magicianFilteredList = this.magicianActions.filter(magician => indexList.every(v => !new KssRng(v).simulateMagician(magician).magicianAttacksFirst));
 		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianActions;
 
 		/** @type {ManipulateResult} */
