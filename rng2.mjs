@@ -1,7 +1,7 @@
 // @ts-check
 
 /**
- * @typedef {{ left: PowerName, right: PowerName, startingIndex: number, endingIndex: number }} BattleWindowsPowersResult コピーの元判定の結果
+ * @typedef {{ left: PowerName, right: PowerName }} BattleWindowsPowersResult コピーの元判定の結果
  * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, frames?: number, name?: string }} ActionTable 行動テーブルのエントリ
  * @typedef {{ knight: ActionTable, dragon: ActionTable, dragonAction: ActionTable, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
  */
@@ -55,6 +55,28 @@ export class KssRng {
 	/** @param {number} index 初期乱数位置 */
 	constructor(index=0) {
 		this.index = index;
+	}
+	/** KssRngのメソッド呼び出しをフックするProxyを作成
+	 * @typedef {function({startingIndex: number, endingIndex: number, p: keyof KssRng, result: any, args: any[]}): void} DebugCallback デバッグコールバック
+	 * @param {DebugCallback} debugCallback
+	 * @param {(p: string) => boolean} [ignore] 関数名に無視するか判定する
+	 * @returns {KssRng}
+	 */
+	withProxy(debugCallback, ignore = p => ['randi', 'advance', 'getIndex', 'getValue', 'withProxy'].includes(p)) {
+		return new Proxy(this, {
+			get(target, /** @type {keyof KssRng} */ p, receiver) {
+				if (typeof p !== 'string') return Reflect.get(target, p, receiver);
+				const v = /** @type {Function} */ (target[p]);
+				if (typeof v !== 'function' || ignore(p)) return v;
+				return function(/** @type {any[]} */...args) {
+					const startingIndex = target.getIndex();
+					const result = v.call(receiver, ...args);
+					const endingIndex = target.getIndex();
+					debugCallback({ startingIndex, endingIndex, p, result, args });
+					return result;
+				};
+			}
+		});
 	}
 	/** 現在の乱数位置を取得 */
 	getIndex() {
@@ -157,7 +179,6 @@ export class KssRng {
 	/** バトルウィンドウズのコピーの元の出現
 	 * @returns {BattleWindowsPowersResult} */
 	battleWindowsPowers() {
-		const startingIndex = this.index;
 		//右の出現
 		let right;
 		if (this.randi(4) === 1) {
@@ -181,11 +202,11 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		return { left, right, startingIndex, endingIndex: this.index };
+		return { left, right };
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
-	 * @typedef {Array<{left: PowerName, right: PowerName, startingIndex: number, endingIndex: number, dragonAction?: DragonAction}>} simulateBattleWindowsMWWResult
+	 * @typedef {BattleWindowsPowersResult[]} simulateBattleWindowsMWWResult
 	 * @param {ActionTable} magician 魔法使いに対する行動
 	 * @param {ActionCombination} actionCombination 魔法使い以外の行動の組み合わせ
 	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
@@ -237,14 +258,14 @@ export class KssRng {
 		this.takeAction(actionCombination.dragonAction);
 		const dragonAction = this.dragonActs();
 		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
-			result.push({ ...this.battleWindowsPowers(), dragonAction });
+			result.push(this.battleWindowsPowers());
 		}
 
 		return result;
 	}
 
 	/** 魔法使い戦の乱数消費シミュレーションを統合した処理
-	 * @typedef {{ advances1: number, advances2: number, advances3: number, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number, powers: BattleWindowsPowersResult, hardHitCheck: boolean, hardHitCheckEndingIndex: number, endingIndex: number }} SimulateMagicianResult 魔法使い戦のシミュレーション結果
+	 * @typedef {{ magicianAttacksFirst: boolean, powers: BattleWindowsPowersResult }} SimulateMagicianResult 魔法使い戦のシミュレーション結果
 	 * @param {ActionTable} magician 魔法使いに対する行動
 	 * @returns {SimulateMagicianResult}
 	 */
@@ -266,18 +287,15 @@ export class KssRng {
 
 		// 魔法使いが先制するかの判定
 		const magicianAttacksFirst = this.magicianAttacksFirst();
-		const magicianAttacksFirstEndingIndex = this.index;
 
 		// 先制判定後からコピーの元判定前までの消費
 		this.advance(advances2);
 
 		let hardHitCheck = false;
-		let hardHitCheckEndingIndex = 0;
 
 		// Fastの早いタイミングでは、コピーの元判定より前にハードヒット判定が行われる
 		if (magician.earlyHardHitCheck) {
 			hardHitCheck = this.checkHammerHardHit();
-			hardHitCheckEndingIndex = this.index;
 		}
 
 		// コピーの元判定
@@ -289,7 +307,6 @@ export class KssRng {
 		// Fastの遅いタイミングやEasyでは、コピーの元判定の後にハードヒット判定が行われる
 		if (!magician.earlyHardHitCheck) {
 			hardHitCheck = this.checkHammerHardHit();
-			hardHitCheckEndingIndex = this.index;
 		}
 
 		// ハードヒット時の追加消費
@@ -297,15 +314,8 @@ export class KssRng {
 		
 		// 攻撃後の土煙
 		this.advance(HammerFlipFinishAdvances);
-		const endingIndex = this.index;
 
-		return {
-			advances1, advances2, advances3,
-			magicianAttacksFirst, magicianAttacksFirstEndingIndex,
-			powers,
-			hardHitCheck, hardHitCheckEndingIndex,
-			endingIndex
-		};
+		return { magicianAttacksFirst, powers };
 	}
 }
 
@@ -657,13 +667,11 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
-	 * @typedef {function({depth: number, p: keyof KssRng, index: number, result: any, args: any[]}): void} DebugCallback デバッグコールバック
-	 * @typedef {(p: keyof KssRng) => boolean} DebugIgnore 関数名に無視するか返す
 	 * @param {number} stars バトルウィンドウズ戦開始前に消費する星の数
 	 * @param {DebugCallback} [debugCallback]
-	 * @param {DebugIgnore} [ignore]
+	 * @param {(p: string) => boolean} [ignore]
 	 */
-	*testGenerator(stars, debugCallback, ignore = p => ['randi', 'advance', 'getIndex', 'getValue'].includes(p) ) {
+	*testGenerator(stars, debugCallback, ignore) {
 		const result = {
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
@@ -695,24 +703,7 @@ export class BattleWindowsMWWManipulator {
 
 		for (let i = this.minIndex; i <= this.maxIndex; i++) {
 			// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
-			const r = debugCallback ? (() => {
-				let depth = -1;
-				return new Proxy(new KssRng(i), {
-					get(target, /** @type {keyof KssRng} */ p, receiver) {
-						if (typeof p !== 'string') return Reflect.get(target, p, receiver);
-						const v = /** @type {Function} */ (target[p]);
-						if (typeof v !== 'function' || ignore(p)) return v;
-						return function(/** @type {any[]} */...args) {
-							depth++;
-							const result = v.call(receiver, ...args);
-							const index = target.getIndex();
-							debugCallback({ depth, p, index, result, args });
-							depth--;
-							return result;
-						}
-					}
-				});
-			})() : new KssRng(i);
+			const r = debugCallback ? new KssRng(i).withProxy(debugCallback, ignore) : new KssRng(i);
 			// 星の方向の確認
 			const starDirectionList = [];
 			for (let j = 0; j < stars; j++) {
@@ -808,7 +799,7 @@ export class BattleWindowsMWWManipulator {
 	/** testGeneratorを最後まで回し、最終結果を返す
 	 * @param {number} stars
 	 * @param {DebugCallback} [debugCallback]
-	 * @param {DebugIgnore} [ignore]
+	 * @param {(p: string) => boolean} [ignore]
 	 */
 	test(stars, debugCallback, ignore) {
 		let finalResult;

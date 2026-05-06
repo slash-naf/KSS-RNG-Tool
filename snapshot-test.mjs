@@ -44,10 +44,10 @@ async function main() {
 		const a = [];
 		let b;
 		let n = 0x10000;
-		manipulator.test(3, ({index, args}) => {
-			if (index <= n) a.push(b = []);
-			b.push([args[0], index]);
-			n = index;
+		manipulator.test(3, ({endingIndex, args}) => {
+			if (endingIndex <= n) a.push(b = []);
+			b.push([args[0], endingIndex]);
+			n = endingIndex;
 		}, p => p !== 'randi');
 		return a;
 	});
