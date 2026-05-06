@@ -6,11 +6,6 @@
  * @typedef {{ knight: ActionTable, dragon: ActionTable, dragonAction: ActionTable, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
  */
 
-/** @param {ActionTable} a */
-export function getActionAdvances({ dashes=0, slides=0, hammerFlips=0, stars=0 }) {
-	return dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances);
-}
-
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
 
@@ -101,6 +96,10 @@ export class KssRng {
 		this.advance(HammerFlipChargeAdvances);	//溜め中の土煙
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
+	}
+	/** 一連の行動をする */
+	takeAction(/** @type {ActionTable} */{ dashes=0, slides=0, hammerFlips=0, stars=0, lateAdvances=0 }) {
+		this.advance(dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances) - lateAdvances);
 	}
 
 	// --- Fastモードの鬼殺し火炎ハンマー ---
@@ -205,7 +204,7 @@ export class KssRng {
 		result.push(m.powers);
 
 		// --- 悪魔の騎士 ---
-		this.advance(getActionAdvances(actionCombination.knight));
+		this.takeAction(actionCombination.knight);
 		if (fastKnight) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastKnight()) return result;
@@ -221,7 +220,7 @@ export class KssRng {
 		this.hammerHit();    // ハンマー投げのヒット
 
 		// --- レッドドラゴン ---
-		this.advance(getActionAdvances(actionCombination.dragon));
+		this.takeAction(actionCombination.dragon);
 		if (fastDragon) {
 			// Fastモード
 			if (this.hammerFlipChargeForFastDragon()) return result;
@@ -235,7 +234,7 @@ export class KssRng {
 		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
 
 		// --- レッドドラゴン2ターン目 ---
-		this.advance(getActionAdvances(actionCombination.dragonAction));
+		this.takeAction(actionCombination.dragonAction);
 		const dragonAction = this.dragonActs();
 		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
 			result.push({ ...this.battleWindowsPowers(), dragonAction });
@@ -250,13 +249,14 @@ export class KssRng {
 	 * @returns {SimulateMagicianResult}
 	 */
 	simulateMagician(magician) {
-		// 行動設定から煙による各待機フレームでの乱数消費数を算出
-		let advances1 = getActionAdvances(magician);
-		let advances2 = 0;
+		const startingIndex = this.index;
+		this.takeAction(magician);
+
+		// 各乱数消費数を算出
+		let advances1 = this.index - startingIndex;
+		let advances2 = magician.lateAdvances ?? 0;
 		let advances3 = HammerFlipChargeAdvances;
 		if (magician.lateAdvances !== undefined) {
-			advances1 -= magician.lateAdvances;
-			advances2 += magician.lateAdvances;
 			// lateAdvancesが0以下の場合、溜め中の煙は全てコピーの元判定の前と見なす
 			if (advances2 <= 0) {
 				advances2 += HammerFlipChargeAdvances;
@@ -265,7 +265,6 @@ export class KssRng {
 		}
 
 		// 魔法使いが先制するかの判定
-		this.advance(advances1);
 		const magicianAttacksFirst = this.magicianAttacksFirst();
 		const magicianAttacksFirstEndingIndex = this.index;
 
@@ -330,12 +329,9 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
 
 
 // --- 分岐方式の定義 ---
-/** @param {BattleWindowsPowersResult} s */
-const obsLeft = s => s.left;
-/** @param {BattleWindowsPowersResult} s */
-const obsRight = s => s.right;
-/** @param {BattleWindowsPowersResult} s */
-const obsPowers = s => s.left + "-" + s.right;
+const obsLeft = (/**@type {BattleWindowsPowersResult}*/s) => s.left;
+const obsRight = (/**@type {BattleWindowsPowersResult}*/s) => s.right;
+const obsPowers = (/**@type {BattleWindowsPowersResult}*/s) => s.left + "-" + s.right;
 /** @typedef {{ getObservable: function({sim: BattleWindowsPowersResult[]}): string, minSimLength: number, filterFallback: function(ActionCombination, ActionCombination): boolean }} BranchType */
 /**
  * @param {number} simIndex
@@ -347,8 +343,8 @@ const createBranchType = (simIndex, observableFn) => ({
 	minSimLength: simIndex + 1,
 	filterFallback: /** @type {function(ActionCombination, ActionCombination): boolean} */ ([
 		() => true,
-		(/** @type {ActionCombination} */ p, /** @type {ActionCombination} */ a) => getActionAdvances(p.knight) === getActionAdvances(a.knight),
-		(/** @type {ActionCombination} */ p, /** @type {ActionCombination} */ a) => getActionAdvances(p.knight) === getActionAdvances(a.knight) && getActionAdvances(p.dragon) === getActionAdvances(a.dragon)
+		(/** @type {ActionCombination} */ p, /** @type {ActionCombination} */ a) => p.knight === a.knight,
+		(/** @type {ActionCombination} */ p, /** @type {ActionCombination} */ a) => p.knight === a.knight && p.dragon === a.dragon,
 	][simIndex])
 });
 export const BranchTypes = {
