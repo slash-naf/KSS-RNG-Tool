@@ -2,7 +2,7 @@
 
 /**
  * @typedef {{ left: PowerName, right: PowerName }} BattleWindowsPowersResult コピーの元判定の結果
- * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, frames?: number, name?: string }} ActionTable 行動テーブルのエントリ
+ * @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, fast?: boolean, frames?: number, name?: string }} ActionTable 行動テーブル（fast: ハンマーの溜めをコピーの元判定の前に行うか）
  * @typedef {{ knight: ActionTable, dragon: ActionTable, dragonAction: ActionTable, difficulty: number }} ActionCombination 魔法使い以外の行動の組み合わせ
  */
 
@@ -124,38 +124,6 @@ export class KssRng {
 		this.advance(dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances) - lateAdvances);
 	}
 
-	// --- Fastモードの鬼殺し火炎ハンマー ---
-	//コピーの元の出現に影響しないように、最速で鬼殺しをする必要がある
-	//先制判定は鬼殺しの溜め中の土煙の最中に行われ、タイミングによって異なる2つの乱数位置を考慮する必要がある
-	//コピーの元判定も、ハードヒット判定とヒットの間に行われる
-	//魔法使いでは鬼殺しの開始タイミングを調整して乱数調整を行い、タイミングによってハードヒット判定がコピーの元判定の前か後か異なる
-	/** 悪魔の騎士への最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
-	hammerFlipChargeForFastKnight() {
-		this.advance(8);
-		const a = this.knightAttacksFirst();
-		this.advance(1);
-		const b = this.knightAttacksFirst();
-		this.advance(2);
-		return a || b;
-	}
-	/** レッドドラゴンへの最速鬼殺しの溜め中の土煙と、先制される可能性があるか */
-	hammerFlipChargeForFastDragon() {
-		this.advance(6);
-		const a = this.dragonAttacksFirst();
-		this.advance(1);
-		const b = this.dragonAttacksFirst();
-		this.advance(4);
-		return a || b;
-	}
-	/** バトルウィンドウズでの最速鬼殺しのヒットと、出現するコピーの元 */
-	hammerFlipHitForFastBattleWindowsPowers() {
-		const hardHit = this.checkHammerHardHit();	//ハードヒットの判定
-		const powers = this.battleWindowsPowers();
-		if (hardHit) this.advance(HammerHardHitAdvances);	//ハードヒット
-		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
-		return powers;
-	}
-
 	// --- バトルウィンドウズ ---
 	slimeAttacksFirst() {
 		return this.randi(4) === 1;
@@ -204,18 +172,32 @@ export class KssRng {
 
 		return { left, right };
 	}
+	/** 鬼殺しのヒットとともに、バトルウィンドウズのコピーの元の出現を、ハードヒット判定の前か後に行う
+	 * @param {boolean} earlyHardHitCheck
+	 * @returns {BattleWindowsPowersResult} */
+	battleWindowsPowersWithHammerFlipHit(earlyHardHitCheck) {
+		let hardHit, powers;
+		if (earlyHardHitCheck) {
+			hardHit = this.checkHammerHardHit();
+			powers = this.battleWindowsPowers();
+		} else {
+			powers = this.battleWindowsPowers();
+			hardHit = this.checkHammerHardHit();
+		}
+		if (hardHit) this.advance(HammerHardHitAdvances);
+		this.advance(HammerFlipFinishAdvances);
+		return powers;
+	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦を、理想的な乱数である限りシミュレートし、出現するコピーの元の配列を返す
 	 * @typedef {BattleWindowsPowersResult[]} simulateBattleWindowsMWWResult
 	 * @param {ActionTable} magician 魔法使いに対する行動
 	 * @param {ActionCombination} actionCombination 魔法使い以外の行動の組み合わせ
-	 * @param {boolean} fastKnight 悪魔の騎士をFastモードでするか
-	 * @param {boolean} fastDragon レッドドラゴンをFastモードでするか
 	 * @param {number} hammerThrow ハンマー投げのダッシュによる乱数消費数
 	 * @param {boolean} [allowDragonStar=false] レッドドラゴンの星攻撃も成功として扱うか
 	 * @returns {simulateBattleWindowsMWWResult} 長さは、魔法使いで失敗なら0、悪魔の騎士で失敗なら1、レッドドラゴンで失敗なら2、レッドドラゴン2ターン目で失敗なら3、全て理想的なら4
 	 */
-	simulateBattleWindowsMWW(magician, actionCombination, fastKnight, fastDragon, hammerThrow, allowDragonStar=false) {
+	simulateBattleWindowsMWW(magician, actionCombination, hammerThrow, allowDragonStar=false) {
 		/** @type {simulateBattleWindowsMWWResult} */
 		const result = [];
 
@@ -226,10 +208,15 @@ export class KssRng {
 
 		// --- 悪魔の騎士 ---
 		this.takeAction(actionCombination.knight);
-		if (fastKnight) {
+		if (actionCombination.knight.fast) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastKnight()) return result;
-			result.push(this.hammerFlipHitForFastBattleWindowsPowers());
+			this.advance(8);
+			const a = this.knightAttacksFirst();
+			this.advance(1);
+			const b = this.knightAttacksFirst();
+			this.advance(2);
+			if (a || b) return result;
+			result.push(this.battleWindowsPowersWithHammerFlipHit(true));
 		} else {
 			// Easyモード
 			if (this.knightAttacksFirst()) return result;
@@ -242,10 +229,15 @@ export class KssRng {
 
 		// --- レッドドラゴン ---
 		this.takeAction(actionCombination.dragon);
-		if (fastDragon) {
+		if (actionCombination.dragon.fast) {
 			// Fastモード
-			if (this.hammerFlipChargeForFastDragon()) return result;
-			result.push(this.hammerFlipHitForFastBattleWindowsPowers());
+			this.advance(6);
+			const a = this.dragonAttacksFirst();
+			this.advance(1);
+			const b = this.dragonAttacksFirst();
+			this.advance(4);
+			if (a || b) return result;
+			result.push(this.battleWindowsPowersWithHammerFlipHit(true));
 		} else {
 			// Easyモード
 			if (this.dragonAttacksFirst()) return result;
@@ -272,46 +264,20 @@ export class KssRng {
 	simulateMagician(magician) {
 		this.takeAction(magician);
 
-		// 各乱数消費数を算出
-		let advances2 = magician.lateAdvances ?? 0;
-		let advances3 = HammerFlipChargeAdvances;
-		if (magician.lateAdvances !== undefined) {
-			// lateAdvancesが0以下の場合、溜め中の煙は全てコピーの元判定の前と見なす
-			if (advances2 <= 0) {
-				advances2 += HammerFlipChargeAdvances;
-				advances3 -= HammerFlipChargeAdvances;
-			}
-		}
-
 		// 魔法使いが先制するかの判定
 		const magicianAttacksFirst = this.magicianAttacksFirst();
 
 		// 先制判定後からコピーの元判定前までの消費
-		this.advance(advances2);
-
-		let hardHitCheck = false;
-
-		// Fastの早いタイミングでは、コピーの元判定より前にハードヒット判定が行われる
-		if (magician.earlyHardHitCheck) {
-			hardHitCheck = this.checkHammerHardHit();
-		}
+		this.advance((magician.lateAdvances ?? 0) + (magician.fast ? HammerFlipChargeAdvances : 0));
 
 		// コピーの元判定
-		const powers = this.battleWindowsPowers();
-
-		// 鬼殺し火炎ハンマーの溜め中の煙
-		this.advance(advances3);
-
-		// Fastの遅いタイミングやEasyでは、コピーの元判定の後にハードヒット判定が行われる
-		if (!magician.earlyHardHitCheck) {
-			hardHitCheck = this.checkHammerHardHit();
+		let powers;
+		if (magician.fast) {
+			powers =this.battleWindowsPowersWithHammerFlipHit(magician.earlyHardHitCheck ?? false);
+		} else {
+			powers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
 		}
-
-		// ハードヒット時の追加消費
-		if (hardHitCheck) this.advance(HammerHardHitAdvances);
-		
-		// 攻撃後の土煙
-		this.advance(HammerFlipFinishAdvances);
 
 		return { magicianAttacksFirst, powers };
 	}
@@ -421,12 +387,12 @@ const DefaultActionsDifficultyTable = {
 
 /** 魔法使いのFast @type {ActionTable[]} */
 export const FastMagicianList = [
-	{ lateAdvances: -8, frames: 1, name: "1st frame", earlyHardHitCheck: true },
-	{ lateAdvances: -6, frames: 3, name: "Fast1",     earlyHardHitCheck: true },
-	{ lateAdvances: -6, frames: 1, name: "5th frame" },
-	{ lateAdvances: -4, frames: 4, name: "Fast2" },
-	{ lateAdvances: -2, frames: 4, name: "Fast3" },
-	{ lateAdvances:  0, frames: 4, name: "Fast4" },
+	{ lateAdvances: -8, frames: 1, name: "1st frame", fast: true, earlyHardHitCheck: true },
+	{ lateAdvances: -6, frames: 3, name: "Fast1",     fast: true, earlyHardHitCheck: true },
+	{ lateAdvances: -6, frames: 1, name: "5th frame", fast: true },
+	{ lateAdvances: -4, frames: 4, name: "Fast2",     fast: true },
+	{ lateAdvances: -2, frames: 4, name: "Fast3",     fast: true },
+	{ lateAdvances:  0, frames: 4, name: "Fast4",     fast: true },
 ];
 /** 魔法使いでの行動の優先順位 @type {{ easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[] }} */
 const MagicianPrioritiesTable = {
@@ -505,13 +471,15 @@ export class BattleWindowsMWWManipulator {
 		this.branchPriorities = branchPriorities;
 
 		// 魔法使いでの行動
-		this.magicianActions = MagicianPrioritiesTable[this.magicianDifficulty];
+		this.magicianList = MagicianPrioritiesTable[this.magicianDifficulty];
 
 		// 魔法使い以外の全ての行動の組み合わせを作成し、難易度の昇順にソート
 		/** @type {ActionCombination[]} */
 		this.actionCombinations = [];
-		for (const knight of actionsDifficultyTable.knight) {
-			for (const dragon of actionsDifficultyTable.dragon) {
+		const knightList = actionsDifficultyTable.knight.map(e => ({ ...e,  fast: this.fastKnight }));
+		const dragonList = actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon }));
+		for (const knight of knightList) {
+			for (const dragon of dragonList) {
 				for (const dragonAction of actionsDifficultyTable.dragonAction) {
 					this.actionCombinations.push({
 						difficulty: (knight.difficulty ?? 0) + (dragon.difficulty ?? 0) + (dragonAction.difficulty ?? 0),
@@ -557,7 +525,7 @@ export class BattleWindowsMWWManipulator {
 				if (!bt.filterFallback(actionCombination, altActionCombination)) continue;
 
 				const allMatch = failIndices.every(index => {
-					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, altActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, altActionCombination, this.hammerThrow, this.allowDragonStar);
 					return sim.length === 4;
 				});
 
@@ -582,8 +550,8 @@ export class BattleWindowsMWWManipulator {
 		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す。なければ全行動を候補とする
-		const magicianFilteredList = this.magicianActions.filter(magician => indexList.every(v => !new KssRng(v).simulateMagician(magician).magicianAttacksFirst));
-		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianActions;
+		const magicianFilteredList = this.magicianList.filter(magician => indexList.every(v => !new KssRng(v).simulateMagician(magician).magicianAttacksFirst));
+		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianList;
 
 		/** @type {ManipulateResult} */
 		let bestPartialResult = { magician: null, actionCombination: null, branch: null };
@@ -601,7 +569,7 @@ export class BattleWindowsMWWManipulator {
 				const fails = [];
 
 				for (const index of indexList) {
-					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
+					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.hammerThrow, this.allowDragonStar);
 					const result = { index, sim };
 
 					if (sim.length === 4) successes.push(result);
@@ -716,7 +684,7 @@ export class BattleWindowsMWWManipulator {
 			// 解決不能の場合でもシミュレーションは継続（デフォルト行動で代替）
 			if (magician === null) result.magicianNGCount++;
 			else if (actionCombination === null) result.otherNGCount++;
-			magician ??= this.magicianActions[0];
+			magician ??= this.magicianList[0];
 			actionCombination ??= this.actionCombinations[0];
 
 			// 分岐が存在する場合は現在の乱数で分岐条件を判定し、使用する行動を選択する
@@ -724,7 +692,7 @@ export class BattleWindowsMWWManipulator {
 			if (branch) {
 				const bt = BranchTypes[branch.type];
 				// 分岐前の乱数位置からシミュレーションを行い、実際の観測値を取得する
-				const tempSim = new KssRng(r.getIndex()).simulateBattleWindowsMWW(magician, actionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
+				const tempSim = new KssRng(r.getIndex()).simulateBattleWindowsMWW(magician, actionCombination, this.hammerThrow, this.allowDragonStar);
 				const isEqual = tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value;
 				if (isEqual) {
 					// 分岐条件に一致した場合はフォールバック行動を使用する
@@ -744,7 +712,7 @@ export class BattleWindowsMWWManipulator {
 			}
 
 			// 行動を適用
-			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.fastKnight, this.fastDragon, this.hammerThrow, this.allowDragonStar);
+			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.hammerThrow, this.allowDragonStar);
 
 			// 星パターンごとにグループを作成（初回のみ）
 			if (!result.simulationGroups[starStr]) {

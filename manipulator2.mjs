@@ -273,24 +273,25 @@ function displayResult() {
 				const timings = FastMagicianList.map(v => {
 					const row = { name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null };
 					const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
-						if (p === 'magicianAttacksFirst') {
+						switch (p) {
+						case 'magicianAttacksFirst': 
 							row.magicianAttacksFirst = result;
 							row.magicianAttacksFirstEndingIndex = endingIndex;
 							row.advances1 = startingIndex - index;
-						}
-						if (p === 'checkHammerHardHit') {
+							break;
+						case 'checkHammerHardHit': 
 							row.hardHitCheck = result;
 							row.hardHitCheckEndingIndex = endingIndex;
 							if (v.earlyHardHitCheck) row.advances2 = startingIndex - row.magicianAttacksFirstEndingIndex;
-						}
-						if (p === 'battleWindowsPowers') {
+							break;
+						case 'battleWindowsPowers':
 							row.powers = { ...result, startingIndex, endingIndex };
-							if (!v.earlyHardHitCheck) row.advances2 = startingIndex - row.magicianAttacksFirstEndingIndex;
+							row.advances2 = startingIndex - row.magicianAttacksFirstEndingIndex - (v.earlyHardHitCheck ? 1 : 0);
+							break;
 						}
 					});
 					rng.simulateMagician(v);
 					row.endingIndex = rng.getIndex();
-					if (row.advances2 === null) row.advances2 = v.lateAdvances > 0 ? v.lateAdvances : 0;
 					return row;
 				});
 				for (let i = 0; i < timings.length; i++) {
@@ -355,7 +356,7 @@ function displayResult() {
 		arrivalSims = Array.from(starIndices).map(index => {
 			let chosenActionCombination = actionCombination;
 			if (hasBranch) {
-				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow, settings.allowDragonStar);
+				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.hammerThrow, settings.allowDragonStar);
 				const bt = BranchTypes[branch.type];
 				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
 					chosenActionCombination = branch.fallbackActionCombination;
@@ -367,7 +368,7 @@ function displayResult() {
 				if (p === 'dragonActs') dragonAction = result;
 				if (p === 'battleWindowsPowers') powersIndices.push(startingIndex);
 			});
-			const sim = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.fastKnight, settings.fastDragon, settings.hammerThrow, settings.allowDragonStar);
+			const sim = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
 			for (let i = 0; i < sim.length; i++) {
 				sim[i].startingIndex = powersIndices[i];
 			}
