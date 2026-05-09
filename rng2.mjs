@@ -303,7 +303,7 @@ export function findIndexesByStars(stars, minIndex, maxIndex) {
 // --- 分岐方式の定義 ---
 const obsLeft = (/**@type {BattleWindowsPowersResult}*/s) => s.left;
 const obsRight = (/**@type {BattleWindowsPowersResult}*/s) => s.right;
-const obsPowers = (/**@type {BattleWindowsPowersResult}*/s) => s.left + "-" + s.right;
+const obsPowers = (/**@type {BattleWindowsPowersResult}*/s) => s.left + ' ' + s.right;
 /** @typedef {{ getObservable: function({sim: BattleWindowsPowersResult[]}): string, minSimLength: number, filterFallback: function(ActionCombination, ActionCombination): boolean }} BranchType */
 /**
  * @param {number} simIndex

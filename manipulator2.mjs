@@ -1,177 +1,180 @@
+// @ts-check
+
 import {
 	BattleWindowsMWWManipulator, BranchTypes,
 	BattleWindowsPowerTable, BattleWindowsPowerNone,
-	StarDirectionChars, findIndexesByStars, KssRng,
+	StarDirectionChars, StarDirectionAdvances,
+	findIndexesByStars, KssRng,
 	DragonGuard, DragonStar,
 	FastMagicianList,
 } from './rng2.mjs';
 
-// --- テンキー→星の方向の変換 ---
-const NumpadToStarIndex = { 8: 0, 9: 1, 6: 2, 3: 3, 2: 4, 1: 5, 4: 6, 7: 7 };
-const NoNumpadMap = { 'w': 8, 'e': 9, 'd': 6, 'c': 3, 'x': 2, 'z': 1, 'a': 4, 'q': 7 };
+// --- 型定義 ---
+/** @typedef {'en' | 'ja'} LangKey */
+/** @typedef {'actionOnly' | 'withIndex' | 'withPowers' | 'withFailPowers' | 'withSimulation'} DisplayMode */
+/** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
+/** @typedef {import('./rng2.mjs').ActionCombination} ActionCombination */
+/** @typedef {import('./rng2.mjs').BattleWindowsPowersResult} BattleWindowsPowersResult */
 
-// --- 多言語テキスト ---
-const L = {
-	en: {
-		langLabel: 'Language:',
-		magician: 'Magician:',
-		knight: 'Knight:',
-		dragon: 'Dragon:',
-		hammerThrow: 'Hammer throw dash advances:',
-		settings: 'Settings',
-		noNumpad: 'No Numpad',
-		showArrival: 'Show arrival RNG index and Copy Essences',
-		dragonStar: 'Include Star Attack',
-		pressToStart: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>',
-		notInRange: 'Not in range.',
-		rngIndex: 'RNG index: ',
-		thAction: 'Action',
-		thBranch: 'Branch',
-		noMagicianAction: 'No valid action found for Magician.',
-		noActionCombination: 'No valid action combination found.',
-		test: 'Analysis',
-		testStars: 'Stars:',
-		testRun: 'Run',
-		testUnsolvable: 'Unsolvable',
-		testBranches: 'Branch',
-		thSuccessIndices: 'Success',
-		thMagician: 'Magician',
-		thKnight: 'Knight',
-		thDragon: 'Dragon',
-		thDragonTurn2: 'Dragon Turn 2',
-		thFailIndices: 'Fail RNG',
-		noMagicianActionCount: 'No valid Magician action',
-		noActionCombinationCount: 'No valid action combination',
-		branchOccurrences: 'Branch occurrences',
-		failMagician: 'Magician fail',
-		failKnight: 'Knight fail',
-		failDragon: 'Dragon fail',
-		failDragonTurn2: 'Dragon turn 2 fail',
-		thStars: 'Stars',
-		thEnemy: 'Enemy',
-		thPowers: 'Copy Powers',
-		thMatch: 'Match (=)',
-		thNoMatch: 'No Match (≠)',
-		thCount: 'Count',
-		thTotal: 'Total',
-		thFailTotal: 'Fail Total',
-		thOverallTotal: 'Overall Total',
-		thItem: 'Item',
-		magicianActions: 'Magician',
-		knightActions: 'Knight',
-		dragonActions: 'Dragon',
-		dragonTurn2Actions: 'Dragon Turn 2',
-		defaultSettings: 'Default Settings',
-		thTiming: 'Timing',
-		thSmoke: 'Smoke',
-		thKirbyFirst: 'Kirby 1st',
-		thHardHitCheck: 'Hard Hit Check',
-		thPowersCheck: 'Powers Check',
-		thHardHit: 'Hard Hit',
-	},
-	ja: {
-		langLabel: '言語:',
-		magician: '魔法使い:',
-		knight: '悪魔の騎士:',
-		dragon: 'レッドドラゴン:',
-		hammerThrow: 'ハンマー投げのダッシュ消費数:',
-		settings: '設定',
-		noNumpad: 'テンキーなし',
-		showArrival: '到着時の乱数位置とコピーの元を表示',
-		dragonStar: '星攻撃あり',
-		pressToStart: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>',
-		notInRange: '範囲内に一致する乱数がありません。',
-		rngIndex: '乱数位置: ',
-		thAction: '行動',
-		thBranch: '分岐',
-		noMagicianAction: '魔法使いの条件に合う行動が見つかりません。',
-		noActionCombination: '行動の組み合わせが見つかりません。',
-		test: '分析',
-		testStars: '星の回数:',
-		testRun: '実行',
-		testUnsolvable: '解決不能',
-		testBranches: '分岐',
-		thSuccessIndices: '成功',
-		thMagician: '魔法使い',
-		thKnight: '悪魔の騎士',
-		thDragon: 'レッドドラゴン',
-		thDragonTurn2: 'レッドドラゴン2ターン目',
-		thFailIndices: '失敗乱数位置',
-		noMagicianActionCount: '魔法使いの条件に合う行動なし',
-		noActionCombinationCount: '行動の組み合わせなし',
-		branchOccurrences: '分岐発生数',
-		failMagician: '魔法使いで失敗',
-		failKnight: '悪魔の騎士で失敗',
-		failDragon: 'レッドドラゴンで失敗',
-		failDragonTurn2: 'レッドドラゴン2ターン目で失敗',
-		thStars: '星',
-		thEnemy: '敵',
-		thPowers: 'コピーの元',
-		thMatch: '一致(=)',
-		thNoMatch: '不一致(≠)',
-		thCount: '件数',
-		thTotal: '合計',
-		thFailTotal: '失敗合計',
-		thOverallTotal: '全体合計',
-		thItem: '項目',
-		magicianActions: '魔法使い',
-		knightActions: '悪魔の騎士',
-		dragonActions: 'レッドドラゴン',
-		dragonTurn2Actions: 'レッドドラゴン2ターン目',
-		defaultSettings: 'デフォルト設定',
-		thTiming: 'タイミング',
-		thSmoke: '煙',
-		thKirbyFirst: 'カービィ先制',
-		thHardHitCheck: 'ハードヒット判定',
-		thPowersCheck: 'コピーの元判定',
-		thHardHit: 'ハードヒット',
-	}
+// --- 定数 ---
+
+/** 結果表示に必要な最小星入力数 */
+const MIN_STARS_FOR_RESULT = 3;
+
+/** テンキー→星の方向の変換 */
+const NumpadToStarIndex = /** @type {Record<number, number>} */ ({ 8: 0, 9: 1, 6: 2, 3: 3, 2: 4, 1: 5, 4: 6, 7: 7 });
+
+/** テンキーなしモード時のキーマッピング */
+const NoNumpadMap = /** @type {Record<string, number>} */ ({ 'w': 8, 'e': 9, 'd': 6, 'c': 3, 'x': 2, 'z': 1, 'a': 4, 'q': 7 });
+
+/** 設定のデフォルト値 */
+const DEFAULT_SETTINGS = {
+	lang: /** @type {LangKey} */ ('en'),
+	min: '2800',
+	max: '3376',
+	magician: 'easy',
+	knight: 'true',
+	dragon: 'true',
+	hammerThrow: '1',
+	noNumpad: false,
+	displayMode: /** @type {DisplayMode} */ ('actionOnly'),
+	allowDragonStar: false,
 };
 
-let lang = (navigator.language || navigator.userLanguage).startsWith('ja') ? 'ja' : 'en';
-function t(key) { return L[lang][key] || L.en[key] || key; }
+// --- 多言語テキスト ---
+/** @type {Record<string, { [K in LangKey]: string }>} */
+const L = {
+	langLabel: { en: 'Language:', ja: '言語:' },
+	magician: { en: 'Magician:', ja: '魔法使い:' },
+	knight: { en: 'Knight:', ja: '悪魔の騎士:' },
+	dragon: { en: 'Dragon:', ja: 'レッドドラゴン:' },
+	hammerThrow: { en: 'Hammer throw dash advances:', ja: 'ハンマー投げのダッシュ消費数:' },
+	settings: { en: 'Settings', ja: '設定' },
+	noNumpad: { en: 'No Numpad', ja: 'テンキーなし' },
+	displayMode: { en: 'Display:', ja: '表示:' },
+	displayModeActionOnly: { en: 'Manipulation only', ja: '乱数調整方法のみ' },
+	displayModeIndex: { en: 'RNG index only', ja: '乱数位置のみ' },
+	displayModePowers: { en: 'With Copy Essences', ja: 'コピーの元と合わせて表示' },
+	displayModeFailPowers: { en: 'With fail Copy Essences', ja: '失敗時のコピーの元と合わせて表示' },
+	displayModeSimulation: { en: 'With simulation', ja: 'シミュレーションと合わせて表示' },
+	dragonStar: { en: 'Include Star Attack', ja: '星攻撃あり' },
+	pressToStart: { en: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>', ja: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>' },
+	notInRange: { en: 'Not in range.', ja: '範囲内に一致する乱数がありません。' },
+	rngIndex: { en: 'RNG index: ', ja: '乱数位置: ' },
+	thAction: { en: 'Action', ja: '行動' },
+	thBranch: { en: 'Branch', ja: '分岐' },
+	noMagicianAction: { en: 'No valid action found for Magician.', ja: '魔法使いの条件に合う行動が見つかりません。' },
+	noActionCombination: { en: 'No valid action combination found.', ja: '行動の組み合わせが見つかりません。' },
+	test: { en: 'Analysis', ja: '分析' },
+	testStars: { en: 'Stars:', ja: '星の回数:' },
+	testRun: { en: 'Run', ja: '実行' },
+	testUnsolvable: { en: 'Unsolvable', ja: '解決不能' },
+	testBranches: { en: 'Branch', ja: '分岐' },
+	thSuccessIndices: { en: 'Success', ja: '成功' },
+	thMagician: { en: 'Magician', ja: '魔法使い' },
+	thKnight: { en: 'Knight', ja: '悪魔の騎士' },
+	thDragon: { en: 'Dragon', ja: 'レッドドラゴン' },
+	thDragonTurn2: { en: 'Dragon Turn 2', ja: 'レッドドラゴン2ターン目' },
+	thFailIndices: { en: 'Fail RNG', ja: '失敗乱数位置' },
+	noMagicianActionCount: { en: 'No valid Magician action', ja: '魔法使いの条件に合う行動なし' },
+	noActionCombinationCount: { en: 'No valid action combination', ja: '行動の組み合わせなし' },
+	branchOccurrences: { en: 'Branch occurrences', ja: '分岐発生数' },
+	failMagician: { en: 'Magician fail', ja: '魔法使いで失敗' },
+	failKnight: { en: 'Knight fail', ja: '悪魔の騎士で失敗' },
+	failDragon: { en: 'Dragon fail', ja: 'レッドドラゴンで失敗' },
+	failDragonTurn2: { en: 'Dragon turn 2 fail', ja: 'レッドドラゴン2ターン目で失敗' },
+	thStars: { en: 'Stars', ja: '星' },
+	thEnemy: { en: 'Enemy', ja: '敵' },
+	thPowers: { en: 'Copy Powers', ja: 'コピーの元' },
+	thMatch: { en: 'Match (=)', ja: '一致(=)' },
+	thNoMatch: { en: 'No Match (≠)', ja: '不一致(≠)' },
+	thCount: { en: 'Count', ja: '件数' },
+	thTotal: { en: 'Total', ja: '合計' },
+	thFailTotal: { en: 'Fail Total', ja: '失敗合計' },
+	thOverallTotal: { en: 'Overall Total', ja: '全体合計' },
+	thItem: { en: 'Item', ja: '項目' },
+	magicianActions: { en: 'Magician', ja: '魔法使い' },
+	knightActions: { en: 'Knight', ja: '悪魔の騎士' },
+	dragonActions: { en: 'Dragon', ja: 'レッドドラゴン' },
+	dragonTurn2Actions: { en: 'Dragon Turn 2', ja: 'レッドドラゴン2ターン目' },
+	defaultSettings: { en: 'Default Settings', ja: 'デフォルト設定' },
+	thTiming: { en: 'Timing', ja: 'タイミング' },
+	thSmoke: { en: 'Smoke', ja: '煙' },
+	thKirbyFirst: { en: 'Kirby 1st', ja: 'カービィ先制' },
+	thHardHitCheck: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
+	thPowersCheck: { en: 'Powers Check', ja: 'コピーの元判定' },
+	thHardHit: { en: 'Hard Hit', ja: 'ハードヒット' },
+};
+
+/** @type {LangKey} */
+let lang = /** @type {LangKey} */ (navigator.language?.startsWith('ja') ? 'ja' : 'en');
+
+/** 多言語テキストの取得
+ * @param {string} key
+ * @returns {string} */
+function t(key) { return L[key]?.[lang] || L[key]?.en || key; }
 
 // --- 状態 ---
+/** @type {number[]} */
 let stars = [];
 
-// --- DOM ---
-const starBoxesEl = document.getElementById('star-boxes');
-const statusEl = document.getElementById('status-message');
-const resultEl = document.getElementById('result-area');
+// --- DOM要素 ---
+const el = {
+	starBoxes: /** @type {HTMLElement} */ (document.getElementById('star-boxes')),
+	status: /** @type {HTMLElement} */ (document.getElementById('status-message')),
+	result: /** @type {HTMLElement} */ (document.getElementById('result-area')),
+	min: /** @type {HTMLInputElement} */ (document.getElementById('min')),
+	max: /** @type {HTMLInputElement} */ (document.getElementById('max')),
+	difficultyMagician: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-magician')),
+	difficultyKnight: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-knight')),
+	difficultyDragon: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-dragon')),
+	allowDragonStar: /** @type {HTMLInputElement} */ (document.getElementById('allow-dragon-star')),
+	displayMode: /** @type {HTMLSelectElement} */ (document.getElementById('display-mode')),
+	noNumpad: /** @type {HTMLInputElement} */ (document.getElementById('no-numpad')),
+	lang: /** @type {HTMLSelectElement} */ (document.getElementById('lang')),
+	testResult: /** @type {HTMLElement} */ (document.getElementById('test-result')),
+	testRunBtn: /** @type {HTMLButtonElement} */ (document.getElementById('test-run-btn')),
+	testStars: /** @type {HTMLInputElement} */ (document.getElementById('test-stars')),
+	btnDefaultSettings: /** @type {HTMLButtonElement} */ (document.getElementById('btn-default-settings')),
+	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area')),
+};
 
 // --- 星ボックスの描画 ---
 function renderStarBoxes() {
-	starBoxesEl.innerHTML = '';
+	el.starBoxes.innerHTML = '';
 	for (let i = 0; i < 6; i++) {
 		const box = document.createElement('span');
 		box.className = 'star-box' + (i < stars.length ? ' filled' : '');
-		box.textContent = i < stars.length ? StarDirectionChars[stars[i]] : (i + 1);
-		starBoxesEl.appendChild(box);
+		box.textContent = i < stars.length ? StarDirectionChars[stars[i]] : String(i + 1);
+		el.starBoxes.appendChild(box);
 	}
 }
 
 // --- 設定値の取得 ---
 function getSettings() {
 	return {
-		minIndex: parseInt(document.getElementById('min').value, 10) || 2800,
-		maxIndex: parseInt(document.getElementById('max').value, 10) || 3376,
-		magicianDifficulty: document.getElementById('difficulty-magician').value,
-		fastKnight: document.getElementById('difficulty-knight').value === 'false',
-		fastDragon: document.getElementById('difficulty-dragon').value === 'false',
-		allowDragonStar: document.getElementById('allow-dragon-star').checked,
-		hammerThrow: parseInt(document.querySelector('input[name="hammer-throw"]:checked').value, 10),
+		minIndex: parseInt(el.min.value, 10) || 2800,
+		maxIndex: parseInt(el.max.value, 10) || 3376,
+		magicianDifficulty: el.difficultyMagician.value,
+		fastKnight: el.difficultyKnight.value === 'false',
+		fastDragon: el.difficultyDragon.value === 'false',
+		allowDragonStar: el.allowDragonStar.checked,
+		hammerThrow: parseInt(/** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value, 10),
+		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 	};
 }
 
 // --- コピーの元の画像タグ（Noneも表示する） ---
+/** @param {string} powerName */
 function powerImg(powerName) {
 	return `<img src="images/abilities/${powerName.toLowerCase()}.png" title="${powerName}">`;
 }
 
 // --- 分岐の観測値を左右のコピーの元画像として表示 ---
+/** @param {string} type @param {string} val */
 function formatBranchPowers(type, val) {
 	if (type.endsWith('Powers')) {
-		const [left, right] = val.split('-');
+		const [left, right] = val.split(' ');
 		return powerImg(left) + ' ' + powerImg(right);
 	}
 	if (type.endsWith('Left')) {
@@ -184,6 +187,7 @@ function formatBranchPowers(type, val) {
 }
 
 // --- メッセージの取得（言語切替対応） ---
+/** @param {ActionTable | null} [actionObj] */
 function msg(actionObj) {
 	if (!actionObj) return lang === 'ja' ? '待機' : 'Wait';
 	const a = [];
@@ -222,162 +226,151 @@ function preloadImages() {
 }
 preloadImages();
 
-// --- 結果表示 ---
-function displayResult() {
-	resultEl.innerHTML = '';
-	statusEl.innerHTML = '';
+// --- 到着乱数位置の表示 ---
+/** @param {Uint16Array} starIndices 星消費後の乱数位置 */
+function renderRngIndices(starIndices) {
+	const starsAdvances = stars.length * StarDirectionAdvances;
+	const arrivalIndices = Array.from(starIndices).map(idx => idx - starsAdvances);
+	el.status.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
+}
 
-	if (stars.length < 3) {
-		statusEl.innerHTML = t('pressToStart');
-		return;
-	}
+// --- Fast魔法使いタイミング詳細テーブル ---
+/** @param {Uint16Array} starIndices */
+function renderTimingTable(starIndices) {
+	const starsAdvances = stars.length * StarDirectionAdvances;
+	let html = '';
+	for (const index of starIndices) {
+		const arrivalIndex = index - starsAdvances;
+		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${arrivalIndex}</b>`;
+		html += `<table class="test-table" style="font-size: 14px"><thead><tr>
+			<th>${t('thTiming')}</th>
+			<th>${t('thStars')}<br>(+${starsAdvances})</th>
+			<th>${t('thSmoke')}</th>
+			<th>${t('thKirbyFirst')}<br>(+1)</th>
+			<th>${t('thSmoke')}</th>
+			<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
+			<th>${t('thPowersCheck')}</th>
+			<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
+			<th><span style="font-size: 8px">${t('thHardHit')}</span><br>(+9)</th>
+			<th>${t('thSmoke')}<br>(+2)</th>
+		</tr></thead><tbody>`;
 
-	const settings = getSettings();
-	const manipulator = new BattleWindowsMWWManipulator(settings);
-
-	// 到着時の乱数位置（星消費前）を計算
-	const starIndices = findIndexesByStars(stars, settings.minIndex, settings.maxIndex);
-
-	if (starIndices.length === 0) {
-		statusEl.innerHTML = t('notInRange');
-		return;
-	}
-
-	// 到着時の乱数位置の表示（設定がオンの場合のみ）
-	const showArrival = document.getElementById('show-arrival-index').checked;
-	let extraHtml = '';
-	if (showArrival) {
-		const starsAdvances = stars.length * 2;
-		const arrivalIndices = Array.from(starIndices).map(idx => idx - starsAdvances);
-		statusEl.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
-
-		// 魔法使いがFastの場合の各タイミングのシミュレーション結果
-		if (settings.magicianDifficulty !== 'easy') {
-			for (const index of starIndices) {
-				const arrivalIndex = index - stars.length * 2;
-				extraHtml += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${arrivalIndex}</b>`;
-				extraHtml += `<table class="test-table" style="font-size: 14px"><thead><tr>
-					<th>${t('thTiming')}</th>
-					<th>${t('thStars')}<br>(+${starsAdvances})</th>
-					<th>${t('thSmoke')}</th>
-					<th>${t('thKirbyFirst')}<br>(+1)</th>
-					<th>${t('thSmoke')}</th>
-					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
-					<th>${t('thPowersCheck')}</th>
-					<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
-					<th><span style="font-size: 8px">${t('thHardHit')}</span><br>(+9)</th>
-					<th>${t('thSmoke')}<br>(+2)</th>
-				</tr></thead><tbody>`;
-
-				const s = { true: '<b style="color: green">✓</b>', false: '<b style="color: red">✕</b>'}
-				const timings = FastMagicianList.map(v => {
-					const row = { name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null };
-					const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
-						switch (p) {
-						case 'magicianAttacksFirst': 
-							row.magicianAttacksFirst = result;
-							row.magicianAttacksFirstEndingIndex = endingIndex;
-							row.advances1 = startingIndex - index;
-							break;
-						case 'checkHammerHardHit': 
-							row.hardHitCheck = result;
-							row.hardHitCheckEndingIndex = endingIndex;
-							if (v.earlyHardHitCheck) row.advances2 = startingIndex - row.magicianAttacksFirstEndingIndex;
-							break;
-						case 'battleWindowsPowers':
-							row.powers = { ...result, startingIndex, endingIndex };
-							row.advances2 = startingIndex - row.magicianAttacksFirstEndingIndex - (v.earlyHardHitCheck ? 1 : 0);
-							break;
-						}
-					});
-					rng.simulateMagician(v);
-					row.endingIndex = rng.getIndex();
-					return row;
-				});
-				for (let i = 0; i < timings.length; i++) {
-					const v = FastMagicianList[i];
-					const row = timings[i];
-
-					extraHtml += `<tr>
-						<td>${row.name}</td>
-						<td>${index}</td>
-						<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
-						<td>${row.magicianAttacksFirstEndingIndex}<br>(${s[!row.magicianAttacksFirst]})</td>
-						<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
-
-					if (i === 0 || i === 2) {
-						// グループ内（i=0,1 or i=2..5）のうち先制されなかった最初の行を代表値として使う
-						const groupEnd = i === 0 ? 2 : 6;
-						const rep = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
-						const span = groupEnd - i;
-
-						// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
-						const hh1 = v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[rep.hardHitCheck]})` : '-';
-						const hh2 = !v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[rep.hardHitCheck]})` : '-';
-						const powersStr = rep
-							? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${rep.powers.endingIndex}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
-							: '-';
-						const hhSmoke = rep && rep.hardHitCheck ? `${rep.endingIndex - 2}` : '-';
-						const finishSmoke = rep ? `${rep.endingIndex}` : '-';
-
-						extraHtml += `<td rowspan="${span}">${hh1}</td>
-						<td rowspan="${span}">${powersStr}</td>
-						<td rowspan="${span}">${hh2}</td>
-						<td rowspan="${span}">${hhSmoke}</td>
-						<td rowspan="${span}">${finishSmoke}</td>`;
-					}
-					extraHtml += `</tr>`;
+		/** @type {Record<string, string>} */
+		const s = { true: '<b style="color: green">✓</b>', false: '<b style="color: red">✕</b>'};
+		const timings = FastMagicianList.map(v => {
+			const row = /** @type {{ name: string|undefined, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {left:string, right:string, startingIndex:number, endingIndex:number}|null, endingIndex: number|null }} */ ({ name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null });
+			let lastIndex = index;
+			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
+				switch (p) {
+				case 'magicianAttacksFirst': 
+					row.magicianAttacksFirst = result;
+					row.magicianAttacksFirstEndingIndex = endingIndex;
+					row.advances1 = startingIndex - lastIndex;
+					break;
+				case 'checkHammerHardHit': 
+					row.hardHitCheck = result;
+					row.hardHitCheckEndingIndex = endingIndex;
+					if (v.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
+					break;
+				case 'battleWindowsPowers':
+					row.powers = { ...result, startingIndex, endingIndex };
+					if (!v.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
+					break;
+				default:
+					return;
 				}
-				extraHtml += `</tbody></table></div>`;
+				lastIndex = endingIndex;
+			});
+			rng.simulateMagician(v);
+			row.endingIndex = rng.getIndex();
+			return row;
+		});
+		for (let i = 0; i < timings.length; i++) {
+			const v = FastMagicianList[i];
+			const row = timings[i];
+
+			html += `<tr>
+				<td>${row.name}</td>
+				<td>${index}</td>
+				<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
+				<td>${row.magicianAttacksFirstEndingIndex}<br>(${s[String(!row.magicianAttacksFirst)]})</td>
+				<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
+
+			if (i === 0 || i === 2) {
+				// グループ内（i=0,1 or i=2..5）のうち先制されなかった最初の行を代表値として使う
+				const groupEnd = i === 0 ? 2 : 6;
+				const rep = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
+				const span = groupEnd - i;
+
+				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
+				const hh1 = v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[String(rep.hardHitCheck)]})` : '-';
+				const hh2 = !v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[String(rep.hardHitCheck)]})` : '-';
+				const powersStr = rep && rep.powers
+					? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${rep.powers.endingIndex}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
+					: '-';
+				const hhSmoke = rep && rep.hardHitCheck && rep.endingIndex !== null ? `${rep.endingIndex - 2}` : '-';
+				const finishSmoke = rep ? `${rep.endingIndex}` : '-';
+
+				html += `<td rowspan="${span}">${hh1}</td>
+				<td rowspan="${span}">${powersStr}</td>
+				<td rowspan="${span}">${hh2}</td>
+				<td rowspan="${span}">${hhSmoke}</td>
+				<td rowspan="${span}">${finishSmoke}</td>`;
 			}
+			html += `</tr>`;
 		}
+		html += `</tbody></table></div>`;
 	}
 
-	// manipulate は全候補を同時に考慮して1つの結果を返す
-	const result = manipulator.manipulate(stars);
+	const div = document.createElement('div');
+	div.innerHTML = html;
+	el.result.appendChild(div);
+}
 
-	if (result.magician === null) {
-		resultEl.innerHTML = `<p>${t('noMagicianAction')}</p>`;
-		return;
-	}
-	if (result.actionCombination === null) {
-		resultEl.innerHTML = `<p>${t('noActionCombination')}</p>`;
-		return;
-	}
-
-	const { magician, actionCombination, branch } = result;
+// --- メイン行動テーブル ---
+/**
+ * @param {any} result manipulate()の結果
+ * @param {Uint16Array} starIndices
+ * @param {ReturnType<typeof getSettings>} settings
+ * @param {boolean} showPowers コピーの元列を表示するか
+ * @param {boolean} showFailPowers 操作ミス時のコピーの元も表示するか
+ */
+function renderMainResultTable({ magician, actionCombination, branch }, starIndices, settings, showPowers, showFailPowers) {
 	const hasBranch = branch !== null;
 
 	// 分岐がある場合、どの敵のターンで観測するか (simIndex)
 	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
-	const branchSimIndex = hasBranch ? BranchTypes[branch.type].minSimLength - 1 : -1;
+	const branchSimIndex = hasBranch ? BranchTypes[/** @type {keyof typeof BranchTypes} */ (branch.type)].minSimLength - 1 : -1;
 
-	// 各候補乱数ごとのシミュレーションデータ（到着乱数表示オン時のみ）
+	// 各候補乱数ごとのシミュレーションデータ（コピーの元表示時のみ計算）
+	/** @type {{ arrivalIndex: number, sim: any[] }[]} */
 	let arrivalSims = [];
-	if (showArrival) {
+	if (showPowers) {
 		arrivalSims = Array.from(starIndices).map(index => {
 			let chosenActionCombination = actionCombination;
 			if (hasBranch) {
 				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.hammerThrow, settings.allowDragonStar);
-				const bt = BranchTypes[branch.type];
+				const bt = BranchTypes[/** @type {keyof typeof BranchTypes} */ (branch.type)];
 				if (tempSim.length >= bt.minSimLength && bt.getObservable({ sim: tempSim }) === branch.value) {
 					chosenActionCombination = branch.fallbackActionCombination;
 				}
 			}
 			let dragonAction = null;
+			/** @type {number[]} */
 			let powersIndices = [];
 			const rng = new KssRng(index).withProxy(({startingIndex, p, result}) => {
 				if (p === 'dragonActs') dragonAction = result;
 				if (p === 'battleWindowsPowers') powersIndices.push(startingIndex);
 			});
-			const sim = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
+			// 動的プロパティ(startingIndex, dragonAction)を追加するため any[] にキャスト
+			const sim = /** @type {any[]} */ (rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar));
 			for (let i = 0; i < sim.length; i++) {
 				sim[i].startingIndex = powersIndices[i];
 			}
 			if (sim[3]) sim[3].dragonAction = dragonAction;
 
 			return {
-				arrivalIndex: index - stars.length * 2,
+				arrivalIndex: index - stars.length * StarDirectionAdvances,
 				sim
 			};
 		});
@@ -404,7 +397,7 @@ function displayResult() {
 	// [0]=magician, [1]=knight, [2]=dragon, [3]=dragonAction
 	const mainActions = [magician, actionCombination.knight, actionCombination.dragon, actionCombination.dragonAction];
 	const fallbackActions = hasBranch
-		? [null, branch.fallbackActionCombination.knight, branch.fallbackActionCombination.dragon, branch.fallbackActionCombination.dragonAction]
+		? /** @type {(ActionTable|null)[]} */ ([null, branch.fallbackActionCombination.knight, branch.fallbackActionCombination.dragon, branch.fallbackActionCombination.dragonAction])
 		: null;
 
 	for (let i = 0; i < 4; i++) {
@@ -422,9 +415,9 @@ function displayResult() {
 			if (i === branchSimIndex) {
 				// この行で観測が行われる → コピーの元を表示
 				html += `<td>${formatBranchPowers(branch.type, branch.value)}</td>`;
-			} else if (i > branchSimIndex && fallbackActions[i]) {
+			} else if (i > branchSimIndex && fallbackActions?.[i]) {
 				// 観測後の行 → 分岐先の行動を表示
-				html += `<td>${msg(fallbackActions[i])}</td>`;
+				html += `<td>${msg(/** @type {ActionTable} */ (fallbackActions[i]))}</td>`;
 			} else {
 				html += '<td></td>';
 			}
@@ -438,7 +431,7 @@ function displayResult() {
 				html += `${powerImg(p.left)} ${powerImg(p.right)}`;
 
 				// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
-				if ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon)) {
+				if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
 					// 本来より1つ前のインデックスからコピーの元判定が始まる
 					const failRng = new KssRng(p.startingIndex - 1);
 					const failPowers = failRng.battleWindowsPowers();
@@ -459,12 +452,57 @@ function displayResult() {
 	}
 
 	table.appendChild(tbody);
-	resultEl.appendChild(table);
+	el.result.appendChild(table);
+}
 
-	if (extraHtml) {
-		const extraDiv = document.createElement('div');
-		extraDiv.innerHTML = extraHtml;
-		resultEl.appendChild(extraDiv);
+// --- 結果表示（表示モードに応じてレンダー関数を呼び分ける） ---
+function displayResult() {
+	el.result.innerHTML = '';
+	el.status.innerHTML = '';
+
+	if (stars.length < MIN_STARS_FOR_RESULT) {
+		el.status.innerHTML = t('pressToStart');
+		return;
+	}
+
+	const settings = getSettings();
+	const starIndices = findIndexesByStars(stars, settings.minIndex, settings.maxIndex);
+
+	if (starIndices.length === 0) {
+		el.status.innerHTML = t('notInRange');
+		return;
+	}
+
+	const mode = settings.displayMode;
+
+	// 乱数位置のみ: 到着インデックスだけ表示して終了
+	if (mode === 'withIndex') {
+		renderRngIndices(starIndices);
+		return;
+	}
+
+	// manipulate は全候補を同時に考慮して1つの結果を返す
+	const manipulator = new BattleWindowsMWWManipulator(/** @type {any} */ (settings));
+	const result = manipulator.manipulate(stars);
+
+	if (result.magician === null) {
+		el.result.innerHTML = `<p>${t('noMagicianAction')}</p>`;
+		return;
+	}
+	if (result.actionCombination === null) {
+		el.result.innerHTML = `<p>${t('noActionCombination')}</p>`;
+		return;
+	}
+
+	// 表示モードに応じたフラグ
+	const showPowers = mode !== 'actionOnly';
+	const showFailPowers = mode === 'withFailPowers' || mode === 'withSimulation';
+
+	renderMainResultTable(/** @type {any} */ (result), starIndices, settings, showPowers, showFailPowers);
+
+	// シミュレーションモードかつ魔法使いがFastの場合のみタイミングテーブルを追加
+	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
+		renderTimingTable(starIndices);
 	}
 }
 
@@ -472,55 +510,55 @@ function displayResult() {
 function resetInputs() {
 	stars = [];
 	renderStarBoxes();
-	resultEl.innerHTML = '';
-	statusEl.innerHTML = t('pressToStart');
+	el.result.innerHTML = '';
+	el.status.innerHTML = t('pressToStart');
 }
 
 // --- テスト関数 ---
 const BranchEnemyNames = {
-	en: { magician: 'Magician', knight: 'Knight', dragon: 'Dragon' },
-	ja: { magician: '魔法使い', knight: '悪魔の騎士', dragon: 'レッドドラゴン' },
+	magician: { en: 'Magician', ja: '魔法使い' },
+	knight: { en: 'Knight', ja: '悪魔の騎士' },
+	dragon: { en: 'Dragon', ja: 'レッドドラゴン' },
 };
 
+/** @param {string} type */
 function branchTypeToEnemy(type) {
-	if (type.startsWith('magician')) return BranchEnemyNames[lang].magician;
-	if (type.startsWith('knight')) return BranchEnemyNames[lang].knight;
-	if (type.startsWith('dragon')) return BranchEnemyNames[lang].dragon;
+	if (type.startsWith('magician')) return BranchEnemyNames.magician[lang];
+	if (type.startsWith('knight')) return BranchEnemyNames.knight[lang];
+	if (type.startsWith('dragon')) return BranchEnemyNames.dragon[lang];
 	return type;
 }
 
 async function runTest() {
-	const testResultEl = document.getElementById('test-result');
-	const runBtn = document.getElementById('test-run-btn');
-	const starsCount = parseInt(document.getElementById('test-stars').value, 10) || 3;
+	const starsCount = parseInt(el.testStars.value, 10) || 3;
 	const settings = getSettings();
 
 	// UIを実行中状態に
-	runBtn.disabled = true;
-	runBtn.textContent = '0%';
+	el.testRunBtn.disabled = true;
+	el.testRunBtn.textContent = '0%';
 
 	// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
 	let time = performance.now();
-	const manipulator = new BattleWindowsMWWManipulator(settings);
+	const manipulator = new BattleWindowsMWWManipulator(/** @type {any} */ (settings));
 	for (const result of manipulator.testGenerator(starsCount)) {
-		const progress = Math.floor(result.count / result.total * 100);
 		if (result.count === result.total) {
-			renderTestResult(result, testResultEl); // 結果を表示
+			renderTestResult(result, el.testResult); // 結果を表示
 			break;
 		}
 		const newTime = performance.now();
-		if (newTime - time > 20) {
+		if (newTime - time > 30) {
 			time = newTime;
-			runBtn.textContent = `${progress}%`; // 進捗を表示
+			el.testRunBtn.textContent = `${Math.floor(result.count / result.total * 100)}%`; // 進捗を表示
 			await new Promise(r => setTimeout(r, 0)); // イベントループに制御を返す
 		}
 	}
 
 	// UIを復元
-	runBtn.disabled = false;
-	runBtn.textContent = t('testRun');
+	el.testRunBtn.disabled = false;
+	el.testRunBtn.textContent = t('testRun');
 }
 
+/** @param {any} result @param {HTMLElement} testResultEl */
 function renderTestResult(result, testResultEl) {
 	let html = '';
 
@@ -597,6 +635,7 @@ function renderTestResult(result, testResultEl) {
 	}
 
 	// 行動テーブル（回数降順）
+	/** @param {string} title @param {Record<string, number>} countList */
 	const renderActionTable = (title, countList) => {
 		const sorted = Object.entries(countList).sort((a, b) => b[1] - a[1]);
 		if (sorted.length === 0) return '';
@@ -620,40 +659,39 @@ function renderTestResult(result, testResultEl) {
 	testResultEl.innerHTML = html;
 }
 
-document.getElementById('test-run-btn').addEventListener('click', runTest);
+el.testRunBtn.addEventListener('click', runTest);
 
-// --- 言語切替 ---
-window.switchLang = function(val) {
-	lang = val;
-	document.getElementById('label-magician').textContent = t('magician');
-	document.getElementById('label-knight').textContent = t('knight');
-	document.getElementById('label-dragon').textContent = t('dragon');
-	document.getElementById('label-hammer-throw').textContent = t('hammerThrow');
-	document.getElementById('label-settings').textContent = t('settings');
-	document.getElementById('label-no-numpad').textContent = t('noNumpad');
-	document.getElementById('label-show-arrival').textContent = t('showArrival');
-	document.getElementById('label-dragon-star').textContent = t('dragonStar');
-	document.getElementById('label-test').textContent = t('test');
-	document.getElementById('label-test-stars').textContent = t('testStars');
-	document.getElementById('test-run-btn').textContent = t('testRun');
-	document.getElementById('btn-default-settings').textContent = t('defaultSettings');
-	if (stars.length < 3) statusEl.innerHTML = t('pressToStart');
+// --- 言語切替（data-t属性方式） ---
+/** data-t属性を持つ全要素のテキストを現在の言語で更新 */
+function updateTranslations() {
+	document.querySelectorAll('[data-t]').forEach(elem => {
+		const key = /** @type {string} */ (elem.getAttribute('data-t'));
+		elem.textContent = t(key);
+	});
+}
+
+/** @param {string} val */
+const switchLang = function(val) {
+	lang = /** @type {LangKey} */ (val);
+	updateTranslations();
+	if (stars.length < MIN_STARS_FOR_RESULT) el.status.innerHTML = t('pressToStart');
 	else displayResult();
 };
 
 // --- キーボードイベント ---
 window.addEventListener('keydown', (event) => {
-	if (event.target.tagName?.toUpperCase() === 'INPUT' || event.target.tagName?.toUpperCase() === 'SELECT') return;
+	const target = /** @type {HTMLElement} */ (event.target);
+	if (target.tagName?.toUpperCase() === 'INPUT' || target.tagName?.toUpperCase() === 'SELECT') return;
 
 	const key = event.key;
-	const noNumpad = document.getElementById('no-numpad').checked;
+	const noNumpad = el.noNumpad.checked;
 
 	let numpadKey = null;
 	if (noNumpad) {
 		numpadKey = NoNumpadMap[key.toLowerCase()] || null;
 	} else {
 		const n = parseInt(key, 10);
-		if (n === n && n !== 0 && n !== 5) numpadKey = n;
+		if (!Number.isNaN(n) && n !== 0 && n !== 5) numpadKey = n;
 	}
 
 	if (numpadKey !== null && NumpadToStarIndex[numpadKey] !== undefined) {
@@ -676,16 +714,16 @@ window.addEventListener('keydown', (event) => {
 // --- 設定とローカルストレージ ---
 function saveSettings() {
 	const settings = {
-		lang: document.getElementById('lang').value,
-		min: document.getElementById('min').value,
-		max: document.getElementById('max').value,
-		magician: document.getElementById('difficulty-magician').value,
-		knight: document.getElementById('difficulty-knight').value,
-		dragon: document.getElementById('difficulty-dragon').value,
-		hammerThrow: document.querySelector('input[name="hammer-throw"]:checked').value,
-		noNumpad: document.getElementById('no-numpad').checked,
-		showArrival: document.getElementById('show-arrival-index').checked,
-		allowDragonStar: document.getElementById('allow-dragon-star').checked,
+		lang: el.lang.value,
+		min: el.min.value,
+		max: el.max.value,
+		magician: el.difficultyMagician.value,
+		knight: el.difficultyKnight.value,
+		dragon: el.difficultyDragon.value,
+		hammerThrow: /** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value,
+		noNumpad: el.noNumpad.checked,
+		displayMode: el.displayMode.value,
+		allowDragonStar: el.allowDragonStar.checked,
 	};
 	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
 }
@@ -695,54 +733,64 @@ function loadSettings() {
 		const stored = localStorage.getItem('kss-rng-manipulator2');
 		if (stored) {
 			const s = JSON.parse(stored);
-			if (s.lang) { document.getElementById('lang').value = s.lang; lang = s.lang; }
-			if (s.min) document.getElementById('min').value = s.min;
-			if (s.max) document.getElementById('max').value = s.max;
-			if (s.magician) document.getElementById('difficulty-magician').value = s.magician;
-			if (s.knight) document.getElementById('difficulty-knight').value = s.knight;
-			if (s.dragon) document.getElementById('difficulty-dragon').value = s.dragon;
+			if (s.lang) { el.lang.value = s.lang; lang = /** @type {LangKey} */ (s.lang); }
+			if (s.min) el.min.value = s.min;
+			if (s.max) el.max.value = s.max;
+			if (s.magician) el.difficultyMagician.value = s.magician;
+			if (s.knight) el.difficultyKnight.value = s.knight;
+			if (s.dragon) el.difficultyDragon.value = s.dragon;
 			if (s.hammerThrow) {
-				const rb = document.querySelector(`input[name="hammer-throw"][value="${s.hammerThrow}"]`);
+				const rb = /** @type {HTMLInputElement | null} */ (document.querySelector(`input[name="hammer-throw"][value="${s.hammerThrow}"]`));
 				if (rb) rb.checked = true;
 			}
-			if (s.noNumpad !== undefined) document.getElementById('no-numpad').checked = s.noNumpad;
-			if (s.showArrival !== undefined) document.getElementById('show-arrival-index').checked = s.showArrival;
-			if (s.allowDragonStar !== undefined) document.getElementById('allow-dragon-star').checked = s.allowDragonStar;
+			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
+			// 旧設定 showArrival → displayMode へのマイグレーション
+			if (s.displayMode) {
+				el.displayMode.value = s.displayMode;
+			} else if (s.showArrival !== undefined) {
+				el.displayMode.value = s.showArrival ? 'withPowers' : 'actionOnly';
+			}
+			if (s.allowDragonStar !== undefined) el.allowDragonStar.checked = s.allowDragonStar;
 			return true;
 		}
-	} catch(e) {}
+	} catch(e) { /* localStorage が使えない場合は無視 */ }
 	return false;
 }
 
 function restoreDefaultSettings() {
-	document.getElementById('min').value = "2800";
-	document.getElementById('max').value = "3376";
-	document.getElementById('difficulty-magician').value = "easy";
-	document.getElementById('difficulty-knight').value = "true";
-	document.getElementById('difficulty-dragon').value = "true";
-	document.querySelector('input[name="hammer-throw"][value="1"]').checked = true;
-	document.getElementById('no-numpad').checked = false;
-	document.getElementById('show-arrival-index').checked = false;
-	document.getElementById('allow-dragon-star').checked = false;
+	el.min.value = DEFAULT_SETTINGS.min;
+	el.max.value = DEFAULT_SETTINGS.max;
+	el.difficultyMagician.value = DEFAULT_SETTINGS.magician;
+	el.difficultyKnight.value = DEFAULT_SETTINGS.knight;
+	el.difficultyDragon.value = DEFAULT_SETTINGS.dragon;
+	/** @type {HTMLInputElement} */ (document.querySelector(`input[name="hammer-throw"][value="${DEFAULT_SETTINGS.hammerThrow}"]`)).checked = true;
+	el.noNumpad.checked = DEFAULT_SETTINGS.noNumpad;
+	el.displayMode.value = DEFAULT_SETTINGS.displayMode;
+	el.allowDragonStar.checked = DEFAULT_SETTINGS.allowDragonStar;
 	saveSettings();
 	displayResult();
 }
 
-document.getElementById('btn-default-settings').addEventListener('click', restoreDefaultSettings);
+el.btnDefaultSettings.addEventListener('click', restoreDefaultSettings);
 
-document.querySelector('.settings-area').addEventListener('change', (e) => {
+el.settingsArea.addEventListener('change', (e) => {
+	const target = /** @type {HTMLElement} */ (e.target);
 	saveSettings();
-	if (e.target.id === 'lang') {
-		switchLang(e.target.value);
-	} else if (e.target.id !== 'no-numpad' && e.target.id !== 'test-stars') {
+	if (target.id === 'lang') {
+		switchLang(/** @type {HTMLSelectElement} */ (target).value);
+	} else if (target.id !== 'no-numpad' && target.id !== 'test-stars') {
 		displayResult();
 	}
 });
 
+// HTMLのonchange="switchLang(this.value)"からアクセスできるようにグローバル公開
+// @ts-ignore
+window.switchLang = switchLang;
+
 // --- 初期化 ---
 if (!loadSettings()) {
-	document.getElementById('lang').value = lang; // ブラウザのデフォルト言語を反映
+	el.lang.value = lang; // ブラウザのデフォルト言語を反映
 }
 switchLang(lang); // lang変数を元にUIテキストを更新
 renderStarBoxes();
-statusEl.innerHTML = t('pressToStart');
+el.status.innerHTML = t('pressToStart');

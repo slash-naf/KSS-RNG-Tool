@@ -138,48 +138,57 @@ details summary {
 	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="max" value="3376">
 	<br>
 
-	<label id="label-magician">Magician:</label>
+	<label id="label-magician" data-t="magician">Magician:</label>
 	<select id="difficulty-magician">
 		<option value="easy" selected>Easy</option>
 		<option value="conservativeFast">Conservative Fast</option>
 		<option value="aggressiveFast">Aggressive Fast</option>
 	</select>
 
-	<label id="label-knight">Knight:</label>
+	<label id="label-knight" data-t="knight">Knight:</label>
 	<select id="difficulty-knight">
 		<option value="true" selected>Easy</option>
 		<option value="false">Fast</option>
 	</select>
 
-	<label id="label-dragon">Dragon:</label>
+	<label id="label-dragon" data-t="dragon">Dragon:</label>
 	<select id="difficulty-dragon">
 		<option value="true" selected>Easy</option>
 		<option value="false">Fast</option>
 	</select>
-	<label><input type="checkbox" id="allow-dragon-star"><span id="label-dragon-star">Include Star Attack</span></label>
+	<label><input type="checkbox" id="allow-dragon-star"><span id="label-dragon-star" data-t="dragonStar">Include Star Attack</span></label>
 	<br>
 
-	<label id="label-hammer-throw">Hammer throw dash advances:</label>
+	<label id="label-hammer-throw" data-t="hammerThrow">Hammer throw dash advances:</label>
 	<input type="radio" name="hammer-throw" value="0"><label>0</label>
 	<input type="radio" name="hammer-throw" value="1" checked><label>1</label>
 	<input type="radio" name="hammer-throw" value="2"><label>2</label>
 	<br>
 
 	<details>
-		<summary id="label-settings">Settings</summary>
+		<summary id="label-settings" data-t="settings">Settings</summary>
 		<div style="padding-left: 2em">
-			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad">No Numpad</span></label></div>
-			<div><label><input type="checkbox" id="show-arrival-index"><span id="label-show-arrival">Show arrival RNG index</span></label></div>
-			<button id="btn-default-settings" style="margin-top:4px">Default Settings</button>
+			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad" data-t="noNumpad">No Numpad</span></label></div>
+			<div>
+				<label id="label-display-mode" data-t="displayMode">Display:</label>
+				<select id="display-mode">
+					<option value="actionOnly" data-t="displayModeActionOnly" selected>Manipulation only</option>
+					<option value="withIndex" data-t="displayModeIndex">RNG index only</option>
+					<option value="withPowers" data-t="displayModePowers">With Copy Essences</option>
+					<option value="withFailPowers" data-t="displayModeFailPowers">With fail Copy Essences</option>
+					<option value="withSimulation" data-t="displayModeSimulation">With simulation</option>
+				</select>
+			</div>
+			<button id="btn-default-settings" data-t="defaultSettings" style="margin-top:4px">Default Settings</button>
 		</div>
 	</details>
 
 	<details>
-		<summary id="label-test">Test</summary>
+		<summary id="label-test" data-t="test">Analysis</summary>
 		<div style="padding-left: 2em">
-			<label id="label-test-stars">Stars:</label>
+			<label id="label-test-stars" data-t="testStars">Stars:</label>
 			<input type="number" id="test-stars" value="3" min="1" max="10" style="width:50px; font-size:20px">
-			<button id="test-run-btn" style="font-size:20px; padding:4px 12px; cursor:pointer">Run</button>
+			<button id="test-run-btn" data-t="testRun" style="font-size:20px; padding:4px 12px; cursor:pointer">Run</button>
 			<div id="test-result"></div>
 		</div>
 	</details>
