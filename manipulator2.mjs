@@ -297,32 +297,34 @@ function displayResult() {
 				for (let i = 0; i < timings.length; i++) {
 					const v = FastMagicianList[i];
 					const row = timings[i];
-					const hh1 = v.earlyHardHitCheck ? `${row.hardHitCheckEndingIndex}<br>(${s[row.hardHitCheck]})` : '-';
-					const hh2 = !v.earlyHardHitCheck ? `${row.hardHitCheckEndingIndex}<br>(${s[row.hardHitCheck]})` : '-';
-					const powersAdvances = row.powers.endingIndex - row.powers.startingIndex;
-					const powersStr = `+${powersAdvances}<br>${row.powers.endingIndex}<br>${powerImg(row.powers.left)} ${powerImg(row.powers.right)}`;
-					const hhSmoke = row.hardHitCheck ? `${row.endingIndex - 2}` : '-';
-					const finishSmoke = `${row.endingIndex}`;
-					
+
 					extraHtml += `<tr>
 						<td>${row.name}</td>
 						<td>${index}</td>
 						<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
 						<td>${row.magicianAttacksFirstEndingIndex}<br>(${s[!row.magicianAttacksFirst]})</td>
 						<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
-						
-					if (i === 0) {
-						extraHtml += `<td rowspan="2">${hh1}</td>
-						<td rowspan="2">${powersStr}</td>
-						<td rowspan="2">${hh2}</td>
-						<td rowspan="2">${hhSmoke}</td>
-						<td rowspan="2">${finishSmoke}</td>`;
-					} else if (i === 2) {
-						extraHtml += `<td rowspan="4">${hh1}</td>
-						<td rowspan="4">${powersStr}</td>
-						<td rowspan="4">${hh2}</td>
-						<td rowspan="4">${hhSmoke}</td>
-						<td rowspan="4">${finishSmoke}</td>`;
+
+					if (i === 0 || i === 2) {
+						// グループ内（i=0,1 or i=2..5）のうち先制されなかった最初の行を代表値として使う
+						const groupEnd = i === 0 ? 2 : 6;
+						const rep = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
+						const span = groupEnd - i;
+
+						// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
+						const hh1 = v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[rep.hardHitCheck]})` : '-';
+						const hh2 = !v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[rep.hardHitCheck]})` : '-';
+						const powersStr = rep
+							? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${rep.powers.endingIndex}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
+							: '-';
+						const hhSmoke = rep && rep.hardHitCheck ? `${rep.endingIndex - 2}` : '-';
+						const finishSmoke = rep ? `${rep.endingIndex}` : '-';
+
+						extraHtml += `<td rowspan="${span}">${hh1}</td>
+						<td rowspan="${span}">${powersStr}</td>
+						<td rowspan="${span}">${hh2}</td>
+						<td rowspan="${span}">${hhSmoke}</td>
+						<td rowspan="${span}">${finishSmoke}</td>`;
 					}
 					extraHtml += `</tr>`;
 				}

@@ -203,8 +203,8 @@ export class KssRng {
 
 		// --- 魔法使い ---
 		const m = this.simulateMagician(magician);
-		if (m.magicianAttacksFirst) return result;
-		result.push(m.powers);
+		if (!m) return result;
+		result.push(m);
 
 		// --- 悪魔の騎士 ---
 		this.takeAction(actionCombination.knight);
@@ -256,16 +256,15 @@ export class KssRng {
 		return result;
 	}
 
-	/** 魔法使い戦の乱数消費シミュレーションを統合した処理
-	 * @typedef {{ magicianAttacksFirst: boolean, powers: BattleWindowsPowersResult }} SimulateMagicianResult 魔法使い戦のシミュレーション結果
+	/** 魔法使い戦のシミュレーション
 	 * @param {ActionTable} magician 魔法使いに対する行動
-	 * @returns {SimulateMagicianResult}
+	 * @returns {BattleWindowsPowersResult | null} 先制されたらnull
 	 */
 	simulateMagician(magician) {
 		this.takeAction(magician);
 
 		// 魔法使いが先制するかの判定
-		const magicianAttacksFirst = this.magicianAttacksFirst();
+		if (this.magicianAttacksFirst()) return null;
 
 		// 先制判定後からコピーの元判定前までの消費
 		this.advance((magician.lateAdvances ?? 0) + (magician.fast ? HammerFlipChargeAdvances : 0));
@@ -279,7 +278,7 @@ export class KssRng {
 			this.hammerFlipChargeAndHit();
 		}
 
-		return { magicianAttacksFirst, powers };
+		return powers;
 	}
 }
 
@@ -550,7 +549,7 @@ export class BattleWindowsMWWManipulator {
 		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す。なければ全行動を候補とする
-		const magicianFilteredList = this.magicianList.filter(magician => indexList.every(v => !new KssRng(v).simulateMagician(magician).magicianAttacksFirst));
+		const magicianFilteredList = this.magicianList.filter(magician => indexList.every(v => new KssRng(v).simulateMagician(magician)));
 		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianList;
 
 		/** @type {ManipulateResult} */
