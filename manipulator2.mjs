@@ -39,8 +39,8 @@ const DEFAULT_SETTINGS = {
 	min: '2800',
 	max: '3376',
 	magician: 'easy',
-	knight: 'true',
-	dragon: 'true',
+	knight: 'easy',
+	dragon: 'easy',
 	hammerThrow: '1',
 	noNumpad: false,
 	displayMode: /** @type {DisplayMode} */ ('actionOnly'),
@@ -167,8 +167,8 @@ function getSettings() {
 		minIndex: parseInt(el.min.value, 10) || 2800,
 		maxIndex: parseInt(el.max.value, 10) || 3376,
 		magicianDifficulty: /** @type {MagicianDifficulty} */ (el.difficultyMagician.value),
-		fastKnight: el.difficultyKnight.value === 'false',
-		fastDragon: el.difficultyDragon.value === 'false',
+		fastKnight: el.difficultyKnight.value === 'fast',
+		fastDragon: el.difficultyDragon.value === 'fast',
 		allowDragonStar: el.allowDragonStar.checked,
 		hammerThrow: parseInt(/** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value, 10),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
@@ -764,19 +764,22 @@ function loadSettings() {
 			if (s.min) el.min.value = s.min;
 			if (s.max) el.max.value = s.max;
 			if (s.magician) el.difficultyMagician.value = s.magician;
-			if (s.knight) el.difficultyKnight.value = s.knight;
-			if (s.dragon) el.difficultyDragon.value = s.dragon;
+
+			// "true" → "easy"、"false" → "fast" へのマイグレーション
+			const migrateDifficulty = (/**@type {string}*/s) => ({'true': 'easy', 'false': 'fast'}[s] ?? s);
+			if (s.knight) el.difficultyKnight.value = migrateDifficulty(s.knight);
+			if (s.dragon) el.difficultyDragon.value = migrateDifficulty(s.dragon);
+
 			if (s.hammerThrow) {
 				const rb = /** @type {HTMLInputElement | null} */ (document.querySelector(`input[name="hammer-throw"][value="${s.hammerThrow}"]`));
 				if (rb) rb.checked = true;
 			}
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
-			// 旧設定 showArrival → displayMode へのマイグレーション
-			if (s.displayMode) {
-				el.displayMode.value = s.displayMode;
-			} else if (s.showArrival !== undefined) {
-				el.displayMode.value = s.showArrival ? 'withPowers' : 'actionOnly';
-			}
+
+			// showArrival → displayMode へのマイグレーション
+			if (s.displayMode) el.displayMode.value = s.displayMode;
+			else if (s.showArrival !== undefined) el.displayMode.value = s.showArrival ? 'withPowers' : 'actionOnly';
+
 			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
 			if (s.allowDragonStar !== undefined) el.allowDragonStar.checked = s.allowDragonStar;
 			return true;
