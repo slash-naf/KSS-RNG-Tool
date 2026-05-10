@@ -7,11 +7,13 @@ import {
 	findIndexesByStars, KssRng,
 	DragonGuard, DragonStar,
 	FastMagicianList,
+	RngCycle,
 } from './rng2.mjs';
 
 // --- 型定義 ---
 /** @typedef {'en' | 'ja'} LangKey */
 /** @typedef {'actionOnly' | 'withIndex' | 'withPowers' | 'withFailPowers' | 'withSimulation'} DisplayMode */
+/** @typedef {'indexOnly' | 'hex' | 'split'} IndexDisplayMode */
 /** @typedef {import('./rng2.mjs').MagicianDifficulty} MagicianDifficulty */
 /** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
 /** @typedef {import('./rng2.mjs').ActionCombination} ActionCombination */
@@ -42,6 +44,7 @@ const DEFAULT_SETTINGS = {
 	hammerThrow: '1',
 	noNumpad: false,
 	displayMode: /** @type {DisplayMode} */ ('actionOnly'),
+	indexDisplayMode: /** @type {IndexDisplayMode} */ ('indexOnly'),
 	allowDragonStar: false,
 };
 
@@ -107,6 +110,10 @@ const L = {
 	thHardHitCheck: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
 	thPowersCheck: { en: 'Powers Check', ja: 'コピーの元判定' },
 	thHardHit: { en: 'Hard Hit', ja: 'ハードヒット' },
+	indexDisplayMode: { en: 'RNG Index Format:', ja: '乱数位置の表示形式:' },
+	indexDisplayModeIndexOnly: { en: 'Only RNG Index', ja: '乱数位置のみ' },
+	indexDisplayModeHex: { en: 'With Hex RNG Value', ja: '16進数の乱数値を併記' },
+	indexDisplayModeSplit: { en: 'With Split RNG Value', ja: '分割した乱数値を併記' },
 };
 
 /** @type {LangKey} */
@@ -133,6 +140,7 @@ const el = {
 	difficultyDragon: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-dragon')),
 	allowDragonStar: /** @type {HTMLInputElement} */ (document.getElementById('allow-dragon-star')),
 	displayMode: /** @type {HTMLSelectElement} */ (document.getElementById('display-mode')),
+	indexDisplayMode: /** @type {HTMLSelectElement} */ (document.getElementById('index-display-mode')),
 	noNumpad: /** @type {HTMLInputElement} */ (document.getElementById('no-numpad')),
 	lang: /** @type {HTMLSelectElement} */ (document.getElementById('lang')),
 	testResult: /** @type {HTMLElement} */ (document.getElementById('test-result')),
@@ -164,6 +172,7 @@ function getSettings() {
 		allowDragonStar: el.allowDragonStar.checked,
 		hammerThrow: parseInt(/** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value, 10),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
+		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
 	};
 }
 
@@ -187,6 +196,18 @@ function formatBranchPowers(type, val) {
 		return '? ' + powerImg(val);
 	}
 	return String(val);
+}
+
+// --- 乱数位置の整形 ---
+/** @param {number} index */
+function formatIndex(index) {
+	const mode = /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value);
+	const value = RngCycle[index];
+	switch (mode) {
+		case 'hex': return `${index} (0x${value.toString(16)})`;
+		case 'split': return `${index} [${value & 0xFF}, ${value >>> 8}]`;
+		default: return String(index);
+	}
 }
 
 // --- メッセージの取得（言語切替対応） ---
@@ -234,7 +255,7 @@ preloadImages();
 function renderRngIndices(starIndices) {
 	const starsAdvances = stars.length * StarDirectionAdvances;
 	const arrivalIndices = Array.from(starIndices).map(idx => idx - starsAdvances);
-	el.status.innerHTML = t('rngIndex') + arrivalIndices.join(', ');
+	el.status.innerHTML = t('rngIndex') + arrivalIndices.map(v => formatIndex(v)).join(', ');
 }
 
 // --- Fast魔法使いタイミング詳細テーブル ---
@@ -244,7 +265,7 @@ function renderTimingTable(starIndices) {
 	let html = '';
 	for (const index of starIndices) {
 		const arrivalIndex = index - starsAdvances;
-		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${arrivalIndex}</b>`;
+		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${formatIndex(arrivalIndex)}</b>`;
 		html += `<table class="test-table" style="font-size: 14px"><thead><tr>
 			<th>${t('thTiming')}</th>
 			<th>${t('thStars')}<br>(+${starsAdvances})</th>
@@ -294,9 +315,9 @@ function renderTimingTable(starIndices) {
 
 			html += `<tr>
 				<td>${row.name}</td>
-				<td>${index}</td>
+				<td>${formatIndex(index)}</td>
 				<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
-				<td>${row.magicianAttacksFirstEndingIndex}<br>(${s[String(!row.magicianAttacksFirst)]})</td>
+				<td>${row.magicianAttacksFirstEndingIndex !== null ? formatIndex(row.magicianAttacksFirstEndingIndex) : '-'}<br>(${s[String(!row.magicianAttacksFirst)]})</td>
 				<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
 
 			if (i === 0 || i === 2) {
@@ -306,13 +327,13 @@ function renderTimingTable(starIndices) {
 				const span = groupEnd - i;
 
 				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
-				const hh1 = v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[String(rep.hardHitCheck)]})` : '-';
-				const hh2 = !v.earlyHardHitCheck && rep ? `${rep.hardHitCheckEndingIndex}<br>(${s[String(rep.hardHitCheck)]})` : '-';
+				const hh1 = v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
+				const hh2 = !v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
 				const powersStr = rep && rep.powers
-					? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${rep.powers.endingIndex}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
+					? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${formatIndex(rep.powers.endingIndex)}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
 					: '-';
-				const hhSmoke = rep && rep.hardHitCheck && rep.endingIndex !== null ? `${rep.endingIndex - 2}` : '-';
-				const finishSmoke = rep ? `${rep.endingIndex}` : '-';
+				const hhSmoke = rep && rep.hardHitCheck && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex - 2)}` : '-';
+				const finishSmoke = rep && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex)}` : '-';
 
 				html += `<td rowspan="${span}">${hh1}</td>
 				<td rowspan="${span}">${powersStr}</td>
@@ -389,7 +410,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 	let headerHtml = `<tr><th></th><th>${t('thAction')}</th>`;
 	if (hasBranch) headerHtml += `<th>${t('thBranch')}</th>`;
 	for (const s of arrivalSims) {
-		headerHtml += `<th>${s.arrivalIndex}</th>`;
+		headerHtml += `<th>${formatIndex(s.arrivalIndex)}</th>`;
 	}
 	headerHtml += '</tr>';
 	thead.innerHTML = headerHtml;
@@ -580,11 +601,11 @@ function renderTestResult(result, testResultEl) {
 		for (const [starStr, group] of unsolvableEntries) {
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
-			html += `<td>${group.success.length > 0 ? group.success.join(', ') : '-'}</td>`;
-			html += `<td>${group.fails[0].length > 0 ? group.fails[0].join(', ') : '-'}</td>`;
-			html += `<td>${group.fails[1].length > 0 ? group.fails[1].join(', ') : '-'}</td>`;
-			html += `<td>${group.fails[2].length > 0 ? group.fails[2].join(', ') : '-'}</td>`;
-			html += `<td>${group.fails[3].length > 0 ? group.fails[3].join(', ') : '-'}</td>`;
+			html += `<td>${group.success.length > 0 ? group.success.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[0].length > 0 ? group.fails[0].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[1].length > 0 ? group.fails[1].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[2].length > 0 ? group.fails[2].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${group.fails[3].length > 0 ? group.fails[3].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
 			html += '</tr>';
 		}
 
@@ -620,8 +641,8 @@ function renderTestResult(result, testResultEl) {
 			html += `<td>${starStr}</td>`;
 			html += `<td>${branchTypeToEnemy(g.type)}</td>`;
 			html += `<td>${g.valStr}</td>`;
-			html += `<td>${g.true.length > 0 ? g.true.join(', ') : '-'}</td>`;
-			html += `<td>${g.false.length > 0 ? g.false.join(', ') : '-'}</td>`;
+			html += `<td>${g.true.length > 0 ? g.true.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${g.false.length > 0 ? g.false.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
 			html += '</tr>';
 		}
 
@@ -728,6 +749,7 @@ function saveSettings() {
 		hammerThrow: /** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value,
 		noNumpad: el.noNumpad.checked,
 		displayMode: el.displayMode.value,
+		indexDisplayMode: el.indexDisplayMode.value,
 		allowDragonStar: el.allowDragonStar.checked,
 	};
 	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
@@ -755,6 +777,7 @@ function loadSettings() {
 			} else if (s.showArrival !== undefined) {
 				el.displayMode.value = s.showArrival ? 'withPowers' : 'actionOnly';
 			}
+			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
 			if (s.allowDragonStar !== undefined) el.allowDragonStar.checked = s.allowDragonStar;
 			return true;
 		}
@@ -771,6 +794,7 @@ function restoreDefaultSettings() {
 	/** @type {HTMLInputElement} */ (document.querySelector(`input[name="hammer-throw"][value="${DEFAULT_SETTINGS.hammerThrow}"]`)).checked = true;
 	el.noNumpad.checked = DEFAULT_SETTINGS.noNumpad;
 	el.displayMode.value = DEFAULT_SETTINGS.displayMode;
+	el.indexDisplayMode.value = DEFAULT_SETTINGS.indexDisplayMode;
 	el.allowDragonStar.checked = DEFAULT_SETTINGS.allowDragonStar;
 	saveSettings();
 	displayResult();
