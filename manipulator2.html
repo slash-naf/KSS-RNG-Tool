@@ -170,13 +170,20 @@ details summary {
 		<div style="padding-left: 2em">
 			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad" data-t="noNumpad">No Numpad</span></label></div>
 			<div>
-				<label id="label-display-mode" data-t="displayMode">Display:</label>
+				<label id="label-display-mode" data-t="displayMode">View Type:</label>
 				<select id="display-mode">
-					<option value="actionOnly" data-t="displayModeActionOnly" selected>Manipulation only</option>
 					<option value="withIndex" data-t="displayModeIndex">RNG index only</option>
-					<option value="withPowers" data-t="displayModePowers">With Copy Essences</option>
-					<option value="withFailPowers" data-t="displayModeFailPowers">With fail Copy Essences</option>
+					<option value="actionOnly" data-t="displayModeAction" selected>Manipulation method</option>
 					<option value="withSimulation" data-t="displayModeSimulation">With simulation</option>
+				</select>
+			</div>
+			<div>
+				<label id="label-detail-mode" data-t="detailMode">Extra Info:</label>
+				<select id="detail-mode">
+					<option value="none" data-t="detailModeNone" selected>None</option>
+					<option value="withPowers" data-t="detailModePowers">With Copy Essences</option>
+					<option value="withFailPowers" data-t="detailModeFailPowers">With fail Copy Essences</option>
+					<option value="withTransitions" data-t="detailModeTransitions">With RNG transitions</option>
 				</select>
 			</div>
 			<div>

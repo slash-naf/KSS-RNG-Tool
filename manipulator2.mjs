@@ -12,7 +12,8 @@ import {
 
 // --- 型定義 ---
 /** @typedef {'en' | 'ja'} LangKey */
-/** @typedef {'actionOnly' | 'withIndex' | 'withPowers' | 'withFailPowers' | 'withSimulation'} DisplayMode */
+/** @typedef {'withIndex' | 'actionOnly' | 'withSimulation'} DisplayMode */
+/** @typedef {'none' | 'withPowers' | 'withFailPowers' | 'withTransitions'} DetailMode */
 /** @typedef {'indexOnly' | 'hex' | 'split'} IndexDisplayMode */
 /** @typedef {import('./rng2.mjs').MagicianDifficulty} MagicianDifficulty */
 /** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS = {
 	hammerThrow: '1',
 	noNumpad: false,
 	displayMode: /** @type {DisplayMode} */ ('actionOnly'),
+	detailMode: /** @type {DetailMode} */ ('none'),
 	indexDisplayMode: /** @type {IndexDisplayMode} */ ('indexOnly'),
 	allowDragonStar: false,
 };
@@ -57,12 +59,15 @@ const L = {
 	hammerThrow: { en: 'Hammer throw dash advances:', ja: 'ハンマー投げのダッシュ消費数:' },
 	settings: { en: 'Settings', ja: '設定' },
 	noNumpad: { en: 'No Numpad', ja: 'テンキーなし' },
-	displayMode: { en: 'Display:', ja: '表示:' },
-	displayModeActionOnly: { en: 'Manipulation only', ja: '乱数調整方法のみ' },
+	displayMode: { en: 'View Type:', ja: '表示の種類:' },
 	displayModeIndex: { en: 'RNG index only', ja: '乱数位置のみ' },
-	displayModePowers: { en: 'With Copy Essences', ja: 'コピーの元と合わせて表示' },
-	displayModeFailPowers: { en: 'With fail Copy Essences', ja: '失敗時のコピーの元と合わせて表示' },
-	displayModeSimulation: { en: 'With simulation', ja: 'シミュレーションと合わせて表示' },
+	displayModeAction: { en: 'Manipulation method', ja: '乱数調整方法' },
+	displayModeSimulation: { en: 'With Fast Magician simulation', ja: '魔法使いのFastのシミュレーションとともに表示' },
+	detailMode: { en: 'Extra Info:', ja: '追加情報:' },
+	detailModeNone: { en: 'None', ja: 'なし' },
+	detailModePowers: { en: 'With Copy Essences', ja: 'コピーの元と合わせて表示' },
+	detailModeFailPowers: { en: 'With fail Copy Essences', ja: '失敗時のコピーの元と合わせて表示' },
+	detailModeTransitions: { en: 'With RNG Transitions', ja: '乱数位置の推移と合わせて表示' },
 	dragonStar: { en: 'Include Star Attack', ja: '星攻撃あり' },
 	pressToStart: { en: 'Press on Numpad to start<br><span style="font-size:16px">enter: reset - backspace: go back</span>', ja: 'テンキーで入力開始<br><span style="font-size:16px">Enter: リセット - Backspace: 戻る</span>' },
 	notInRange: { en: 'Not in range.', ja: '範囲内に一致する乱数がありません。' },
@@ -140,6 +145,7 @@ const el = {
 	difficultyDragon: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-dragon')),
 	allowDragonStar: /** @type {HTMLInputElement} */ (document.getElementById('allow-dragon-star')),
 	displayMode: /** @type {HTMLSelectElement} */ (document.getElementById('display-mode')),
+	detailMode: /** @type {HTMLSelectElement} */ (document.getElementById('detail-mode')),
 	indexDisplayMode: /** @type {HTMLSelectElement} */ (document.getElementById('index-display-mode')),
 	noNumpad: /** @type {HTMLInputElement} */ (document.getElementById('no-numpad')),
 	lang: /** @type {HTMLSelectElement} */ (document.getElementById('lang')),
@@ -172,14 +178,19 @@ function getSettings() {
 		allowDragonStar: el.allowDragonStar.checked,
 		hammerThrow: parseInt(/** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value, 10),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
+		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
 	};
 }
 
-// --- コピーの元の画像タグ（Noneも表示する） ---
+// --- コピーの元の画像タグ ---
 /** @param {string} powerName */
 function powerImg(powerName) {
 	return `<img src="images/abilities/${powerName.toLowerCase()}.png" title="${powerName}">`;
+}
+/** @param {{left: string, right: string}} powers */
+function formatPowers({left, right}) {
+	return powerImg(left) + ' ' + powerImg(right);
 }
 
 // --- 分岐の観測値を左右のコピーの元画像として表示 ---
@@ -187,7 +198,7 @@ function powerImg(powerName) {
 function formatBranchPowers(type, val) {
 	if (type.endsWith('Powers')) {
 		const [left, right] = val.split(' ');
-		return powerImg(left) + ' ' + powerImg(right);
+		return formatPowers({left, right});
 	}
 	if (type.endsWith('Left')) {
 		return powerImg(val) + ' ?';
@@ -330,7 +341,7 @@ function renderTimingTable(starIndices) {
 				const hh1 = v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
 				const hh2 = !v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
 				const powersStr = rep && rep.powers
-					? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${formatIndex(rep.powers.endingIndex)}<br>${powerImg(rep.powers.left)} ${powerImg(rep.powers.right)}`
+					? `+${rep.powers.endingIndex - rep.powers.startingIndex}<br>${formatIndex(rep.powers.endingIndex)}<br>${formatPowers(rep.powers)}`
 					: '-';
 				const hhSmoke = rep && rep.hardHitCheck && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex - 2)}` : '-';
 				const finishSmoke = rep && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex)}` : '-';
@@ -358,20 +369,22 @@ function renderTimingTable(starIndices) {
  * @param {Branch | null} branch 分岐情報
  * @param {Uint16Array} starIndices
  * @param {ReturnType<typeof getSettings>} settings
- * @param {boolean} showPowers コピーの元列を表示するか
- * @param {boolean} showFailPowers 操作ミス時のコピーの元も表示するか
  */
-function renderMainResultTable(magician, actionCombination, branch, starIndices, settings, showPowers, showFailPowers) {
+function renderMainResultTable(magician, actionCombination, branch, starIndices, settings) {
+	const detailMode = settings.detailMode;
+	const showPowers = detailMode === 'withPowers' || detailMode === 'withFailPowers';
+	const showFailPowers = detailMode === 'withFailPowers';
+	const showTransitions = detailMode === 'withTransitions';
 	const hasBranch = branch !== null;
 
 	// 分岐がある場合、どの敵のターンで観測するか (simIndex)
 	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
 	const branchSimIndex = hasBranch ? BranchTypes[/** @type {keyof typeof BranchTypes} */ (branch.type)].minSimLength - 1 : -1;
 
-	// 各候補乱数ごとのシミュレーションデータ（コピーの元表示時のみ計算）
-	/** @type {{ arrivalIndex: number, sim: (BattleWindowsPowersResult & {startingIndex: number})[], dragonAction?: DragonAction }[]} */
+	// 各候補乱数ごとのシミュレーションデータ（詳細表示時のみ計算）
+	/** @type {{ arrivalIndex: number, sim: (BattleWindowsPowersResult & {powersStartingIndex: number})[], dragonAction?: DragonAction }[]} */
 	let arrivalSims = [];
-	if (showPowers) {
+	if (showPowers || showTransitions) {
 		arrivalSims = Array.from(starIndices).map(index => {
 			/** @type {DragonAction | undefined} */
 			let dragonAction;
@@ -392,7 +405,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			// simulateBattleWindowsMWW の戻り値は BattleWindowsPowersResult[] だが、
 			// startingIndex と dragonAction を後付けで追加するため SimEntry[] として扱う
 			const simRaw = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
-			const sim = simRaw.map((entry, i) => ({ ...entry, startingIndex: powersIndices[i] ?? 0 }));
+			const sim = simRaw.map((entry, i) => ({ ...entry, powersStartingIndex: powersIndices[i] ?? 0 }));
 
 			return {
 				arrivalIndex: index - stars.length * StarDirectionAdvances,
@@ -448,25 +461,29 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			}
 		}
 
-		// 各乱数ごとのコピーの元
+		// 各乱数ごとの詳細情報
 		for (const s of arrivalSims) {
 			const p = s.sim[i];
 			html += '<td>';
 			if (p !== undefined) {
-				html += `${powerImg(p.left)} ${powerImg(p.right)}`;
+				if (showTransitions) {
+					// 乱数位置の推移
+				} else if (showPowers) {
+					html += formatPowers(p);
 
-				// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
-				if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
-					// 本来より1つ前のインデックスからコピーの元判定が始まる
-					const failRng = new KssRng(p.startingIndex - 1);
-					const failPowers = failRng.battleWindowsPowers();
-					html += `<span style="opacity: 0.5;">(${powerImg(failPowers.left)} ${powerImg(failPowers.right)})</span>`;
-				}
+					// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
+					if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
+						// 本来より1つ前のインデックスからコピーの元判定が始まる
+						const failRng = new KssRng(p.powersStartingIndex - 1);
+						const failPowers = failRng.battleWindowsPowers();
+						html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
+					}
 
-				if (i === 3 && settings.allowDragonStar) {
-					// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-					const dragonImg = s.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
-					html += ` <img src="${dragonImg}" style="height:1em;">`;
+					if (i === 3 && settings.allowDragonStar) {
+						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
+						const dragonImg = s.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
+						html += ` <img src="${dragonImg}" style="height:1em;">`;
+					}
 				}
 			}
 			html += '</td>';
@@ -519,13 +536,9 @@ function displayResult() {
 		return;
 	}
 
-	// 表示モードに応じたフラグ
-	const showPowers = mode !== 'actionOnly';
-	const showFailPowers = mode === 'withFailPowers' || mode === 'withSimulation';
+	renderMainResultTable(result.magician, result.actionCombination, result.branch, starIndices, settings);
 
-	renderMainResultTable(result.magician, result.actionCombination, result.branch, starIndices, settings, showPowers, showFailPowers);
-
-	// シミュレーションモードかつ魔法使いがFastの場合のみタイミングテーブルを追加
+	// 魔法使いがFastの場合のみタイミングテーブルを追加
 	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
 		renderTimingTable(starIndices);
 	}
@@ -749,6 +762,7 @@ function saveSettings() {
 		hammerThrow: /** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value,
 		noNumpad: el.noNumpad.checked,
 		displayMode: el.displayMode.value,
+		detailMode: el.detailMode.value,
 		indexDisplayMode: el.indexDisplayMode.value,
 		allowDragonStar: el.allowDragonStar.checked,
 	};
@@ -778,7 +792,11 @@ function loadSettings() {
 
 			// showArrival → displayMode へのマイグレーション
 			if (s.displayMode) el.displayMode.value = s.displayMode;
-			else if (s.showArrival !== undefined) el.displayMode.value = s.showArrival ? 'withPowers' : 'actionOnly';
+			else if (s.showArrival !== undefined) {
+				el.displayMode.value = s.showArrival ? 'withSimulation' : 'actionOnly';
+				el.detailMode.value = s.showArrival ? 'withFailPowers' : 'none';
+			}
+			if (s.detailMode) el.detailMode.value = s.detailMode;
 
 			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
 			if (s.allowDragonStar !== undefined) el.allowDragonStar.checked = s.allowDragonStar;
@@ -797,6 +815,7 @@ function restoreDefaultSettings() {
 	/** @type {HTMLInputElement} */ (document.querySelector(`input[name="hammer-throw"][value="${DEFAULT_SETTINGS.hammerThrow}"]`)).checked = true;
 	el.noNumpad.checked = DEFAULT_SETTINGS.noNumpad;
 	el.displayMode.value = DEFAULT_SETTINGS.displayMode;
+	el.detailMode.value = DEFAULT_SETTINGS.detailMode;
 	el.indexDisplayMode.value = DEFAULT_SETTINGS.indexDisplayMode;
 	el.allowDragonStar.checked = DEFAULT_SETTINGS.allowDragonStar;
 	saveSettings();
