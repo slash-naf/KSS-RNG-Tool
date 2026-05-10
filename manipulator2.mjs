@@ -569,7 +569,7 @@ function renderTestResult(result, testResultEl) {
 	let html = '';
 
 	// 解決不能
-	const unsolvableEntries = Object.entries(result.simulationGroups).filter(([, group]) => group.hasFail);
+	const unsolvableEntries = Array.from(result.simulationGroups.entries()).filter(([, group]) => group.hasFail);
 	if (unsolvableEntries.length > 0) {
 		html += `<b>${t('testUnsolvable')}</b>`;
 		html += `<table class="test-table"><thead><tr>`;
@@ -609,15 +609,15 @@ function renderTestResult(result, testResultEl) {
 	}
 
 	// 分岐
-	const branchEntries = Object.entries(result.branchGroups);
+	const branchEntries = Array.from(result.branchGroups.entries());
 	if (branchEntries.length > 0) {
 		html += `<b>${t('testBranches')}</b>`;
 		html += '<table class="test-table"><thead><tr>';
 		html += `<th>${t('thStars')}</th><th>${t('thEnemy')}</th><th>${t('thPowers')}</th><th>${t('thMatch')}</th><th>${t('thNoMatch')}</th>`;
 		html += '</tr></thead><tbody>';
-		for (const [, g] of branchEntries) {
+		for (const [starStr, g] of branchEntries) {
 			html += '<tr>';
-			html += `<td>${g.starStr}</td>`;
+			html += `<td>${starStr}</td>`;
 			html += `<td>${branchTypeToEnemy(g.type)}</td>`;
 			html += `<td>${g.valStr}</td>`;
 			html += `<td>${g.true.length > 0 ? g.true.join(', ') : '-'}</td>`;
@@ -641,14 +641,13 @@ function renderTestResult(result, testResultEl) {
 	}
 
 	// 行動テーブル（回数降順）
-	/** @param {string} title @param {Record<string, number>} countList */
+	/** @param {string} title @param {Map<object, number>} countList */
 	const renderActionTable = (title, countList) => {
-		const sorted = Object.entries(countList).sort((a, b) => b[1] - a[1]);
-		if (sorted.length === 0) return '';
+		if (countList.size === 0) return '';
+		const sorted = Array.from(countList.entries()).sort((a, b) => b[1] - a[1]);
 		let s = `<div><b>${title}</b>`;
 		s += `<table class="test-table" style="margin-top: 5px;"><thead><tr><th>${t('thAction')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
-		for (const [actionJson, count] of sorted) {
-			const actionObj = JSON.parse(actionJson);
+		for (const [actionObj, count] of sorted) {
 			s += `<tr><td>${msg(actionObj)}</td><td>${count}</td></tr>`;
 		}
 		s += '</tbody></table></div>';

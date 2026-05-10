@@ -642,18 +642,18 @@ export class BattleWindowsMWWManipulator {
 			branchCount: 0,          // 分岐が発生した回数
 			totalBranchMatch: 0,     // 分岐が一致した回数（フォールバック行動を使用）
 			totalBranchNoMatch: 0,   // 分岐が不一致だった回数（通常行動を使用）
-			/** @type {Record<string, {true: number[], false: number[], starStr: string, type: string, valStr: string}>} */
-			branchGroups: {},        // 分岐の種類・値ごとにグループ化した乱数位置の一覧
-			/** @type {Record<string, {success: number[], fails: number[][], hasFail: boolean}>} */
-			simulationGroups: {},    // 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧
-			/** @type {Record<string, number>} */
-			magicianCountList: {},   // 魔法使いの行動ごとの使用回数
-			/** @type {Record<string, number>} */
-			knightCountList: {},     // 騎士の行動ごとの使用回数
-			/** @type {Record<string, number>} */
-			dragonCountList: {},     // ドラゴンの行動ごとの使用回数
-			/** @type {Record<string, number>} */
-			dragonActionCountList: {}, // ドラゴン2ターン目の行動ごとの使用回数
+			/** @type {Map<string, {true: number[], false: number[], type: string, valStr: string}>} */
+			branchGroups: new Map(),        // 分岐の種類・値ごとにグループ化した乱数位置の一覧
+			/** @type {Map<string, {success: number[], fails: number[][], hasFail: boolean}>} */
+			simulationGroups: new Map(),    // 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧
+			/** @type {Map<ActionTable, number>} */
+			magicianCountList: new Map(),   // 魔法使いの行動ごとの使用回数
+			/** @type {Map<ActionTable, number>} */
+			knightCountList: new Map(),     // 騎士の行動ごとの使用回数
+			/** @type {Map<ActionTable, number>} */
+			dragonCountList: new Map(),     // ドラゴンの行動ごとの使用回数
+			/** @type {Map<ActionTable, number>} */
+			dragonActionCountList: new Map(), // ドラゴン2ターン目の行動ごとの使用回数
 			totalTime: 0,            // manipulate()の合計計算時間（ms）
 			averageTime: 0,          // manipulate()の平均計算時間（ms）
 			worstTime: 0,            // manipulate()の最悪計算時間（ms）
@@ -704,11 +704,14 @@ export class BattleWindowsMWWManipulator {
 				// 分岐の発生を集計
 				result.branchCount++;
 				const valStr = branch.value;
-				// 星パターン・分岐種類・値でキーを作り、一致/不一致ごとに乱数位置をグループ化する
-				const key = `${starStr} ${branch.type} = ${valStr}`;
-				if (!result.branchGroups[key]) result.branchGroups[key] = { true: [], false: [], starStr, type: branch.type, valStr };
-				result.branchGroups[key][`${isEqual}`].push(i);
-				
+				// 一致/不一致ごとに乱数位置をグループ化する
+				let branchGroup = result.branchGroups.get(starStr);
+				if (!branchGroup) {
+					branchGroup = { true: [], false: [], type: branch.type, valStr };
+					result.branchGroups.set(starStr, branchGroup);
+				}
+				branchGroup[`${isEqual}`].push(i);
+
 				if (isEqual) result.totalBranchMatch++;
 				else result.totalBranchNoMatch++;
 			}
@@ -717,41 +720,36 @@ export class BattleWindowsMWWManipulator {
 			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.hammerThrow, this.allowDragonStar);
 
 			// 星パターンごとにグループを作成（初回のみ）
-			if (!result.simulationGroups[starStr]) {
-				result.simulationGroups[starStr] = {
+			let simGroup = result.simulationGroups.get(starStr);
+			if (!simGroup) {
+				simGroup = {
 					success: [],
 					fails: [[], [], [], []],
 					hasFail: false,
 				};
+				result.simulationGroups.set(starStr, simGroup);
 			}
 
 			// 行動の結果を確認
 			if (sim.length !== 4) {
 				result.wrongCounts[sim.length]++;
-				result.simulationGroups[starStr].fails[sim.length].push(i);
+				simGroup.fails[sim.length].push(i);
 
 				// これまでに記録されていた現在のパターンの成功回数を解決不能時の成功としてカウント
-				if (!result.simulationGroups[starStr].hasFail) {
-					result.simulationGroups[starStr].hasFail = true;
-					result.unsolvableSuccessCount += result.simulationGroups[starStr].success.length;
+				if (!simGroup.hasFail) {
+					simGroup.hasFail = true;
+					result.unsolvableSuccessCount += simGroup.success.length;
 				}
 			} else {			
-				result.simulationGroups[starStr].success.push(i);
+				simGroup.success.push(i);
 				result.successCount++;
-				if (result.simulationGroups[starStr].hasFail) result.unsolvableSuccessCount++;
+				if (simGroup.hasFail) result.unsolvableSuccessCount++;
 
 				// 成功した行動の使用回数を集計する
-				const magicianMsg = JSON.stringify(magician);
-				result.magicianCountList[magicianMsg] = (result.magicianCountList[magicianMsg] ?? 0) + 1;
-
-				const knightMsg = JSON.stringify(chosenActionCombination.knight);
-				result.knightCountList[knightMsg] = (result.knightCountList[knightMsg] ?? 0) + 1;
-
-				const dragonMsg = JSON.stringify(chosenActionCombination.dragon);
-				result.dragonCountList[dragonMsg] = (result.dragonCountList[dragonMsg] ?? 0) + 1;
-
-				const dragonActionMsg = JSON.stringify(chosenActionCombination.dragonAction);
-				result.dragonActionCountList[dragonActionMsg] = (result.dragonActionCountList[dragonActionMsg] ?? 0) + 1;
+				result.magicianCountList.set(magician, (result.magicianCountList.get(magician) ?? 0) + 1);
+				result.knightCountList.set(chosenActionCombination.knight, (result.knightCountList.get(chosenActionCombination.knight) ?? 0) + 1);
+				result.dragonCountList.set(chosenActionCombination.dragon, (result.dragonCountList.get(chosenActionCombination.dragon) ?? 0) + 1);
+				result.dragonActionCountList.set(chosenActionCombination.dragonAction, (result.dragonActionCountList.get(chosenActionCombination.dragonAction) ?? 0) + 1);
 			}
 
 			yield result;
