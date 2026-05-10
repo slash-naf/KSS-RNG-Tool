@@ -12,9 +12,13 @@ import {
 // --- 型定義 ---
 /** @typedef {'en' | 'ja'} LangKey */
 /** @typedef {'actionOnly' | 'withIndex' | 'withPowers' | 'withFailPowers' | 'withSimulation'} DisplayMode */
+/** @typedef {import('./rng2.mjs').MagicianDifficulty} MagicianDifficulty */
 /** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
 /** @typedef {import('./rng2.mjs').ActionCombination} ActionCombination */
 /** @typedef {import('./rng2.mjs').BattleWindowsPowersResult} BattleWindowsPowersResult */
+/** @typedef {import('./rng2.mjs').DragonAction} DragonAction */
+/** @typedef {import('./rng2.mjs').Branch} Branch */
+/** @typedef {import('./rng2.mjs').ManipulateResult} ManipulateResult */
 
 // --- 定数 ---
 
@@ -42,7 +46,6 @@ const DEFAULT_SETTINGS = {
 };
 
 // --- 多言語テキスト ---
-/** @type {Record<string, { [K in LangKey]: string }>} */
 const L = {
 	langLabel: { en: 'Language:', ja: '言語:' },
 	magician: { en: 'Magician:', ja: '魔法使い:' },
@@ -110,9 +113,9 @@ const L = {
 let lang = /** @type {LangKey} */ (navigator.language?.startsWith('ja') ? 'ja' : 'en');
 
 /** 多言語テキストの取得
- * @param {string} key
+ * @param {keyof typeof L} key
  * @returns {string} */
-function t(key) { return L[key]?.[lang] || L[key]?.en || key; }
+function t(key) { return L[key]?.[lang] ?? L[key]?.en ?? key; }
 
 // --- 状態 ---
 /** @type {number[]} */
@@ -155,7 +158,7 @@ function getSettings() {
 	return {
 		minIndex: parseInt(el.min.value, 10) || 2800,
 		maxIndex: parseInt(el.max.value, 10) || 3376,
-		magicianDifficulty: el.difficultyMagician.value,
+		magicianDifficulty: /** @type {MagicianDifficulty} */ (el.difficultyMagician.value),
 		fastKnight: el.difficultyKnight.value === 'false',
 		fastDragon: el.difficultyDragon.value === 'false',
 		allowDragonStar: el.allowDragonStar.checked,
@@ -329,13 +332,15 @@ function renderTimingTable(starIndices) {
 
 // --- メイン行動テーブル ---
 /**
- * @param {any} result manipulate()の結果
+ * @param {ActionTable} magician 魔法使い行動
+ * @param {ActionCombination} actionCombination 行動組み合わせ
+ * @param {Branch | null} branch 分岐情報
  * @param {Uint16Array} starIndices
  * @param {ReturnType<typeof getSettings>} settings
  * @param {boolean} showPowers コピーの元列を表示するか
  * @param {boolean} showFailPowers 操作ミス時のコピーの元も表示するか
  */
-function renderMainResultTable({ magician, actionCombination, branch }, starIndices, settings, showPowers, showFailPowers) {
+function renderMainResultTable(magician, actionCombination, branch, starIndices, settings, showPowers, showFailPowers) {
 	const hasBranch = branch !== null;
 
 	// 分岐がある場合、どの敵のターンで観測するか (simIndex)
@@ -343,10 +348,12 @@ function renderMainResultTable({ magician, actionCombination, branch }, starIndi
 	const branchSimIndex = hasBranch ? BranchTypes[/** @type {keyof typeof BranchTypes} */ (branch.type)].minSimLength - 1 : -1;
 
 	// 各候補乱数ごとのシミュレーションデータ（コピーの元表示時のみ計算）
-	/** @type {{ arrivalIndex: number, sim: any[] }[]} */
+	/** @type {{ arrivalIndex: number, sim: (BattleWindowsPowersResult & {startingIndex: number})[], dragonAction?: DragonAction }[]} */
 	let arrivalSims = [];
 	if (showPowers) {
 		arrivalSims = Array.from(starIndices).map(index => {
+			/** @type {DragonAction | undefined} */
+			let dragonAction;
 			let chosenActionCombination = actionCombination;
 			if (hasBranch) {
 				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.hammerThrow, settings.allowDragonStar);
@@ -355,23 +362,20 @@ function renderMainResultTable({ magician, actionCombination, branch }, starIndi
 					chosenActionCombination = branch.fallbackActionCombination;
 				}
 			}
-			let dragonAction = null;
 			/** @type {number[]} */
-			let powersIndices = [];
+			const powersIndices = [];
 			const rng = new KssRng(index).withProxy(({startingIndex, p, result}) => {
-				if (p === 'dragonActs') dragonAction = result;
+				if (p === 'dragonActs') dragonAction = /** @type {DragonAction} */ (result);
 				if (p === 'battleWindowsPowers') powersIndices.push(startingIndex);
 			});
-			// 動的プロパティ(startingIndex, dragonAction)を追加するため any[] にキャスト
-			const sim = /** @type {any[]} */ (rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar));
-			for (let i = 0; i < sim.length; i++) {
-				sim[i].startingIndex = powersIndices[i];
-			}
-			if (sim[3]) sim[3].dragonAction = dragonAction;
+			// simulateBattleWindowsMWW の戻り値は BattleWindowsPowersResult[] だが、
+			// startingIndex と dragonAction を後付けで追加するため SimEntry[] として扱う
+			const simRaw = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
+			const sim = simRaw.map((entry, i) => ({ ...entry, startingIndex: powersIndices[i] ?? 0 }));
 
 			return {
 				arrivalIndex: index - stars.length * StarDirectionAdvances,
-				sim
+				sim, dragonAction,
 			};
 		});
 	}
@@ -427,7 +431,7 @@ function renderMainResultTable({ magician, actionCombination, branch }, starIndi
 		for (const s of arrivalSims) {
 			const p = s.sim[i];
 			html += '<td>';
-			if (p) {
+			if (p !== undefined) {
 				html += `${powerImg(p.left)} ${powerImg(p.right)}`;
 
 				// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
@@ -440,7 +444,7 @@ function renderMainResultTable({ magician, actionCombination, branch }, starIndi
 
 				if (i === 3 && settings.allowDragonStar) {
 					// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-					const dragonImg = p.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
+					const dragonImg = s.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
 					html += ` <img src="${dragonImg}" style="height:1em;">`;
 				}
 			}
@@ -482,7 +486,7 @@ function displayResult() {
 	}
 
 	// manipulate は全候補を同時に考慮して1つの結果を返す
-	const manipulator = new BattleWindowsMWWManipulator(/** @type {any} */ (settings));
+	const manipulator = new BattleWindowsMWWManipulator(settings);
 	const result = manipulator.manipulate(stars);
 
 	if (result.magician === null) {
@@ -498,7 +502,7 @@ function displayResult() {
 	const showPowers = mode !== 'actionOnly';
 	const showFailPowers = mode === 'withFailPowers' || mode === 'withSimulation';
 
-	renderMainResultTable(/** @type {any} */ (result), starIndices, settings, showPowers, showFailPowers);
+	renderMainResultTable(result.magician, result.actionCombination, result.branch, starIndices, settings, showPowers, showFailPowers);
 
 	// シミュレーションモードかつ魔法使いがFastの場合のみタイミングテーブルを追加
 	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
@@ -536,10 +540,11 @@ async function runTest() {
 	// UIを実行中状態に
 	el.testRunBtn.disabled = true;
 	el.testRunBtn.textContent = '0%';
+	el.testResult.innerHTML = '';
 
-	// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
+// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
 	let time = performance.now();
-	const manipulator = new BattleWindowsMWWManipulator(/** @type {any} */ (settings));
+	const manipulator = new BattleWindowsMWWManipulator(settings);
 	for (const result of manipulator.testGenerator(starsCount)) {
 		if (result.count === result.total) {
 			renderTestResult(result, el.testResult); // 結果を表示
@@ -558,8 +563,9 @@ async function runTest() {
 	el.testRunBtn.textContent = t('testRun');
 }
 
-/** @param {any} result @param {HTMLElement} testResultEl */
+/** @param {ReturnType<BattleWindowsMWWManipulator['test']>} result @param {HTMLElement} testResultEl */
 function renderTestResult(result, testResultEl) {
+	if (result === undefined) return;
 	let html = '';
 
 	// 解決不能
@@ -665,7 +671,7 @@ el.testRunBtn.addEventListener('click', runTest);
 /** data-t属性を持つ全要素のテキストを現在の言語で更新 */
 function updateTranslations() {
 	document.querySelectorAll('[data-t]').forEach(elem => {
-		const key = /** @type {string} */ (elem.getAttribute('data-t'));
+		const key = /** @type {keyof typeof L} */ (elem.getAttribute('data-t'));
 		elem.textContent = t(key);
 	});
 }

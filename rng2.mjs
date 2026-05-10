@@ -393,6 +393,7 @@ export const FastMagicianList = [
 	{ lateAdvances: -2, frames: 4, name: "Fast3",     fast: true },
 	{ lateAdvances:  0, frames: 4, name: "Fast4",     fast: true },
 ];
+/** @typedef {keyof MagicianPrioritiesTable} MagicianDifficulty */
 /** 魔法使いでの行動の優先順位 @type {{ easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[] }} */
 const MagicianPrioritiesTable = {
 	easy: [
@@ -435,12 +436,16 @@ const MagicianPrioritiesTable = {
 	],
 };
 
+/**
+ * @typedef {{ type: keyof BranchTypes, value: string, fallbackActionCombination: ActionCombination }} Branch 分岐情報
+ * @typedef {{ magician: ActionTable | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
+ */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
 	/**
 	 * @param {Object} options
 	 * @param {ActionsDifficultyTable} [options.actionsDifficultyTable] 行動と難易度の定義テーブル
-	 * @param {keyof MagicianPrioritiesTable} [options.magicianDifficulty] 魔法使いの難易度
+	 * @param {MagicianDifficulty} [options.magicianDifficulty] 魔法使いの難易度
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
 	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃も成功として扱うか
@@ -495,7 +500,6 @@ export class BattleWindowsMWWManipulator {
 	/** 部分一致候補から分岐方式を適用して解を探す
 	 * @typedef {{ index: number, sim: BattleWindowsPowersResult[] }} SimResult シミュレーション結果
 	 * @typedef {{ actionCombination: ActionCombination, successes: SimResult[], fails: SimResult[] }} ActionAttempt ある行動パターンに対する全乱数位置のシミュレーション結果
- 	 * @typedef {{ type: keyof BranchTypes, value: string, fallbackActionCombination: ActionCombination }} Branch 分岐情報
 	 * @param {keyof BranchTypes} branchTypeName 分岐方式の名前
 	 * @param {ActionAttempt[]} bestAttempts 試行する行動パターンのリスト
 	 * @param {ActionTable} magician 魔法使いに対する行動
@@ -540,7 +544,6 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
-	 * @typedef {{ magician: ActionTable | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
 	 */
