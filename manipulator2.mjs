@@ -5,7 +5,7 @@ import {
 	BattleWindowsPowerNames, BattleWindowsPowerNone,
 	getLeftPower, getRightPower,
 	StarDirectionChars, StarDirectionAdvances,
-	findIndexesByStars, KssRng,
+	KssRng,
 	DragonGuard, DragonStar,
 	FastMagicianList,
 	RngCycle,
@@ -232,8 +232,8 @@ function formatIndex(index) {
 function msg(/** @type {ActionTable} */{ dashes, slides, hammerFlips, stars, lateAdvances, name }) {
 	const a = [];
 	if (lateAdvances !== undefined) {
-		if (slides) a.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 		if (lateAdvances <= 0) a.push(name);
+		else if (slides) a.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
 		if (dashes) a.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash')][dashes]);
 		if (stars) a.push([, t('actionStar'), t('action2Stars')][stars]);
@@ -269,8 +269,7 @@ preloadImages();
 // --- 到着乱数位置の表示 ---
 /** @param {RngIndex[]} starIndices 星消費後の乱数位置 */
 function renderRngIndices(starIndices) {
-	const starsAdvances = stars.length * StarDirectionAdvances;
-	const arrivalIndices = Array.from(starIndices).map(idx => idx - starsAdvances);
+	const arrivalIndices = Array.from(starIndices).map(idx => KssRng.getArrivalIndex(idx, stars.length));
 	el.status.innerHTML = t('rngIndex') + arrivalIndices.map(v => formatIndex(v)).join(', ');
 }
 
@@ -280,7 +279,7 @@ function renderTimingTable(starIndices) {
 	const starsAdvances = stars.length * StarDirectionAdvances;
 	let html = '';
 	for (const index of starIndices) {
-		const arrivalIndex = index - starsAdvances;
+		const arrivalIndex = KssRng.getArrivalIndex(index, stars.length);
 		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${formatIndex(arrivalIndex)}</b>`;
 		html += `<table class="test-table" style="font-size: 14px"><thead><tr>
 			<th>${t('thTiming')}</th>
@@ -410,7 +409,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			const sim = simRaw.map((entry, i) => ({ pair: entry, powersStartingIndex: powersIndices[i] ?? /** @type {RngIndex} */(0) }));
 
 			return {
-				arrivalIndex: /** @type {RngIndex} */(index - stars.length * StarDirectionAdvances),
+				arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
 				sim, dragonAction,
 			};
 		});
@@ -510,7 +509,7 @@ function displayResult() {
 	}
 
 	const settings = getSettings();
-	const starIndices = findIndexesByStars(stars, settings.minIndex, settings.maxIndex);
+	const starIndices = KssRng.findIndicesByStars(stars, settings.minIndex, settings.maxIndex);
 
 	if (starIndices.length === 0) {
 		el.status.innerHTML = t('notInRange');

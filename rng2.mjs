@@ -106,9 +106,7 @@ export class KssRng {
 	/** 乱数を指定の回数進める
 	 * @param {number} count */
 	advance(count) {
-		let next = this.index + count;
-		if (next >= CYCLE_LEN) next -= CYCLE_LEN;
-		this.index = /** @type {RngIndex} */ (next);
+		this.index = KssRng.calcIndex(this.index, count);
 	}
 
 	/** 着地時・壁や天井にぶつかった時に出る小さな星の出る方向 */
@@ -152,10 +150,12 @@ export class KssRng {
 	dragonAttacksFirst() {
 		return this.randi(4) === 3;
 	}
+	/** @return {ID<DragonAction>} */
 	dragonActs() {
 		return /**@type {ID<DragonAction>}*/(DragonActionMap[this.randi(10)]);
 	}
-	/** バトルウィンドウズのコピーの元の出現 */
+	/** バトルウィンドウズのコピーの元の出現
+	 * @returns {BattleWindowsPowersPair} */
 	battleWindowsPowers() {
 		//右の出現
 		let right;
@@ -289,25 +289,43 @@ export class KssRng {
 
 		return powers;
 	}
-}
 
-/**
- * 星の方向に一致する乱数位置を探索し、星を消費した後の乱数位置のリストを返す
- * @param {number[]} stars 観測された星の向きの配列
- * @param {number} minIndex 探索開始の乱数位置
- * @param {number} maxIndex 探索終了の乱数位置
- * @returns {RngIndex[]} 星消費後の乱数位置の配列
- */
-export function findIndexesByStars(stars, minIndex, maxIndex) {
-	/** @type {RngIndex[]} */
-	const indexList = [];
-	for (let i = minIndex; i <= maxIndex; i++) {
-		const r = new KssRng(i);
-		if (stars.every(v => r.starDirection() === v)) {
-			indexList.push(r.getIndex());
-		}
+	// --- ヘルパー関数 ---
+
+	/** 乱数位置に値を加算してからモジュロ計算する
+	 * @param {RngIndex} index 元の乱数位置
+	 * @param {number} append 乱数位置に加算する値
+	 * @returns {RngIndex} */
+	static calcIndex(index, append) {
+		return /**@type {RngIndex}*/(((index + append) % CYCLE_LEN + CYCLE_LEN) % CYCLE_LEN);
 	}
-	return indexList;
+
+	/** 星消費後の乱数位置から、消費前の乱数位置（到着位置）を逆算する
+	 * @param {RngIndex} index 星消費後の乱数位置
+	 * @param {number} starsCount 消費した星の数
+	 * @returns {RngIndex} */
+	static getArrivalIndex(index, starsCount) {
+		return this.calcIndex(index, -starsCount * StarDirectionAdvances);
+	}
+
+	/**
+	 * 星の方向に一致する乱数位置を探索し、星を消費した後の乱数位置のリストを返す
+	 * @param {number[]} stars 観測された星の向きの配列
+	 * @param {number} minIndex 探索開始の乱数位置
+	 * @param {number} maxIndex 探索終了の乱数位置
+	 * @returns {RngIndex[]} 星消費後の乱数位置の配列
+	 */
+	static findIndicesByStars(stars, minIndex, maxIndex) {
+		/** @type {RngIndex[]} */
+		const indices = [];
+		for (let i = minIndex; i <= maxIndex; i++) {
+			const r = new KssRng(i);
+			if (stars.every(v => r.starDirection() === v)) {
+				indices.push(r.getIndex());
+			}
+		}
+		return indices;
+	}
 }
 
 /** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonAction: ActionTable[] }} ActionsDifficultyTable */
@@ -533,10 +551,10 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulate(stars) {
 		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後の乱数位置が返る）
-		const indexList = findIndexesByStars(stars, this.minIndex, this.maxIndex);
+		const indices = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex);
 
 		// 魔法使いに先制されない行動を探す。なければ全行動を候補とする
-		const magicianFilteredList = this.magicianList.filter(magician => indexList.every(v => new KssRng(v).simulateMagician(magician)));
+		const magicianFilteredList = this.magicianList.filter(magician => indices.every(v => new KssRng(v).simulateMagician(magician)));
 		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianList;
 
 		/** @type {ManipulateResult} */
@@ -554,7 +572,7 @@ export class BattleWindowsMWWManipulator {
 				const successes = [];
 				const fails = [];
 
-				for (const index of indexList) {
+				for (const index of indices) {
 					const sim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, this.hammerThrow, this.allowDragonStar);
 					const result = { index, sim };
 
