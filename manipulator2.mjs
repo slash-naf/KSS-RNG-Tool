@@ -6,7 +6,7 @@ import {
 	getLeftPower, getRightPower,
 	StarDirectionChars, StarDirectionAdvances,
 	KssRng,
-	DragonGuard, DragonStar,
+	DragonActionNames, DragonGuard, DragonStar,
 	FastMagicianList,
 	RngCycle,
 	SIM_INDEX_MAGICIAN, SIM_INDEX_KNIGHT, SIM_INDEX_DRAGON, SIM_INDEX_DRAGON_TURN2,
@@ -24,6 +24,7 @@ import {
 /** @typedef {import('./rng2.mjs').MagicianDifficulty} MagicianDifficulty */
 /** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
 /** @typedef {import('./rng2.mjs').ActionCombination} ActionCombination */
+/** @typedef {import('./rng2.mjs').PowerName} PowerName */
 /** @typedef {import('./rng2.mjs').BattleWindowsPowersPair} BattleWindowsPowersPair */
 /** @typedef {import('./rng2.mjs').DragonAction} DragonAction */
 /** @typedef {import('./rng2.mjs').Branch} Branch */
@@ -204,17 +205,51 @@ function getSettings() {
 	};
 }
 
-// --- コピーの元の画像タグ ---
-/** @param {string} powerName */
-function powerImg(powerName) {
-	return `<img src="images/abilities/${powerName.toLowerCase()}.png" title="${powerName}">`;
+// --- 画像・アセット管理 ---
+const Assets = {
+	enemies: [
+		'images/magician.png',
+		'images/knight.png',
+		'images/dragon.png',
+		'images/dragonshield.png',
+	],
+	/**@type {Record<ID<DragonAction>, string>}*/
+	dragonActions: {[DragonGuard]: 'images/dragonshield.png', [DragonStar]: 'images/dragonstars.png'},
+	ability: (/** @type {PowerName} */ name) => `images/abilities/${name.toLowerCase()}.png`,
+};
+
+/**
+ * <img> タグを生成する
+ * @param {string} src
+ * @param {string} [title]
+ * @param {string} [style]
+ */
+function img(src, title = '', style = '') {
+	return `<img src="${src}"${title ? ` title="${title}"` : ''}${style ? ` style="${style}"` : ''}>`;
 }
-/** @param {BattleWindowsPowersPair} p */
-function formatPowers(p) {
+
+/**
+ * コピーの元の画像タグを取得
+ * @param {BattleWindowsPowersPair} p
+ * @param {string} [style] */
+function formatPowers(p, style = '') {
 	const left = BattleWindowsPowerNames[getLeftPower(p)];
 	const right = BattleWindowsPowerNames[getRightPower(p)];
-	return powerImg(left) + ' ' + powerImg(right);
+	return img(Assets.ability(left), left, style) + ' ' + img(Assets.ability(right), right, style);
 }
+
+/** 画像のプリロード */
+function preloadImages() {
+	[
+		...Object.values(Assets.enemies),
+		...Object.values(Assets.dragonActions),
+		...BattleWindowsPowerNames.map(Assets.ability),
+	].forEach(src => {
+		const imgObj = new Image();
+		imgObj.src = src;
+	});
+}
+preloadImages();
 
 // --- 乱数位置の整形 ---
 /** @param {number} index */
@@ -242,29 +277,6 @@ function msg(/** @type {ActionTable} */{ dashes, slides, hammerFlips, stars, lat
 	}
 	return a.length ? a.join(' & ') : t('actionWait');
 }
-
-// --- 敵の画像パス ---
-const EnemyImages = [
-	'images/magician.png',
-	'images/knight.png',
-	'images/dragon.png',
-	'images/dragonshield.png',
-];
-
-// --- 画像のプリロード ---
-// 初回表示時に一瞬遅れるのを防ぐために、事前に画像を読み込ませておく
-function preloadImages() {
-	EnemyImages.forEach(src => {
-		const img = new Image();
-		img.src = src;
-	});
-	new Image().src = 'images/dragonstars.png';
-	BattleWindowsPowerNames.forEach(name => {
-		const img = new Image();
-		img.src = `images/abilities/${name.toLowerCase()}.png`;
-	});
-}
-preloadImages();
 
 // --- 到着乱数位置の表示 ---
 /** @param {RngIndex[]} starIndices 星消費後の乱数位置 */
@@ -444,7 +456,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 		let html = '';
 
 		// 敵の画像
-		html += `<td class="enemy-cell"><img src="${EnemyImages[i]}"></td>`;
+		html += `<td class="enemy-cell">${img(Assets.enemies[i])}</td>`;
 
 		// メイン行動
 		html += `<td>${msg(mainActions[i])}</td>`;
@@ -482,8 +494,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 
 					if (i === 3 && settings.allowDragonStar) {
 						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-						const dragonImg = s.dragonAction === DragonGuard ? 'images/dragonshield.png' : 'images/dragonstars.png';
-						html += ` <img src="${dragonImg}" style="height:1em;">`;
+						if (s.dragonAction !== undefined) html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
 					}
 				}
 			}
@@ -649,7 +660,7 @@ function renderTestResult(result, testResultEl) {
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
 			html += `<td>${branchIndexToEnemy(g.simIndex)}</td>`;
-			html += `<td>${formatPowers(g.value)}</td>`;
+			html += `<td>${formatPowers(g.value, 'height:1em;')}</td>`;
 			html += `<td>${g.true.length > 0 ? g.true.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
 			html += `<td>${g.false.length > 0 ? g.false.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
 			html += '</tr>';
