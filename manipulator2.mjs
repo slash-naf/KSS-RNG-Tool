@@ -487,7 +487,8 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 					// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
 					if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
 						// 本来より1つ前のインデックスからコピーの元判定が始まる
-						const failRng = new KssRng(p.powersStartingIndex - 1);
+						const failRng = new KssRng(p.powersStartingIndex);
+						failRng.advance(-1);
 						const failPowers = failRng.battleWindowsPowers();
 						html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
 					}
