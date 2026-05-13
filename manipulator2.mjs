@@ -118,7 +118,7 @@ const L = {
 	defaultSettings: { en: 'Default Settings', ja: 'デフォルト設定' },
 	thTiming: { en: 'Timing', ja: 'タイミング' },
 	thSmoke: { en: 'Smoke', ja: '煙' },
-	thKirbyFirst: { en: 'Kirby 1st', ja: 'カービィ先制' },
+	thAttacksFirst: { en: '1st Attack', ja: '先制' },
 	thHardHitCheck: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
 	thPowersCheck: { en: 'Powers Check', ja: 'コピーの元判定' },
 	thHardHit: { en: 'Hard Hit', ja: 'ハードヒット' },
@@ -141,6 +141,10 @@ const L = {
 	enemyMagician: { en: 'Magician', ja: '魔法使い' },
 	enemyKnight: { en: 'Knight', ja: '悪魔の騎士' },
 	enemyDragon: { en: 'Dragon', ja: 'レッドドラゴン' },
+	enemyDragonTurn2: { en: 'Dragon Turn 2', ja: 'レッドドラゴン2ターン目' },
+	logAction: { en: 'Action', ja: '行動' },
+	logAttacksFirst: { en: '1st Attack', ja: '先制' },
+	logHardHit: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
 };
 
 /** @type {LangKey} */
@@ -278,6 +282,11 @@ function msg(/** @type {ActionTable} */{ dashes, slides, hammerFlips, stars, lat
 	return a.length ? a.join(' & ') : t('actionWait');
 }
 
+/** @param {boolean} b  */
+function boolMsg(b) {
+	return b ? '✅' : '❌';
+}
+
 // --- 到着乱数位置の表示 ---
 /** @param {RngIndex[]} starIndices 星消費後の乱数位置 */
 function renderRngIndices(starIndices) {
@@ -297,7 +306,7 @@ function renderTimingTable(starIndices) {
 			<th>${t('thTiming')}</th>
 			<th>${t('thStars')}<br>(+${starsAdvances})</th>
 			<th>${t('thSmoke')}</th>
-			<th>${t('thKirbyFirst')}<br>(+1)</th>
+			<th>${t('thAttacksFirst')}<br>(+1)</th>
 			<th>${t('thSmoke')}</th>
 			<th><span style="font-size: 8px">${t('thHardHitCheck')}</span><br>(+1)</th>
 			<th>${t('thPowersCheck')}</th>
@@ -306,8 +315,6 @@ function renderTimingTable(starIndices) {
 			<th>${t('thSmoke')}<br>(+2)</th>
 		</tr></thead><tbody>`;
 
-		/** @type {Record<string, string>} */
-		const s = { true: '<b style="color: green">✓</b>', false: '<b style="color: red">✕</b>'};
 		const timings = FastMagicianList.map(v => {
 			const row = /** @type {{ name: string|undefined, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {pair:BattleWindowsPowersPair, powersStartingIndex:RngIndex, powersEndingIndex:RngIndex}|null, endingIndex: number|null }} */ ({ name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null });
 			let lastIndex = index;
@@ -344,7 +351,7 @@ function renderTimingTable(starIndices) {
 				<td>${row.name ?? '-'}</td>
 				<td>${formatIndex(index)}</td>
 				<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
-				<td>${row.magicianAttacksFirstEndingIndex !== null ? formatIndex(row.magicianAttacksFirstEndingIndex) : '-'}<br>(${s[String(!row.magicianAttacksFirst)]})</td>
+				<td>${boolMsg(!row.magicianAttacksFirst)}${row.magicianAttacksFirstEndingIndex !== null ? formatIndex(row.magicianAttacksFirstEndingIndex) : '-'}</td>
 				<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
 
 			if (i === 0 || i === 2) {
@@ -354,8 +361,8 @@ function renderTimingTable(starIndices) {
 				const span = groupEnd - i;
 
 				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
-				const hh1 = v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
-				const hh2 = !v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${formatIndex(rep.hardHitCheckEndingIndex)}<br>(${s[String(rep.hardHitCheck)]})` : '-';
+				const hh1 = v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
+				const hh2 = !v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
 				const powersStr = rep && rep.powers
 					? `+${rep.powers.powersEndingIndex - rep.powers.powersStartingIndex}<br>${formatIndex(rep.powers.powersEndingIndex)}<br>${formatPowers(rep.powers.pair)}`
 					: '-';
@@ -398,7 +405,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 	const branchSimIndex = hasBranch ? branch.simIndex : -1;
 
 	// 各候補乱数ごとのシミュレーションデータ（詳細表示時のみ計算）
-	/** @type {{ arrivalIndex: RngIndex, sim: {pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex}[], dragonAction?: ID<DragonAction> }[]} */
+	/** @type {{ arrivalIndex: RngIndex, sim: {pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string}[], dragonAction?: ID<DragonAction> }[]} */
 	let arrivalSims = [];
 	if (showPowers || showTransitions) {
 		arrivalSims = Array.from(starIndices).map(index => {
@@ -413,12 +420,50 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			}
 			/** @type {RngIndex[]} */
 			const powersIndices = [];
-			const rng = new KssRng(index).withProxy(({startingIndex, p, result}) => {
-				if (p === 'dragonActs') dragonAction = /** @type {ID<DragonAction>} */ (result);
-				if (p === 'battleWindowsPowers') powersIndices.push(startingIndex);
+			/** @type {string[]} */
+			const logs = [];
+			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
+				switch (p) {
+					case 'takeAction': {
+						/** @type {ActionTable} */
+						const a = args[0];
+						logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+						break;
+					}
+					case 'magicianAttacksFirst':
+					case 'knightAttacksFirst':
+					case 'dragonAttacksFirst': {
+						/** @type {boolean} */
+						const a = !result;
+						logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
+						break;
+					}
+					case 'checkHammerHardHit': {
+						/** @type {boolean} */
+						const a = result;
+						logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
+						break;
+					}
+					case 'battleWindowsPowers': {
+						/** @type {BattleWindowsPowersPair} */
+						const a = result;
+						logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
+
+						powersIndices.push(startingIndex);
+						break;
+					}
+					case 'dragonActs': {
+						/** @type {ID<DragonAction>} */
+						const a = result;
+						logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
+
+						dragonAction = a;
+						break;
+					}
+				}
 			});
 			const simRaw = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
-			const sim = simRaw.map((entry, i) => ({ pair: entry, powersStartingIndex: powersIndices[i] ?? /** @type {RngIndex} */(0) }));
+			const sim = simRaw.map((entry, i) => ({ pair: entry, powersStartingIndex: powersIndices[i] ?? /** @type {RngIndex} */(0), log: logs[i] ?? '' }));
 
 			return {
 				arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
@@ -480,7 +525,10 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			html += '<td>';
 			if (p !== undefined) {
 				if (showTransitions) {
-					// todo: 乱数位置の推移
+					// 乱数位置の推移
+					html += '<span style="font-size: 12px;">';
+					html += p.log;
+					html += '</span>';
 				} else if (showPowers) {
 					html += formatPowers(p.pair);
 
@@ -571,6 +619,7 @@ function branchIndexToEnemy(simIndex) {
 		t('enemyMagician'),
 		t('enemyKnight'),
 		t('enemyDragon'),
+		t('enemyDragonTurn2'),
 	][simIndex] ?? String(simIndex);
 }
 
