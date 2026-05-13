@@ -656,9 +656,9 @@ export class BattleWindowsMWWManipulator {
 			branchCount: 0,          // 分岐が発生した回数
 			totalBranchMatch: 0,     // 分岐が一致した回数（フォールバック行動を使用）
 			totalBranchNoMatch: 0,   // 分岐が不一致だった回数（通常行動を使用）
-			/** @type {Map<string, {true: number[], false: number[], simIndex: SimIndex, value: BattleWindowsPowersPair}>} */
+			/** @type {Map<string, {true: number[], false: RngIndex[], simIndex: SimIndex, value: BattleWindowsPowersPair}>} */
 			branchGroups: new Map(),        // 分岐の種類・値ごとにグループ化した乱数位置の一覧
-			/** @type {Map<string, {success: number[], fails: number[][], hasFail: boolean}>} */
+			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} */
 			simulationGroups: new Map(),    // 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧
 			/** @type {Map<ActionTable, number>} */
 			magicianCountList: new Map(),   // 魔法使いの行動ごとの使用回数
@@ -686,9 +686,12 @@ export class BattleWindowsMWWManipulator {
 			}
 			const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
 
+			// 既に同じ星のパターンの結果がないか確認
+			let simGroup = result.simulationGroups.get(starStr);
+
 			// 乱数調整の行動探索（処理時間を計測）
 			const t0 = performance.now();
-			let { magician, actionCombination, branch } = this.manipulate(starDirectionList);
+			const manipulateResult = simGroup ? simGroup.manipulateResult : this.manipulate(starDirectionList);
 			const elapsed = performance.now() - t0;
 
 			// 計算時間の記録
@@ -697,6 +700,7 @@ export class BattleWindowsMWWManipulator {
 			if (elapsed > result.worstTime) result.worstTime = elapsed;
 
 			// 解決不能の場合でもシミュレーションは継続（デフォルト行動で代替）
+			let { magician, actionCombination, branch } = manipulateResult;
 			if (magician === null) result.magicianNGCount++;
 			else if (actionCombination === null) result.otherNGCount++;
 			magician ??= this.magicianList[0];
@@ -731,12 +735,12 @@ export class BattleWindowsMWWManipulator {
 			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.hammerThrow, this.allowDragonStar);
 
 			// 星パターンごとにグループを作成（初回のみ）
-			let simGroup = result.simulationGroups.get(starStr);
 			if (!simGroup) {
 				simGroup = {
 					success: [],
 					fails: [[], [], [], []],
 					hasFail: false,
+					manipulateResult,
 				};
 				result.simulationGroups.set(starStr, simGroup);
 			}
