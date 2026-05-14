@@ -160,9 +160,11 @@ details summary {
 	<br>
 
 	<label id="label-hammer-throw" data-t="hammerThrow">Hammer throw dash advances:</label>
-	<input type="radio" name="hammer-throw" value="0"><label>0</label>
-	<input type="radio" name="hammer-throw" value="1" checked><label>1</label>
-	<input type="radio" name="hammer-throw" value="2"><label>2</label>
+	<select id="hammer-throw">
+		<option value="0">0</option>
+		<option value="1" selected>1</option>
+		<option value="2">2</option>
+	</select>
 	<br>
 
 	<details>
@@ -194,7 +196,14 @@ details summary {
 					<option value="split" data-t="indexDisplayModeSplit">With Split RNG Value</option>
 				</select>
 			</div>
-			<button id="btn-default-settings" data-t="defaultSettings" style="margin-top:4px">Default Settings</button>
+			<div>
+				<label id="label-preset" data-t="preset">Preset:</label>
+				<select id="preset">
+					<option value="easiest" data-t="presetEasiest">Easiest</option>
+					<option value="fastest" data-t="presetFastest">Fastest</option>
+					<option value="custom" data-t="presetCustom" selected>Custom</option>
+				</select>
+			</div>
 		</div>
 	</details>
 

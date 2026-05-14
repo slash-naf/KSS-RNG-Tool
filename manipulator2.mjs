@@ -18,6 +18,7 @@ import {
 // --- 型定義 ---
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {'en' | 'ja'} LangKey */
+/** @typedef {'easiest' | 'fastest' | 'custom'} PresetMode */
 /** @typedef {'withIndex' | 'actionOnly' | 'withSimulation'} DisplayMode */
 /** @typedef {'none' | 'withPowers' | 'withFailPowers' | 'withTransitions'} DetailMode */
 /** @typedef {'indexOnly' | 'hex' | 'split'} IndexDisplayMode */
@@ -43,6 +44,7 @@ const NoNumpadMap = /** @type {Record<string, number>} */ ({ 'w': 8, 'e': 9, 'd'
 
 /** 設定のデフォルト値 */
 const DEFAULT_SETTINGS = {
+	preset: /** @type {PresetMode} */ ('custom'),
 	lang: /** @type {LangKey} */ ('en'),
 	min: '2800',
 	max: '3376',
@@ -57,9 +59,29 @@ const DEFAULT_SETTINGS = {
 	allowDragonStar: false,
 };
 
+let customState = {
+	min: DEFAULT_SETTINGS.min,
+	max: DEFAULT_SETTINGS.max,
+	magician: DEFAULT_SETTINGS.magician,
+	knight: DEFAULT_SETTINGS.knight,
+	dragon: DEFAULT_SETTINGS.dragon,
+	allowDragonStar: DEFAULT_SETTINGS.allowDragonStar,
+	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
+};
+
+/** @type {Record<Exclude<PresetMode, 'custom'>, typeof customState>} */
+const PRESETS = {
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '2' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1' },
+};
+
 // --- 多言語テキスト ---
 const L = {
 	langLabel: { en: 'Language:', ja: '言語:' },
+	preset: { en: 'Preset:', ja: 'プリセット:' },
+	presetEasiest: { en: 'Easiest', ja: 'Easiest' },
+	presetFastest: { en: 'Fastest', ja: 'Fastest' },
+	presetCustom: { en: 'Custom', ja: 'Custom' },
 	magician: { en: 'Magician:', ja: '魔法使い:' },
 	knight: { en: 'Knight:', ja: '悪魔の騎士:' },
 	dragon: { en: 'Dragon:', ja: 'レッドドラゴン:' },
@@ -115,7 +137,6 @@ const L = {
 	knightActions: { en: 'Knight', ja: '悪魔の騎士' },
 	dragonActions: { en: 'Dragon', ja: 'レッドドラゴン' },
 	dragonTurn2Actions: { en: 'Dragon Turn 2', ja: 'レッドドラゴン2ターン目' },
-	defaultSettings: { en: 'Default Settings', ja: 'デフォルト設定' },
 	thTiming: { en: 'Timing', ja: 'タイミング' },
 	thSmoke: { en: 'Smoke', ja: '煙' },
 	thAttacksFirst: { en: '1st Attack', ja: '先制' },
@@ -175,10 +196,11 @@ const el = {
 	indexDisplayMode: /** @type {HTMLSelectElement} */ (document.getElementById('index-display-mode')),
 	noNumpad: /** @type {HTMLInputElement} */ (document.getElementById('no-numpad')),
 	lang: /** @type {HTMLSelectElement} */ (document.getElementById('lang')),
+	preset: /** @type {HTMLSelectElement} */ (document.getElementById('preset')),
 	testResult: /** @type {HTMLElement} */ (document.getElementById('test-result')),
 	testRunBtn: /** @type {HTMLButtonElement} */ (document.getElementById('test-run-btn')),
 	testStars: /** @type {HTMLInputElement} */ (document.getElementById('test-stars')),
-	btnDefaultSettings: /** @type {HTMLButtonElement} */ (document.getElementById('btn-default-settings')),
+	hammerThrow: /** @type {HTMLSelectElement} */ (document.getElementById('hammer-throw')),
 	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area')),
 };
 
@@ -202,7 +224,7 @@ function getSettings() {
 		fastKnight: el.difficultyKnight.value === 'fast',
 		fastDragon: el.difficultyDragon.value === 'fast',
 		allowDragonStar: el.allowDragonStar.checked,
-		hammerThrow: parseInt(/** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value, 10),
+		hammerThrow: parseInt(el.hammerThrow.value, 10),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
@@ -807,44 +829,101 @@ window.addEventListener('keydown', (event) => {
 	}
 }, true);
 
-// --- 設定とローカルストレージ ---
+// --- プリセット処理 ---
+/** プリセットによって上書き・ロックの対象となる設定項目とUI要素の対応定義 */
+const presetTargetElements = {
+	min: el.min,
+	max: el.max,
+	magician: el.difficultyMagician,
+	knight: el.difficultyKnight,
+	dragon: el.difficultyDragon,
+	allowDragonStar: el.allowDragonStar,
+	hammerThrow: el.hammerThrow,
+};
+
+/** プリセットに応じてUI項目の編集可否を切り替える
+ * @param {boolean} locked */
+function setPresetLockedState(locked) {
+	for (const element of Object.values(presetTargetElements)) {
+		element.disabled = locked;
+	}
+}
+
+/** ロック対象となっているUI項目から現在の設定値を取得する
+ * @returns {typeof customState} */
+function getLockedFieldsFromUI() {
+	const state = /** @type {any} */ ({});
+	for (const [key, element] of Object.entries(presetTargetElements)) {
+		state[key] = element.type === 'checkbox' ? /** @type {HTMLInputElement} */(element).checked : element.value;
+	}
+	return state;
+}
+
+/** ロック対象となっているUI項目に指定された設定値を反映する
+ * @param {typeof customState} config */
+function setLockedFieldsToUI(config) {
+	for (const [key, element] of Object.entries(presetTargetElements)) {
+		const value = config[/** @type {keyof typeof presetTargetElements} */ (key)];
+		if (element.type === 'checkbox') /** @type {HTMLInputElement} */(element).checked = /** @type {boolean} */(value);
+		else element.value = /** @type {string} */(value);
+	}
+}
+
+/** プリセットの選択状態に合わせてUIの表示と編集ロック状態を更新する */
+function applyPresetUI() {
+	const p = /** @type {PresetMode} */ (el.preset.value);
+	// Easiest/Fastestなら固定値を、Customなら保存されている独自設定を反映
+	setLockedFieldsToUI(p === 'custom' ? customState : PRESETS[p]);
+	// Custom以外は編集できないようにロック
+	setPresetLockedState(p !== 'custom');
+}
+
+/** 現在のUI状態をLocalStorageに保存する */
 function saveSettings() {
+	const p = /** @type {PresetMode} */ (el.preset.value);
+
+	// Customモード時のみ、現在のUIの値を独自設定スロット（customState）に記録する
+	if (p === 'custom') {
+		customState = getLockedFieldsFromUI();
+	}
+
 	const settings = {
 		lang: el.lang.value,
-		min: el.min.value,
-		max: el.max.value,
-		magician: el.difficultyMagician.value,
-		knight: el.difficultyKnight.value,
-		dragon: el.difficultyDragon.value,
-		hammerThrow: /** @type {HTMLInputElement} */ (document.querySelector('input[name="hammer-throw"]:checked')).value,
+		preset: p,
+		...customState, // ロック対象の設定は、Customの時のみUIから取得し、それ以外はcustomStateを維持する
+
 		noNumpad: el.noNumpad.checked,
 		displayMode: el.displayMode.value,
 		detailMode: el.detailMode.value,
 		indexDisplayMode: el.indexDisplayMode.value,
-		allowDragonStar: el.allowDragonStar.checked,
 	};
 	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
 }
 
+/** LocalStorageから設定を読み込み、UIに反映する
+ * @returns {boolean} 読み込みに成功したか */
 function loadSettings() {
 	try {
 		const stored = localStorage.getItem('kss-rng-manipulator2');
 		if (stored) {
 			const s = JSON.parse(stored);
 			if (s.lang) { el.lang.value = s.lang; lang = /** @type {LangKey} */ (s.lang); }
-			if (s.min) el.min.value = s.min;
-			if (s.max) el.max.value = s.max;
-			if (s.magician) el.difficultyMagician.value = s.magician;
+			if (s.preset) el.preset.value = s.preset;
+			
+			// --- Customスロットの値を復元 ---
+			if (s.min) customState.min = s.min;
+			if (s.max) customState.max = s.max;
+			if (s.magician) customState.magician = s.magician;
 
 			// "true" → "easy"、"false" → "fast" へのマイグレーション
 			const migrateDifficulty = (/**@type {string}*/s) => ({'true': 'easy', 'false': 'fast'}[s] ?? s);
-			if (s.knight) el.difficultyKnight.value = migrateDifficulty(s.knight);
-			if (s.dragon) el.difficultyDragon.value = migrateDifficulty(s.dragon);
+			if (s.knight) customState.knight = migrateDifficulty(s.knight);
+			if (s.dragon) customState.dragon = migrateDifficulty(s.dragon);
 
-			if (s.hammerThrow) {
-				const rb = /** @type {HTMLInputElement | null} */ (document.querySelector(`input[name="hammer-throw"][value="${s.hammerThrow}"]`));
-				if (rb) rb.checked = true;
-			}
+			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
+			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
+
+			// --- 他の値を復元 ---
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
 
 			// showArrival → displayMode へのマイグレーション
@@ -856,33 +935,19 @@ function loadSettings() {
 			if (s.detailMode) el.detailMode.value = s.detailMode;
 
 			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
-			if (s.allowDragonStar !== undefined) el.allowDragonStar.checked = s.allowDragonStar;
+			
+			applyPresetUI();
 			return true;
 		}
 	} catch(e) { /* localStorage が使えない場合は無視 */ }
 	return false;
 }
 
-function restoreDefaultSettings() {
-	el.min.value = DEFAULT_SETTINGS.min;
-	el.max.value = DEFAULT_SETTINGS.max;
-	el.difficultyMagician.value = DEFAULT_SETTINGS.magician;
-	el.difficultyKnight.value = DEFAULT_SETTINGS.knight;
-	el.difficultyDragon.value = DEFAULT_SETTINGS.dragon;
-	/** @type {HTMLInputElement} */ (document.querySelector(`input[name="hammer-throw"][value="${DEFAULT_SETTINGS.hammerThrow}"]`)).checked = true;
-	el.noNumpad.checked = DEFAULT_SETTINGS.noNumpad;
-	el.displayMode.value = DEFAULT_SETTINGS.displayMode;
-	el.detailMode.value = DEFAULT_SETTINGS.detailMode;
-	el.indexDisplayMode.value = DEFAULT_SETTINGS.indexDisplayMode;
-	el.allowDragonStar.checked = DEFAULT_SETTINGS.allowDragonStar;
-	saveSettings();
-	displayResult();
-}
-
-el.btnDefaultSettings.addEventListener('click', restoreDefaultSettings);
-
 el.settingsArea.addEventListener('change', (e) => {
 	const target = /** @type {HTMLElement} */ (e.target);
+	if (target.id === 'preset') {
+		applyPresetUI();
+	}
 	saveSettings();
 	if (target.id === 'lang') {
 		switchLang(/** @type {HTMLSelectElement} */ (target).value);
