@@ -1,21 +1,20 @@
 // @ts-check
 
+//　--- インポート・型定義 ---
+
 import {
 	BattleWindowsMWWManipulator,
-	BattleWindowsPowerNames, BattleWindowsPowerNone,
+	BattleWindowsPowerNames,
 	getLeftPower, getRightPower,
 	StarDirectionChars, StarDirectionAdvances,
 	KssRng,
 	DragonActionNames, DragonGuard, DragonStar,
 	FastMagicianList,
 	RngCycle,
-	SIM_INDEX_MAGICIAN, SIM_INDEX_KNIGHT, SIM_INDEX_DRAGON, SIM_INDEX_DRAGON_TURN2,
 } from './rng2.mjs';
 
 /** @typedef {import('./rng2.mjs').RngIndex} RngIndex */
 /** @typedef {import('./rng2.mjs').SimIndex} SimIndex */
-
-// --- 型定義 ---
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {'en' | 'ja'} LangKey */
 /** @typedef {'easiest' | 'fastest' | 'custom'} PresetMode */
@@ -30,22 +29,49 @@ import {
 /** @typedef {import('./rng2.mjs').DragonAction} DragonAction */
 /** @typedef {import('./rng2.mjs').Branch} Branch */
 /** @typedef {import('./rng2.mjs').ManipulateResult} ManipulateResult */
+/** @typedef {'easy' | 'fast'} DifficultyMode */
 
-// --- 定数 ---
+/** 
+ * ユーザー独自のカスタム設定
+ * @typedef {{
+ *   min: string,
+ *   max: string,
+ *   magician: MagicianDifficulty,
+ *   knight: DifficultyMode,
+ *   dragon: DifficultyMode,
+ *   allowDragonStar: boolean,
+ *   hammerThrow: string
+ * }} CustomState
+ */
 
-/** 結果表示に必要な最小星入力数 */
+/**
+ * 保存される設定の全体像
+ * @typedef {CustomState & {
+ *   lang: LangKey,
+ *   preset: PresetMode,
+ *   noNumpad: boolean,
+ *   displayMode: DisplayMode,
+ *   detailMode: DetailMode,
+ *   indexDisplayMode: IndexDisplayMode
+ * }} SavedSettings
+ */
+
+//　--- 定数・初期状態 ---
+
+/** 結果表示を開始するために必要な最小の星入力数 */
 const MIN_STARS_FOR_RESULT = 3;
 
-/** テンキー→星の方向の変換 */
+/** テンキーの数値（1-9）から星の方向インデックス（0-7）への変換マップ */
 const NumpadToStarIndex = /** @type {Record<number, number>} */ ({ 8: 0, 9: 1, 6: 2, 3: 3, 2: 4, 1: 5, 4: 6, 7: 7 });
 
-/** テンキーなしモード時のキーマッピング */
+/** テンキーなしのキーマッピング */
 const NoNumpadMap = /** @type {Record<string, number>} */ ({ 'w': 8, 'e': 9, 'd': 6, 'c': 3, 'x': 2, 'z': 1, 'a': 4, 'q': 7 });
 
-/** 設定のデフォルト値 */
+/** アプリケーションのデフォルト設定値 */
+/** @type {SavedSettings} */
 const DEFAULT_SETTINGS = {
-	preset: /** @type {PresetMode} */ ('custom'),
-	lang: /** @type {LangKey} */ ('en'),
+	preset: 'custom',
+	lang: 'en',
 	min: '2800',
 	max: '3376',
 	magician: 'easy',
@@ -53,12 +79,14 @@ const DEFAULT_SETTINGS = {
 	dragon: 'easy',
 	hammerThrow: '1',
 	noNumpad: false,
-	displayMode: /** @type {DisplayMode} */ ('actionOnly'),
-	detailMode: /** @type {DetailMode} */ ('none'),
-	indexDisplayMode: /** @type {IndexDisplayMode} */ ('indexOnly'),
+	displayMode: 'actionOnly',
+	detailMode: 'none',
+	indexDisplayMode: 'indexOnly',
 	allowDragonStar: false,
 };
 
+/** ユーザーが「Custom」モードで編集・維持する独自設定のスロット */
+/** @type {CustomState} */
 let customState = {
 	min: DEFAULT_SETTINGS.min,
 	max: DEFAULT_SETTINGS.max,
@@ -69,13 +97,30 @@ let customState = {
 	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
 };
 
-/** @type {Record<Exclude<PresetMode, 'custom'>, typeof customState>} */
+/** 各プリセットモードに対応する固定設定値 */
+/** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
 	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '2' },
 	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1' },
 };
 
+/** 画像アセットのパス定義 */
+const Assets = {
+	enemies: [
+		'images/magician.png',
+		'images/knight.png',
+		'images/dragon.png',
+		'images/dragonshield.png',
+	],
+	/** @type {Record<ID<DragonAction>, string>} */
+	dragonActions: { [DragonGuard]: 'images/dragonshield.png', [DragonStar]: 'images/dragonstars.png' },
+	/** @param {PowerName} name */
+	ability: (name) => `images/abilities/${name.toLowerCase()}.png`,
+};
+
 // --- 多言語テキスト ---
+
+/** 言語リソース辞書 */
 const L = {
 	langLabel: { en: 'Language:', ja: '言語:' },
 	preset: { en: 'Preset:', ja: 'プリセット:' },
@@ -168,54 +213,93 @@ const L = {
 	logHardHit: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
 };
 
+/** 現在選択されている言語コード */
 /** @type {LangKey} */
 let lang = /** @type {LangKey} */ (navigator.language?.startsWith('ja') ? 'ja' : 'en');
 
-/** 多言語テキストの取得
- * @param {keyof typeof L} key
- * @returns {string} */
-function t(key) { return L[key]?.[lang] ?? L[key]?.en ?? key; }
+/** 指定されたキーに対応する翻訳テキストを取得する */
+function t(/** @type {keyof typeof L} */ key) {
+	return L[key]?.[lang] ?? L[key]?.en ?? key;
+}
 
-// --- 状態 ---
-/** @type {number[]} */
-let stars = [];
+/** data-t属性を持つ全要素のテキストを現在の言語で更新する */
+function updateTranslations() {
+	document.querySelectorAll('[data-t]').forEach(elem => {
+		const key = /** @type {keyof typeof L} */ (elem.getAttribute('data-t'));
+		elem.textContent = t(key);
+	});
+}
 
-// --- DOM要素 ---
-const el = {
-	starBoxes: /** @type {HTMLElement} */ (document.getElementById('star-boxes')),
-	status: /** @type {HTMLElement} */ (document.getElementById('status-message')),
-	result: /** @type {HTMLElement} */ (document.getElementById('result-area')),
-	min: /** @type {HTMLInputElement} */ (document.getElementById('min')),
-	max: /** @type {HTMLInputElement} */ (document.getElementById('max')),
-	difficultyMagician: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-magician')),
-	difficultyKnight: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-knight')),
-	difficultyDragon: /** @type {HTMLSelectElement} */ (document.getElementById('difficulty-dragon')),
-	allowDragonStar: /** @type {HTMLInputElement} */ (document.getElementById('allow-dragon-star')),
-	displayMode: /** @type {HTMLSelectElement} */ (document.getElementById('display-mode')),
-	detailMode: /** @type {HTMLSelectElement} */ (document.getElementById('detail-mode')),
-	indexDisplayMode: /** @type {HTMLSelectElement} */ (document.getElementById('index-display-mode')),
-	noNumpad: /** @type {HTMLInputElement} */ (document.getElementById('no-numpad')),
-	lang: /** @type {HTMLSelectElement} */ (document.getElementById('lang')),
-	preset: /** @type {HTMLSelectElement} */ (document.getElementById('preset')),
-	testResult: /** @type {HTMLElement} */ (document.getElementById('test-result')),
-	testRunBtn: /** @type {HTMLButtonElement} */ (document.getElementById('test-run-btn')),
-	testStars: /** @type {HTMLInputElement} */ (document.getElementById('test-stars')),
-	hammerThrow: /** @type {HTMLSelectElement} */ (document.getElementById('hammer-throw')),
-	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area')),
-};
-
-// --- 星ボックスの描画 ---
-function renderStarBoxes() {
-	el.starBoxes.innerHTML = '';
-	for (let i = 0; i < 6; i++) {
-		const box = document.createElement('span');
-		box.className = 'star-box' + (i < stars.length ? ' filled' : '');
-		box.textContent = i < stars.length ? StarDirectionChars[stars[i]] : String(i + 1);
-		el.starBoxes.appendChild(box);
+/** 言語を切り替えてUIを再描画する
+ * @param {string} val */
+function switchLang(val) {
+	lang = /** @type {LangKey} */ (val);
+	updateTranslations();
+	if (stars.length < MIN_STARS_FOR_RESULT) {
+		el.status.innerHTML = t('pressToStart');
+	} else {
+		displayResult();
 	}
 }
 
-// --- 設定値の取得 ---
+// --- アプリケーション状態・DOM要素 ---
+
+/** ユーザーが入力した星の方向履歴（0〜7の数値配列） */
+/** @type {number[]} */
+let stars = [];
+
+/**
+ * DOM要素を取得し型を検証する（失敗時は例外を投げる）
+ * @template {HTMLElement} T
+ * @param {string} id
+ * @param {new () => T} type
+ * @returns {T}
+ */
+const $ = (id, type) => {
+	const e = document.getElementById(id);
+	if (!(e instanceof type)) throw new Error(id);
+	return e;
+};
+
+/** HTML内の各DOM要素への参照まとめ */
+const el = {
+	starBoxes: $('star-boxes', HTMLElement),
+	status: $('status-message', HTMLElement),
+	result: $('result-area', HTMLElement),
+	min: $('min', HTMLInputElement),
+	max: $('max', HTMLInputElement),
+	difficultyMagician: $('difficulty-magician', HTMLSelectElement),
+	difficultyKnight: $('difficulty-knight', HTMLSelectElement),
+	difficultyDragon: $('difficulty-dragon', HTMLSelectElement),
+	allowDragonStar: $('allow-dragon-star', HTMLInputElement),
+	displayMode: $('display-mode', HTMLSelectElement),
+	detailMode: $('detail-mode', HTMLSelectElement),
+	indexDisplayMode: $('index-display-mode', HTMLSelectElement),
+	noNumpad: $('no-numpad', HTMLInputElement),
+	lang: $('lang', HTMLSelectElement),
+	preset: $('preset', HTMLSelectElement),
+	testResult: $('test-result', HTMLElement),
+	testRunBtn: $('test-run-btn', HTMLButtonElement),
+	testStars: $('test-stars', HTMLInputElement),
+	hammerThrow: $('hammer-throw', HTMLSelectElement),
+	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') || document.body),
+};
+
+/** プリセットによって上書き・ロックの対象となるUI要素のマップ */
+/** @type {Record<keyof CustomState, HTMLInputElement | HTMLSelectElement>} */
+const presetTargetElements = {
+	min: el.min,
+	max: el.max,
+	magician: el.difficultyMagician,
+	knight: el.difficultyKnight,
+	dragon: el.difficultyDragon,
+	allowDragonStar: el.allowDragonStar,
+	hammerThrow: el.hammerThrow,
+};
+
+// --- 設定・ストレージ管理 ---
+
+/** 現在のUI項目からシミュレーターに渡すための設定オブジェクトを生成する */
 function getSettings() {
 	return {
 		minIndex: parseInt(el.min.value, 10) || 2800,
@@ -231,31 +315,126 @@ function getSettings() {
 	};
 }
 
-// --- 画像・アセット管理 ---
-const Assets = {
-	enemies: [
-		'images/magician.png',
-		'images/knight.png',
-		'images/dragon.png',
-		'images/dragonshield.png',
-	],
-	/**@type {Record<ID<DragonAction>, string>}*/
-	dragonActions: {[DragonGuard]: 'images/dragonshield.png', [DragonStar]: 'images/dragonstars.png'},
-	ability: (/** @type {PowerName} */ name) => `images/abilities/${name.toLowerCase()}.png`,
-};
+/** プリセットに応じてUI項目の編集可否を切り替える
+ * @param {boolean} locked */
+function setPresetLockedState(locked) {
+	for (const element of Object.values(presetTargetElements)) {
+		element.disabled = locked;
+	}
+}
 
-/**
- * <img> タグを生成する
- * @param {string} src
- * @param {string} [title]
- * @param {string} [style]
- */
+/** ロック対象となっているUI項目から現在の設定値を一括取得する
+ * @returns {CustomState} */
+function getLockedFieldsFromUI() {
+	const state = /** @type {any} */ ({});
+	for (const [key, element] of Object.entries(presetTargetElements)) {
+		state[key] = element.type === 'checkbox' ? element.checked : element.value;
+	}
+	return state;
+}
+
+/** 指定された設定値をUI項目に一括反映する
+ * @param {CustomState} config */
+function setLockedFieldsToUI(config) {
+	for (const [key, element] of /** @type {[keyof CustomState, any][]} */(Object.entries(presetTargetElements))) {
+		const value = config[key];
+		if (typeof value === 'boolean') {
+			element.checked = value;
+		} else {
+			element.value = value;
+		}
+	}
+}
+
+/** プリセットの選択状態に合わせてUIの表示とロック状態を更新する */
+function applyPresetUI() {
+	const p = /** @type {PresetMode} */ (el.preset.value);
+	// Easiest/Fastestなら固定値を、Customなら保存されている独自設定を反映
+	setLockedFieldsToUI(p === 'custom' ? customState : PRESETS[p]);
+	// Custom以外は編集できないようにロック
+	setPresetLockedState(p !== 'custom');
+}
+
+/** 現在のUI状態をLocal Storageに永続化する */
+function saveSettings() {
+	const p = /** @type {PresetMode} */ (el.preset.value);
+
+	// Customモード時のみ、現在のUIの値を独自設定スロット（customState）に記録する
+	if (p === 'custom') {
+		customState = getLockedFieldsFromUI();
+	}
+
+	/** @type {SavedSettings} */
+	const settings = {
+		lang: /** @type {LangKey} */ (el.lang.value),
+		preset: p,
+		...customState, // ロック対象の設定は、Customの時のみUIから取得し、それ以外は内部のcustomStateを維持して保存
+
+		noNumpad: el.noNumpad.checked,
+		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
+		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
+		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
+	};
+	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
+}
+
+/** Local Storageから設定を読み込みUIに反映する
+ * @returns {boolean} 読み込みに成功したか */
+function loadSettings() {
+	try {
+		const stored = localStorage.getItem('kss-rng-manipulator2');
+		if (stored) {
+			const s = /** @type {SavedSettings} */ (JSON.parse(stored));
+			if (s.lang) { el.lang.value = s.lang; lang = s.lang; }
+			if (s.preset) el.preset.value = s.preset;
+			
+			// --- Customスロットの値を復元 ---
+			if (s.min) customState.min = s.min;
+			if (s.max) customState.max = s.max;
+			if (s.magician) customState.magician = s.magician;
+
+			// 旧バージョンからのマイグレーション ("true" → "easy"、"false" → "fast" など)
+			const migrateDifficulty = (/**@type {string}*/val) => /**@type {DifficultyMode}*/ ({'true': 'easy', 'false': 'fast'}[val] ?? val);
+			if (s.knight) customState.knight = migrateDifficulty(s.knight);
+			if (s.dragon) customState.dragon = migrateDifficulty(s.dragon);
+
+			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
+			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
+
+			// --- 他の基本設定を復元 ---
+			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
+
+			// showArrival → displayMode へのマイグレーション (旧仕様互換)
+			if (s.displayMode) {
+				el.displayMode.value = s.displayMode;
+			} else if (/** @type {any} */(s).showArrival !== undefined) {
+				el.displayMode.value = /** @type {any} */(s).showArrival ? 'withSimulation' : 'actionOnly';
+				el.detailMode.value = /** @type {any} */(s).showArrival ? 'withFailPowers' : 'none';
+			}
+			if (s.detailMode) el.detailMode.value = s.detailMode;
+			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
+			
+			// UIへの最終反映（ロック制御含む）
+			applyPresetUI();
+			return true;
+		}
+	} catch(e) {
+		// localStorage が使えない環境（プライベートブラウズ等）では無視
+	}
+	return false;
+}
+
+// --- UI描画ユーティリティ ---
+
+/** HTMLの <img> タグ文字列を生成する
+ * @param {string} src 画像パス
+ * @param {string} [title] ツールチップテキスト
+ * @param {string} [style] 追加CSSスタイル */
 function img(src, title = '', style = '') {
 	return `<img src="${src}"${title ? ` title="${title}"` : ''}${style ? ` style="${style}"` : ''}>`;
 }
 
-/**
- * コピーの元の画像タグを取得
+/** 指定されたコピーの元ペア（BattleWindowsPowersPair）の画像タグ群を生成する
  * @param {BattleWindowsPowersPair} p
  * @param {string} [style] */
 function formatPowers(p, style = '') {
@@ -264,21 +443,8 @@ function formatPowers(p, style = '') {
 	return img(Assets.ability(left), left, style) + ' ' + img(Assets.ability(right), right, style);
 }
 
-/** 画像のプリロード */
-function preloadImages() {
-	[
-		...Object.values(Assets.enemies),
-		...Object.values(Assets.dragonActions),
-		...BattleWindowsPowerNames.map(Assets.ability),
-	].forEach(src => {
-		const imgObj = new Image();
-		imgObj.src = src;
-	});
-}
-preloadImages();
-
-// --- 乱数位置の整形 ---
-/** @param {number} index */
+/** 乱数インデックスを表示設定（Hex, Split等）に合わせて整形する
+ * @param {number} index */
 function formatIndex(index) {
 	const mode = /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value);
 	const value = RngCycle[index];
@@ -289,35 +455,71 @@ function formatIndex(index) {
 	}
 }
 
-// --- メッセージの取得（言語切替対応） ---
-function msg(/** @type {ActionTable} */{ dashes, slides, hammerFlips, stars, lateAdvances, name }) {
-	const a = [];
+/** 行動テーブルの内容を翻訳テキストと画像を用いて説明文字列に変換する
+ * @param {ActionTable} action */
+function msg({ dashes, slides, hammerFlips, stars, lateAdvances, name }) {
+	const result = [];
 	if (lateAdvances !== undefined) {
-		if (lateAdvances <= 0) a.push(name);
-		else if (slides) a.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
+		if (lateAdvances <= 0) result.push(name);
+		else if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
-		if (dashes) a.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash')][dashes]);
-		if (stars) a.push([, t('actionStar'), t('action2Stars')][stars]);
-		if (hammerFlips) a.push([, t('actionFlip'), t('action2Flips')][hammerFlips]);
-		if (slides) a.push([, t('actionSlide'), t('action2Slides')][slides]);
+		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash')][dashes]);
+		if (stars) result.push([, t('actionStar'), t('action2Stars')][stars]);
+		if (hammerFlips) result.push([, t('actionFlip'), t('action2Flips')][hammerFlips]);
+		if (slides) result.push([, t('actionSlide'), t('action2Slides')][slides]);
 	}
-	return a.length ? a.join(' & ') : t('actionWait');
+	return result.length ? result.join(' & ') : t('actionWait');
 }
 
-/** @param {boolean} b  */
-function boolMsg(b) {
+/** 真偽値を絵文字アイコンに変換する */
+function boolMsg(/** @type {boolean} */ b) {
 	return b ? '✅' : '❌';
 }
 
-// --- 到着乱数位置の表示 ---
-/** @param {RngIndex[]} starIndices 星消費後の乱数位置 */
+/** SimIndexを対応する敵の名前に変換する
+ * @param {SimIndex} simIndex */
+function branchIndexToEnemy(simIndex) {
+	return [
+		t('enemyMagician'),
+		t('enemyKnight'),
+		t('enemyDragon'),
+		t('enemyDragonTurn2'),
+	][simIndex] ?? String(simIndex);
+}
+
+/** 現在入力されている星の数に合わせた星ボックスUIを更新する */
+function renderStarBoxes() {
+	el.starBoxes.innerHTML = '';
+	for (let i = 0; i < 6; i++) {
+		const box = document.createElement('span');
+		box.className = 'star-box' + (i < stars.length ? ' filled' : '');
+		box.textContent = i < stars.length ? StarDirectionChars[stars[i]] : String(i + 1);
+		el.starBoxes.appendChild(box);
+	}
+}
+
+/** 入力履歴とUI表示をクリアし、初期状態に戻す */
+function resetInputs() {
+	stars = [];
+	renderStarBoxes();
+	el.result.innerHTML = '';
+	el.status.innerHTML = t('pressToStart');
+}
+
+// --- 乱数計算と結果表示 ---
+
+/** 星消費後の「到着乱数位置」を整形してステータス欄に表示する
+ * @param {RngIndex[]} starIndices */
 function renderRngIndices(starIndices) {
 	const arrivalIndices = Array.from(starIndices).map(idx => KssRng.getArrivalIndex(idx, stars.length));
 	el.status.innerHTML = t('rngIndex') + arrivalIndices.map(v => formatIndex(v)).join(', ');
 }
 
-// --- Fast魔法使いタイミング詳細テーブル ---
-/** @param {RngIndex[]} starIndices */
+/** Fast魔法使いの1行分のシミュレーション結果 */
+/** @typedef {{ name: string|undefined, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {pair:BattleWindowsPowersPair, powersStartingIndex:RngIndex, powersEndingIndex:RngIndex}|null, endingIndex: number|null }} TimingRow */
+
+/** Fast魔法使いのタイミング詳細テーブルを描画する
+ * @param {RngIndex[]} starIndices */
 function renderTimingTable(starIndices) {
 	const starsAdvances = stars.length * StarDirectionAdvances;
 	let html = '';
@@ -338,7 +540,7 @@ function renderTimingTable(starIndices) {
 		</tr></thead><tbody>`;
 
 		const timings = FastMagicianList.map(v => {
-			const row = /** @type {{ name: string|undefined, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {pair:BattleWindowsPowersPair, powersStartingIndex:RngIndex, powersEndingIndex:RngIndex}|null, endingIndex: number|null }} */ ({ name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null });
+			const row = /** @type {TimingRow} */ ({ name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null });
 			let lastIndex = index;
 			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
 				switch (p) {
@@ -407,14 +609,12 @@ function renderTimingTable(starIndices) {
 	el.result.appendChild(div);
 }
 
-// --- メイン行動テーブル ---
-/**
+/** 全体の行動手順テーブル（魔法使い〜レッドドラゴン2ターン目）を描画する
  * @param {ActionTable} magician 魔法使い行動
  * @param {ActionCombination} actionCombination 行動組み合わせ
  * @param {Branch | null} branch 分岐情報
- * @param {RngIndex[]} starIndices
- * @param {ReturnType<typeof getSettings>} settings
- */
+ * @param {RngIndex[]} starIndices 候補となる乱数位置リスト
+ * @param {ReturnType<typeof getSettings>} settings 現在の設定 */
 function renderMainResultTable(magician, actionCombination, branch, starIndices, settings) {
 	const detailMode = settings.detailMode;
 	const showPowers = detailMode === 'withPowers' || detailMode === 'withFailPowers';
@@ -426,8 +626,11 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
 	const branchSimIndex = hasBranch ? branch.simIndex : -1;
 
+	/** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
+	/** @typedef {{ arrivalIndex: RngIndex, sim: SimEntry[], dragonAction?: ID<DragonAction> }} ArrivalSim */
+
 	// 各候補乱数ごとのシミュレーションデータ（詳細表示時のみ計算）
-	/** @type {{ arrivalIndex: RngIndex, sim: {pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string}[], dragonAction?: ID<DragonAction> }[]} */
+	/** @type {ArrivalSim[]} */
 	let arrivalSims = [];
 	if (showPowers || showTransitions) {
 		arrivalSims = Array.from(starIndices).map(index => {
@@ -447,8 +650,6 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
 				switch (p) {
 					case 'takeAction': {
-						/** @type {ActionTable} */
-						const a = args[0];
 						logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
 						break;
 					}
@@ -511,8 +712,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 
 	const tbody = document.createElement('tbody');
 
-	// 各ターンの行データ
-	// [0]=magician, [1]=knight, [2]=dragon, [3]=dragonAction
+	// 各ターンの行データ [0]=magician, [1]=knight, [2]=dragon, [3]=dragonTurn2
 	const mainActions = [magician, actionCombination.knight, actionCombination.dragon, actionCombination.dragonAction];
 	const fallbackActions = hasBranch
 		? /** @type {(ActionTable|null)[]} */ ([null, branch.fallbackActionCombination.knight, branch.fallbackActionCombination.dragon, branch.fallbackActionCombination.dragonAction])
@@ -554,7 +754,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 				} else if (showPowers) {
 					html += formatPowers(p.pair);
 
-					// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元
+					// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元を表示
 					if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
 						// 本来より1つ前のインデックスからコピーの元判定が始まる
 						const failRng = new KssRng(p.powersStartingIndex);
@@ -565,7 +765,9 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 
 					if (i === 3 && settings.allowDragonStar) {
 						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-						if (s.dragonAction !== undefined) html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
+						if (s.dragonAction !== undefined) {
+							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
+						}
 					}
 				}
 			}
@@ -580,7 +782,7 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 	el.result.appendChild(table);
 }
 
-// --- 結果表示（表示モードに応じてレンダー関数を呼び分ける） ---
+/** 現在の入力状況と設定に基づき、乱数調整結果を画面に表示する */
 function displayResult() {
 	el.result.innerHTML = '';
 	el.status.innerHTML = '';
@@ -600,13 +802,13 @@ function displayResult() {
 
 	const mode = settings.displayMode;
 
-	// 乱数位置のみ: 到着インデックスだけ表示して終了
+	// 乱数位置のみ表示モード
 	if (mode === 'withIndex') {
 		renderRngIndices(starIndices);
 		return;
 	}
 
-	// manipulate は全候補を同時に考慮して1つの結果を返す
+	// 乱数調整シミュレーション実行
 	const manipulator = new BattleWindowsMWWManipulator(settings);
 	const result = manipulator.manipulate(stars);
 
@@ -619,43 +821,28 @@ function displayResult() {
 		return;
 	}
 
+	// メイン結果テーブルの描画
 	renderMainResultTable(result.magician, result.actionCombination, result.branch, starIndices, settings);
 
-	// 魔法使いがFastの場合のみタイミングテーブルを追加
+	// シミュレーション付き表示かつ魔法使いがFastの場合のみタイミングテーブルを追加
 	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
 		renderTimingTable(starIndices);
 	}
 }
 
-// --- 入力リセット ---
-function resetInputs() {
-	stars = [];
-	renderStarBoxes();
-	el.result.innerHTML = '';
-	el.status.innerHTML = t('pressToStart');
-}
+// --- 分析・テスト機能 ---
 
-/** @param {SimIndex} simIndex */
-function branchIndexToEnemy(simIndex) {
-	return [
-		t('enemyMagician'),
-		t('enemyKnight'),
-		t('enemyDragon'),
-		t('enemyDragonTurn2'),
-	][simIndex] ?? String(simIndex);
-}
-
-// --- テスト関数 ---
+/** 指定された星の数で発生しうる全パターンを分析する */
 async function runTest() {
 	const starsCount = parseInt(el.testStars.value, 10) || 3;
 	const settings = getSettings();
 
-	// UIを実行中状態に
+	// UIを実行中状態に更新
 	el.testRunBtn.disabled = true;
 	el.testRunBtn.textContent = '0%';
 	el.testResult.innerHTML = '';
 
-	// ジェネレーターを用いて処理を細切れにし、UIをブロックしないようにする
+	// ジェネレーターを用いて処理を分割実行し、ブラウザのフリーズを防ぐ
 	let time = performance.now();
 	const manipulator = new BattleWindowsMWWManipulator(settings);
 	for (const result of manipulator.testGenerator(starsCount)) {
@@ -676,12 +863,17 @@ async function runTest() {
 	el.testRunBtn.textContent = t('testRun');
 }
 
-/** @param {ReturnType<BattleWindowsMWWManipulator['test']>} result @param {HTMLElement} testResultEl */
+/** 分析結果のデータ型 */
+/** @typedef {ReturnType<BattleWindowsMWWManipulator['test']>} AnalysisResult */
+
+/** 分析結果（成功/失敗/分岐統計）をテーブル形式で描画する
+ * @param {AnalysisResult} result
+ * @param {HTMLElement} testResultEl */
 function renderTestResult(result, testResultEl) {
 	if (result === undefined) return;
 	let html = '';
 
-	// 解決不能
+	// --- 解決不能（失敗）パターンの表示 ---
 	const unsolvableEntries = Array.from(result.simulationGroups.entries()).filter(([, group]) => group.hasFail);
 	if (unsolvableEntries.length > 0) {
 		html += `<b>${t('testUnsolvable')}</b>`;
@@ -703,25 +895,19 @@ function renderTestResult(result, testResultEl) {
 
 		const failTotal = result.wrongCounts[0] + result.wrongCounts[1] + result.wrongCounts[2] + result.wrongCounts[3];
 
-		// 合計行
-		html += `</tbody><tfoot>`;
-		html += `<tr>`;
+		html += `</tbody><tfoot><tr>`;
 		html += `<th rowspan="2">${t('thCount')}</th>`;
 		html += `<td rowspan="2">${result.unsolvableSuccessCount}</td>`;
 		html += `<td>${result.wrongCounts[0]}</td>`;
 		html += `<td>${result.wrongCounts[1]}</td>`;
 		html += `<td>${result.wrongCounts[2]}</td>`;
 		html += `<td>${result.wrongCounts[3]}</td>`;
-		html += `</tr>`;
-
-		// 失敗の合計
-		html += `<tr>`;
+		html += `</tr><tr>`;
 		html += `<td colspan="4">${failTotal}</td>`;
-		html += `</tr>`;
-		html += '</tfoot></table>';
+		html += `</tr></tfoot></table>`;
 	}
 
-	// 分岐
+	// --- 分岐パターンの統計表示 ---
 	const branchEntries = Array.from(result.branchGroups.entries());
 	if (branchEntries.length > 0) {
 		html += `<b>${t('testBranches')}</b>`;
@@ -738,23 +924,17 @@ function renderTestResult(result, testResultEl) {
 			html += '</tr>';
 		}
 
-		// 合計行
-		html += `</tbody><tfoot>`;
-		html += `<tr>`;
+		html += `</tbody><tfoot><tr>`;
 		html += `<th colspan="3" rowspan="2">${t('thCount')}</th>`;
 		html += `<td>${result.totalBranchMatch}</td>`;
 		html += `<td>${result.totalBranchNoMatch}</td>`;
-		html += `</tr>`;
-		
-		html += `<tr>`;
+		html += `</tr><tr>`;
 		html += `<td colspan="2">${result.branchCount}</td>`;
-		html += `</tr>`;
-
-		html += '</tfoot></table>';
+		html += `</tr></tfoot></table>`;
 	}
 
-	// 行動テーブル（回数降順）
-	/** @param {string} title @param {Map<object, number>} countList */
+	// --- 採用された各行動の頻度統計 ---
+	/** @param {string} title @param {Map<ActionTable, number>} countList */
 	const renderActionTable = (title, countList) => {
 		if (countList.size === 0) return '';
 		const sorted = Array.from(countList.entries()).sort((a, b) => b[1] - a[1]);
@@ -777,31 +957,17 @@ function renderTestResult(result, testResultEl) {
 	testResultEl.innerHTML = html;
 }
 
-el.testRunBtn.addEventListener('click', runTest);
+// --- イベントリスナー・初期化処理 ---
 
-// --- 言語切替（data-t属性方式） ---
-/** data-t属性を持つ全要素のテキストを現在の言語で更新 */
-function updateTranslations() {
-	document.querySelectorAll('[data-t]').forEach(elem => {
-		const key = /** @type {keyof typeof L} */ (elem.getAttribute('data-t'));
-		elem.textContent = t(key);
-	});
-}
+/** キーボードによる星入力イベントの処理 */
+window.addEventListener('keydown', (e) => {
+	const target = /** @type {HTMLElement} */ (e.target);
+	// 入力フィールド（input/select）にフォーカスがある場合は無視
+	if (target.tagName?.toUpperCase() === 'INPUT' || target.tagName?.toUpperCase() === 'SELECT') {
+		return;
+	}
 
-/** @param {string} val */
-const switchLang = function(val) {
-	lang = /** @type {LangKey} */ (val);
-	updateTranslations();
-	if (stars.length < MIN_STARS_FOR_RESULT) el.status.innerHTML = t('pressToStart');
-	else displayResult();
-};
-
-// --- キーボードイベント ---
-window.addEventListener('keydown', (event) => {
-	const target = /** @type {HTMLElement} */ (event.target);
-	if (target.tagName?.toUpperCase() === 'INPUT' || target.tagName?.toUpperCase() === 'SELECT') return;
-
-	const key = event.key;
+	const key = e.key;
 	const noNumpad = el.noNumpad.checked;
 
 	let numpadKey = null;
@@ -809,18 +975,23 @@ window.addEventListener('keydown', (event) => {
 		numpadKey = NoNumpadMap[key.toLowerCase()] || null;
 	} else {
 		const n = parseInt(key, 10);
-		if (!Number.isNaN(n) && n !== 0 && n !== 5) numpadKey = n;
+		if (!Number.isNaN(n) && n !== 0 && n !== 5) {
+			numpadKey = n;
+		}
 	}
 
 	if (numpadKey !== null && NumpadToStarIndex[numpadKey] !== undefined) {
+		// 星の入力（最大6回まで）
 		if (stars.length < 6) {
 			stars.push(NumpadToStarIndex[numpadKey]);
 			renderStarBoxes();
 			displayResult();
 		}
 	} else if (key === 'Enter') {
+		// リセット
 		resetInputs();
 	} else if (key === 'Backspace') {
+		// 1つ戻る
 		if (stars.length > 0) {
 			stars.pop();
 			renderStarBoxes();
@@ -829,126 +1000,19 @@ window.addEventListener('keydown', (event) => {
 	}
 }, true);
 
-// --- プリセット処理 ---
-/** プリセットによって上書き・ロックの対象となる設定項目とUI要素の対応定義 */
-const presetTargetElements = {
-	min: el.min,
-	max: el.max,
-	magician: el.difficultyMagician,
-	knight: el.difficultyKnight,
-	dragon: el.difficultyDragon,
-	allowDragonStar: el.allowDragonStar,
-	hammerThrow: el.hammerThrow,
-};
-
-/** プリセットに応じてUI項目の編集可否を切り替える
- * @param {boolean} locked */
-function setPresetLockedState(locked) {
-	for (const element of Object.values(presetTargetElements)) {
-		element.disabled = locked;
-	}
-}
-
-/** ロック対象となっているUI項目から現在の設定値を取得する
- * @returns {typeof customState} */
-function getLockedFieldsFromUI() {
-	const state = /** @type {any} */ ({});
-	for (const [key, element] of Object.entries(presetTargetElements)) {
-		state[key] = element.type === 'checkbox' ? /** @type {HTMLInputElement} */(element).checked : element.value;
-	}
-	return state;
-}
-
-/** ロック対象となっているUI項目に指定された設定値を反映する
- * @param {typeof customState} config */
-function setLockedFieldsToUI(config) {
-	for (const [key, element] of Object.entries(presetTargetElements)) {
-		const value = config[/** @type {keyof typeof presetTargetElements} */ (key)];
-		if (element.type === 'checkbox') /** @type {HTMLInputElement} */(element).checked = /** @type {boolean} */(value);
-		else element.value = /** @type {string} */(value);
-	}
-}
-
-/** プリセットの選択状態に合わせてUIの表示と編集ロック状態を更新する */
-function applyPresetUI() {
-	const p = /** @type {PresetMode} */ (el.preset.value);
-	// Easiest/Fastestなら固定値を、Customなら保存されている独自設定を反映
-	setLockedFieldsToUI(p === 'custom' ? customState : PRESETS[p]);
-	// Custom以外は編集できないようにロック
-	setPresetLockedState(p !== 'custom');
-}
-
-/** 現在のUI状態をLocalStorageに保存する */
-function saveSettings() {
-	const p = /** @type {PresetMode} */ (el.preset.value);
-
-	// Customモード時のみ、現在のUIの値を独自設定スロット（customState）に記録する
-	if (p === 'custom') {
-		customState = getLockedFieldsFromUI();
-	}
-
-	const settings = {
-		lang: el.lang.value,
-		preset: p,
-		...customState, // ロック対象の設定は、Customの時のみUIから取得し、それ以外はcustomStateを維持する
-
-		noNumpad: el.noNumpad.checked,
-		displayMode: el.displayMode.value,
-		detailMode: el.detailMode.value,
-		indexDisplayMode: el.indexDisplayMode.value,
-	};
-	localStorage.setItem('kss-rng-manipulator2', JSON.stringify(settings));
-}
-
-/** LocalStorageから設定を読み込み、UIに反映する
- * @returns {boolean} 読み込みに成功したか */
-function loadSettings() {
-	try {
-		const stored = localStorage.getItem('kss-rng-manipulator2');
-		if (stored) {
-			const s = JSON.parse(stored);
-			if (s.lang) { el.lang.value = s.lang; lang = /** @type {LangKey} */ (s.lang); }
-			if (s.preset) el.preset.value = s.preset;
-			
-			// --- Customスロットの値を復元 ---
-			if (s.min) customState.min = s.min;
-			if (s.max) customState.max = s.max;
-			if (s.magician) customState.magician = s.magician;
-
-			// "true" → "easy"、"false" → "fast" へのマイグレーション
-			const migrateDifficulty = (/**@type {string}*/s) => ({'true': 'easy', 'false': 'fast'}[s] ?? s);
-			if (s.knight) customState.knight = migrateDifficulty(s.knight);
-			if (s.dragon) customState.dragon = migrateDifficulty(s.dragon);
-
-			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
-			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
-
-			// --- 他の値を復元 ---
-			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
-
-			// showArrival → displayMode へのマイグレーション
-			if (s.displayMode) el.displayMode.value = s.displayMode;
-			else if (s.showArrival !== undefined) {
-				el.displayMode.value = s.showArrival ? 'withSimulation' : 'actionOnly';
-				el.detailMode.value = s.showArrival ? 'withFailPowers' : 'none';
-			}
-			if (s.detailMode) el.detailMode.value = s.detailMode;
-
-			if (s.indexDisplayMode) el.indexDisplayMode.value = s.indexDisplayMode;
-			
-			applyPresetUI();
-			return true;
-		}
-	} catch(e) { /* localStorage が使えない場合は無視 */ }
-	return false;
-}
-
+/** 設定変更イベントの処理 */
 el.settingsArea.addEventListener('change', (e) => {
 	const target = /** @type {HTMLElement} */ (e.target);
+	
+	// プリセット変更時の挙動
 	if (target.id === 'preset') {
 		applyPresetUI();
 	}
+	
+	// 設定の保存
 	saveSettings();
+
+	// 言語変更、またはシミュレーション関連設定の変更に応じた再描画
 	if (target.id === 'lang') {
 		switchLang(/** @type {HTMLSelectElement} */ (target).value);
 	} else if (target.id !== 'no-numpad' && target.id !== 'test-stars') {
@@ -956,14 +1020,40 @@ el.settingsArea.addEventListener('change', (e) => {
 	}
 });
 
-// HTMLのonchange="switchLang(this.value)"からアクセスできるようにグローバル公開
-// @ts-ignore
-window.switchLang = switchLang;
+/** 分析実行ボタンのイベント登録 */
+el.testRunBtn.addEventListener('click', runTest);
 
-// --- 初期化 ---
+/** 言語切り替えのイベント登録 */
+el.lang.addEventListener('change', (e) => {
+	const target = /** @type {HTMLSelectElement} */ (e.target);
+	switchLang(target.value);
+});
+
+// --- 初期化実行 ---
+
+/** 全画像アセットのプリロード（ブラウザキャッシュへの読み込み） */
+function preloadImages() {
+	[
+		...Assets.enemies,
+		...Object.values(Assets.dragonActions),
+		...BattleWindowsPowerNames.map(Assets.ability),
+	].forEach(src => {
+		const imgObj = new Image();
+		imgObj.src = src;
+	});
+}
+preloadImages();
+
+// 設定の読み込み（LocalStorageに保存されていなければデフォルト値を適用）
 if (!loadSettings()) {
 	el.lang.value = lang; // ブラウザのデフォルト言語を反映
 }
-switchLang(lang); // lang変数を元にUIテキストを更新
+
+// 言語設定に基づきUIテキストを初回更新
+switchLang(lang);
+
+// 星ボックスの初期状態を描画
 renderStarBoxes();
+
+// ステータス欄を待機メッセージで初期化
 el.status.innerHTML = t('pressToStart');
