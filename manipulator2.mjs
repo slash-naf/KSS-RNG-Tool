@@ -218,28 +218,26 @@ const L = {
 let lang = /** @type {LangKey} */ (navigator.language?.startsWith('ja') ? 'ja' : 'en');
 
 /** 指定されたキーに対応する翻訳テキストを取得する */
-function t(/** @type {keyof typeof L} */ key) {
+function tRaw(/** @type {keyof typeof L} */ key) {
 	return L[key]?.[lang] ?? L[key]?.en ?? key;
 }
 
-/** data-t属性を持つ全要素のテキストを現在の言語で更新する */
-function updateTranslations() {
-	document.querySelectorAll('[data-t]').forEach(elem => {
-		const key = /** @type {keyof typeof L} */ (elem.getAttribute('data-t'));
-		elem.textContent = t(key);
-	});
+/** 指定されたキーに対応する翻訳テキストを、翻訳追従用のspanタグで囲んで取得する */
+function t(/** @type {keyof typeof L} */ key) {
+	return `<span data-t="${key}">${tRaw(key)}</span>`;
+}
+
+/** 指定された要素のテキストを現在の言語で更新する */
+function updateTranslation(/** @type {Element} */ elem) {
+	const key = /** @type {keyof typeof L} */ (elem.getAttribute('data-t'));
+	elem.innerHTML = tRaw(key);
 }
 
 /** 言語を切り替えてUIを再描画する
  * @param {string} val */
 function switchLang(val) {
 	lang = /** @type {LangKey} */ (val);
-	updateTranslations();
-	if (stars.length < MIN_STARS_FOR_RESULT) {
-		el.status.innerHTML = t('pressToStart');
-	} else {
-		displayResult();
-	}
+	document.querySelectorAll('[data-t]').forEach(elem => updateTranslation(elem));
 }
 
 // --- アプリケーション状態・DOM要素 ---
@@ -860,7 +858,7 @@ async function runTest() {
 
 	// UIを復元
 	el.testRunBtn.disabled = false;
-	el.testRunBtn.textContent = t('testRun');
+	updateTranslation(el.testRunBtn);
 }
 
 /** 分析結果のデータ型 */
@@ -1002,32 +1000,28 @@ window.addEventListener('keydown', (e) => {
 
 /** 設定変更イベントの処理 */
 el.settingsArea.addEventListener('change', (e) => {
-	const target = /** @type {HTMLElement} */ (e.target);
-	
-	// プリセット変更時の挙動
-	if (target.id === 'preset') {
-		applyPresetUI();
+	const target = /** @type {HTMLSelectElement} */ (e.target);
+	switch (target.id) {
+		// 言語の切り替え
+		case 'lang':
+			switchLang(target.value);
+			break;
+		// プリセット変更時の挙動
+		case 'preset':
+			applyPresetUI();
+			displayResult();
+			break;
+		case 'no-numpad':
+		case 'test-stars':
+			break;
+		default:
+			displayResult();
 	}
-	
-	// 設定の保存
 	saveSettings();
-
-	// 言語変更、またはシミュレーション関連設定の変更に応じた再描画
-	if (target.id === 'lang') {
-		switchLang(/** @type {HTMLSelectElement} */ (target).value);
-	} else if (target.id !== 'no-numpad' && target.id !== 'test-stars') {
-		displayResult();
-	}
 });
 
 /** 分析実行ボタンのイベント登録 */
 el.testRunBtn.addEventListener('click', runTest);
-
-/** 言語切り替えのイベント登録 */
-el.lang.addEventListener('change', (e) => {
-	const target = /** @type {HTMLSelectElement} */ (e.target);
-	switchLang(target.value);
-});
 
 // --- 初期化実行 ---
 
