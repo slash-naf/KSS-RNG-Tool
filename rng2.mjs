@@ -211,82 +211,119 @@ export class KssRng {
 
 		// --- 魔法使い ---
 		const m = this.simulateMagician(magician);
-		if (!m) return result;
+		if (m === null) return result;
 		result.push(m);
 
 		// --- 悪魔の騎士 ---
-		this.takeAction(actionCombination.knight);
-		if (actionCombination.knight.fast) {
-			// Fastモード
-			this.advance(8);
-			const a = this.knightAttacksFirst();
-			this.advance(1);
-			const b = this.knightAttacksFirst();
-			this.advance(2);
-			if (a || b) return result;
-			result.push(this.battleWindowsPowersWithHammerFlipHit(true));
-		} else {
-			// Easyモード
-			if (this.knightAttacksFirst()) return result;
-			result.push(this.battleWindowsPowers());
-			this.hammerFlipChargeAndHit();
-		}
-		this.advance(hammerThrow);    // ハンマー投げのダッシュ
-		this.hammerHit();    // ハンマー投げのスイングのヒット
-		this.hammerHit();    // ハンマー投げのヒット
+		const k = this.simulateKnight(actionCombination.knight, hammerThrow);
+		if (k === null) return result;
+		result.push(k);
 
 		// --- レッドドラゴン ---
-		this.takeAction(actionCombination.dragon);
-		if (actionCombination.dragon.fast) {
-			// Fastモード
-			this.advance(6);
-			const a = this.dragonAttacksFirst();
-			this.advance(1);
-			const b = this.dragonAttacksFirst();
-			this.advance(4);
-			if (a || b) return result;
-			result.push(this.battleWindowsPowersWithHammerFlipHit(true));
-		} else {
-			// Easyモード
-			if (this.dragonAttacksFirst()) return result;
-			result.push(this.battleWindowsPowers());
-			this.hammerFlipChargeAndHit();
-		}
-		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
+		const d1 = this.simulateDragon(actionCombination.dragon);
+		if (d1 === null) return result;
+		result.push(d1);
 
 		// --- レッドドラゴン2ターン目 ---
-		this.takeAction(actionCombination.dragonAction);
-		const dragonAction = this.dragonActs();
-		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
-			result.push(this.battleWindowsPowers());
-		}
+		const d2 = this.simulateDragonTurn2(actionCombination.dragonAction, allowDragonStar);
+		if (d2 === null) return result;
+		result.push(d2);
 
 		return result;
 	}
 
 	/** 魔法使い戦のシミュレーション
-	 * @param {ActionTable} magician 魔法使いに対する行動
+	 * @param {ActionTable} action 魔法使いに対する行動
 	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
 	 */
-	simulateMagician(magician) {
-		this.takeAction(magician);
+	simulateMagician(action) {
+		this.takeAction(action);
 
 		// 魔法使いが先制するかの判定
 		if (this.magicianAttacksFirst()) return null;
 
 		// 先制判定後からコピーの元判定前までの消費
-		this.advance((magician.lateAdvances ?? 0) + (magician.fast ? HammerFlipChargeAdvances : 0));
+		this.advance((action.lateAdvances ?? 0) + (action.fast ? HammerFlipChargeAdvances : 0));
 
 		// コピーの元判定
 		let powers;
-		if (magician.fast) {
-			powers =this.battleWindowsPowersWithHammerFlipHit(magician.earlyHardHitCheck ?? false);
+		if (action.fast) {
+			powers =this.battleWindowsPowersWithHammerFlipHit(action.earlyHardHitCheck ?? false);
 		} else {
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
 
 		return powers;
+	}
+
+	/** 悪魔の騎士戦のシミュレーション
+	 * @param {ActionTable} knightAction 悪魔の騎士に対する行動
+	 * @param {number} hammerThrow ハンマー投げのダッシュによる乱数消費数
+	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
+	 */
+	simulateKnight(knightAction, hammerThrow) {
+		this.takeAction(knightAction);
+		let powers;
+		if (knightAction.fast) {
+			// Fastモード
+			this.advance(8);
+			const a = this.knightAttacksFirst();
+			this.advance(1);
+			const b = this.knightAttacksFirst();
+			this.advance(2);
+			if (a || b) return null;
+			powers = this.battleWindowsPowersWithHammerFlipHit(true);
+		} else {
+			// Easyモード
+			if (this.knightAttacksFirst()) return null;
+			powers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
+		}
+		this.advance(hammerThrow);    // ハンマー投げのダッシュ
+		this.hammerHit();    // ハンマー投げのスイングのヒット
+		this.hammerHit();    // ハンマー投げのヒット
+		return powers;
+	}
+
+	/** レッドドラゴン戦（1ターン目）のシミュレーション
+	 * @param {ActionTable} dragonAction レッドドラゴンに対する行動
+	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
+	 */
+	simulateDragon(dragonAction) {
+		this.takeAction(dragonAction);
+		let powers;
+		if (dragonAction.fast) {
+			// Fastモード
+			this.advance(6);
+			const a = this.dragonAttacksFirst();
+			this.advance(1);
+			const b = this.dragonAttacksFirst();
+			this.advance(4);
+			if (a || b) return null;
+			powers = this.battleWindowsPowersWithHammerFlipHit(true);
+		} else {
+			// Easyモード
+			if (this.dragonAttacksFirst()) return null;
+			powers = this.battleWindowsPowers();
+			this.hammerFlipChargeAndHit();
+		}
+		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
+		return powers;
+	}
+
+	/** レッドドラゴン戦2ターン目のシミュレーション
+	 * @param {ActionTable} action レッドドラゴン2ターン目の行動
+	 * @param {boolean} allowDragonStar 星攻撃も成功とするか
+	 * @returns {BattleWindowsPowersPair | null} 望まない行動をされたらnull
+	 */
+	simulateDragonTurn2(action, allowDragonStar) {
+		this.takeAction(action);
+		const dragonAction = this.dragonActs();
+		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
+			return this.battleWindowsPowers();
+		}
+		return null;
 	}
 
 	// --- ヘルパー関数 ---
@@ -340,7 +377,7 @@ export class KssRng {
 	}
 }
 
-/** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonAction: ActionTable[] }} ActionsDifficultyTable */
+/** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonTurn2: ActionTable[] }} ActionsDifficultyTable */
 /** BattleWindowsMWWManipulatorのactionsDifficultyTableデフォルト値 @type {ActionsDifficultyTable} */
 const DefaultActionsDifficultyTable = {
 	knight: [
@@ -378,7 +415,7 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 200, dashes: 1 },
 		{ difficulty: 251, dashes: 1, slides: 1 },
 	],
-	dragonAction: [
+	dragonTurn2: [
 		{ difficulty: 0 },
 		{ difficulty: 1, stars: 1 },
 		{ difficulty: 1, hammerFlips: 1 },
@@ -446,8 +483,7 @@ const MagicianPrioritiesTable = {
 };
 
 /**
- * @typedef {{ simIndex: SimIndex, value: BattleWindowsPowersPair, fallbackActionCombination: ActionCombination }} Branch 分岐情報
- * @typedef {{ magician: ActionTable | null, actionCombination: ActionCombination | null, branch: Branch | null }} ManipulateResult
+ * @typedef {{ action: ActionTable, branches: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
  */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
@@ -462,6 +498,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
 	 * @param {SimIndex[]} [options.branchPriorities] 完全一致しない場合にフォールバックとして試す分岐位置（SimIndex）の優先順位
+	 * @param {number} [options.branchDifficulty]
 	 */
 	constructor({
 		actionsDifficultyTable = DefaultActionsDifficultyTable,
@@ -473,6 +510,7 @@ export class BattleWindowsMWWManipulator {
 		minIndex = 2800,
 		maxIndex = 3376,
 		branchPriorities = [SIM_INDEX_KNIGHT, SIM_INDEX_DRAGON, SIM_INDEX_MAGICIAN],
+		branchDifficulty = 100,
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
@@ -482,6 +520,7 @@ export class BattleWindowsMWWManipulator {
 		this.minIndex = minIndex;
 		this.maxIndex = maxIndex;
 		this.branchPriorities = branchPriorities;
+		this.branchDifficulty = branchDifficulty;
 
 		// 魔法使いでの行動
 		this.magicianList = MagicianPrioritiesTable[this.magicianDifficulty];
@@ -493,7 +532,7 @@ export class BattleWindowsMWWManipulator {
 		const dragonList = actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon }));
 		for (const knight of knightList) {
 			for (const dragon of dragonList) {
-				for (const dragonAction of actionsDifficultyTable.dragonAction) {
+				for (const dragonAction of actionsDifficultyTable.dragonTurn2) {
 					this.actionCombinations.push({
 						difficulty: (knight.difficulty ?? 0) + (dragon.difficulty ?? 0) + (dragonAction.difficulty ?? 0),
 						knight,
@@ -507,6 +546,7 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** 部分一致候補から分岐方式を適用して解を探す
+	 * @typedef {{ simIndex: SimIndex, value: BattleWindowsPowersPair, fallbackActionCombination: ActionCombination }} Branch 分岐情報
 	 * @typedef {{ index: RngIndex, sim: BattleWindowsPowersPair[] }} SimResult シミュレーション結果
 	 * @typedef {{ actionCombination: ActionCombination, successes: SimResult[], fails: SimResult[] }} ActionAttempt ある行動パターンに対する全乱数位置のシミュレーション結果
 	 * @param {SimIndex} simIndex 分岐方式のインデックス
@@ -557,6 +597,43 @@ export class BattleWindowsMWWManipulator {
 		return null;
 	}
 
+	/**
+	 * 内部の探索結果をツリー構造に変換する
+	 * @param {ActionTable} magician 
+	 * @param {ActionCombination} actionCombination 
+	 * @param {Branch | null} branch 
+	 * @returns {ManipulateResult}
+	 */
+	_buildTree(magician, actionCombination, branch) {
+		const buildNode = (simIndex, combo, currentBranch) => {
+			if (simIndex > 3) return null;
+
+			let action;
+			if (simIndex === 0) action = magician;
+			else if (simIndex === 1) action = combo.knight;
+			else if (simIndex === 2) action = combo.dragon;
+			else action = combo.dragonAction;
+
+			/** @type {Map<BattleWindowsPowersPair, ManipulateResult>} */
+			const branches = new Map();
+			let defaultNode;
+
+			if (currentBranch && currentBranch.simIndex === simIndex) {
+				branches.set(
+					currentBranch.value,
+					buildNode(simIndex + 1, currentBranch.fallbackActionCombination, null)
+				);
+				defaultNode = buildNode(simIndex + 1, combo, null);
+			} else {
+				defaultNode = buildNode(simIndex + 1, combo, currentBranch);
+			}
+
+			return { action, branches, default: defaultNode };
+		}
+
+		return buildNode(0, actionCombination, branch);
+	}
+
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
@@ -569,7 +646,7 @@ export class BattleWindowsMWWManipulator {
 		const magicianFilteredList = this.magicianList.filter(magician => indices.every(v => new KssRng(v).simulateMagician(magician)));
 		const magicianList = magicianFilteredList.length ? magicianFilteredList : this.magicianList;
 
-		/** @type {ManipulateResult} */
+		/** @type {{ magician: ActionTable | null, actionCombination: ActionCombination | null, branch: Branch | null }} */
 		let bestPartialResult = { magician: null, actionCombination: null, branch: null };
 		/** @type {ActionAttempt | null} */
 		let bestAttemptOverall = null;
@@ -594,7 +671,7 @@ export class BattleWindowsMWWManipulator {
 
 				// 全乱数位置で理想的なら確定
 				if (fails.length === 0) {
-					return { magician, actionCombination, branch: null };
+					return this._buildTree(magician, actionCombination, null);
 				}
 
 				// 失敗がより少ない（＝成功が多い）結果を蓄積
@@ -611,7 +688,7 @@ export class BattleWindowsMWWManipulator {
 			for (const simIndex of this.branchPriorities) {
 				const branchResult = this._tryBranch(simIndex, bestAttemptsForThisMagician, magician);
 				if (branchResult) {
-					return { magician, actionCombination: branchResult.actionCombination, branch: branchResult.branch };
+					return this._buildTree(magician, branchResult.actionCombination, branchResult.branch);
 				}
 			}
 
@@ -638,7 +715,10 @@ export class BattleWindowsMWWManipulator {
 			}
 		}
 
-		return bestPartialResult;
+		let { magician, actionCombination, branch } = bestPartialResult;
+		magician ??= this.magicianList[0];
+		actionCombination ??= this.actionCombinations[0];
+		return this._buildTree(magician, actionCombination, branch);
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
@@ -651,25 +731,25 @@ export class BattleWindowsMWWManipulator {
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
 			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
-			successCount: 0,         // 全4体を倒せた回数
+			successCount: 0,         // 最後まで成功した回数
+			successValue: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
-			branchCount: 0,          // 分岐が発生した回数
-			totalBranchMatch: 0,     // 分岐が一致した回数（フォールバック行動を使用）
-			totalBranchNoMatch: 0,   // 分岐が不一致だった回数（通常行動を使用）
-			/** @type {Map<string, {true: number[], false: RngIndex[], simIndex: SimIndex, value: BattleWindowsPowersPair}>} */
-			branchGroups: new Map(),        // 分岐の種類・値ごとにグループ化した乱数位置の一覧
-			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} */
-			simulationGroups: new Map(),    // 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧
-			/** @type {Map<ActionTable, number>} */
-			magicianCountList: new Map(),   // 魔法使いの行動ごとの使用回数
-			/** @type {Map<ActionTable, number>} */
-			knightCountList: new Map(),     // 騎士の行動ごとの使用回数
-			/** @type {Map<ActionTable, number>} */
-			dragonCountList: new Map(),     // ドラゴンの行動ごとの使用回数
-			/** @type {Map<ActionTable, number>} */
-			dragonActionCountList: new Map(), // ドラゴン2ターン目の行動ごとの使用回数
+			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [simIndex][branchSize] */
+			turnBranchCounts: Array.from({ length: 4 }, () => []),
+			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
+			simulationGroups: new Map(),
+			/** @type {Map<ActionTable, number>} 魔法使いでの行動ごとの使用回数 */
+			magicianCountList: new Map(),
+			/** @type {Map<ActionTable, number>} 悪魔の騎士での行動ごとの使用回数 */
+			knightCountList: new Map(),
+			/** @type {Map<ActionTable, number>} ドラゴンでの行動ごとの使用回数 */
+			dragonCountList: new Map(),
+			/** @type {Map<ActionTable, number>} ドラゴン2ターン目での行動ごとの使用回数 */
+			dragonTurn2CountList: new Map(),
 			totalTime: 0,            // manipulate()の合計計算時間（ms）
 			worstTime: 0,            // manipulate()の最悪計算時間（ms）
+			totalDifficulty: 0,	// 合計難易度
+			worstDifficulty: 0,	// 最悪難易度
 			// 進捗確認用
 			count: 0,
 			total: this.maxIndex - this.minIndex + 1,
@@ -688,54 +768,16 @@ export class BattleWindowsMWWManipulator {
 
 			// 既に同じ星のパターンの結果がないか確認
 			let simGroup = result.simulationGroups.get(starStr);
+			// 乱数調整の行動探索
+			let manipulateResult;
+			if (simGroup) {
+				manipulateResult = simGroup.manipulateResult;
+			} else {
+				const t0 = performance.now();
+				manipulateResult = this.manipulate(starDirectionList);
+				const elapsed = performance.now() - t0;
 
-			// 乱数調整の行動探索（処理時間を計測）
-			const t0 = performance.now();
-			const manipulateResult = simGroup ? simGroup.manipulateResult : this.manipulate(starDirectionList);
-			const elapsed = performance.now() - t0;
-
-			// 計算時間の記録
-			result.count++;
-			result.totalTime += elapsed;
-			if (elapsed > result.worstTime) result.worstTime = elapsed;
-
-			// 解決不能の場合でもシミュレーションは継続（デフォルト行動で代替）
-			let { magician, actionCombination, branch } = manipulateResult;
-			if (magician === null) result.magicianNGCount++;
-			else if (actionCombination === null) result.otherNGCount++;
-			magician ??= this.magicianList[0];
-			actionCombination ??= this.actionCombinations[0];
-
-			// 分岐が存在する場合は現在の乱数で分岐条件を判定し、使用する行動を選択する
-			let chosenActionCombination = actionCombination;
-			if (branch) {
-				// 分岐前の乱数位置からシミュレーションを行い、実際の観測値を取得する
-				const tempSim = new KssRng(r.getIndex()).simulateBattleWindowsMWW(magician, actionCombination, this.hammerThrow, this.allowDragonStar);
-				const isEqual = tempSim.length > branch.simIndex && tempSim[branch.simIndex] === branch.value;
-				if (isEqual) {
-					// 分岐条件に一致した場合はフォールバック行動を使用する
-					chosenActionCombination = branch.fallbackActionCombination;
-				}
-
-				// 分岐の発生を集計
-				result.branchCount++;
-				// 一致/不一致ごとに乱数位置をグループ化する
-				let branchGroup = result.branchGroups.get(starStr);
-				if (!branchGroup) {
-					branchGroup = { true: [], false: [], simIndex: branch.simIndex, value: branch.value };
-					result.branchGroups.set(starStr, branchGroup);
-				}
-				branchGroup[`${isEqual}`].push(i);
-
-				if (isEqual) result.totalBranchMatch++;
-				else result.totalBranchNoMatch++;
-			}
-
-			// 行動を適用
-			const sim = r.simulateBattleWindowsMWW(magician, chosenActionCombination, this.hammerThrow, this.allowDragonStar);
-
-			// 星パターンごとにグループを作成（初回のみ）
-			if (!simGroup) {
+				// 星パターンごとにグループを作成
 				simGroup = {
 					success: [],
 					fails: [[], [], [], []],
@@ -743,6 +785,43 @@ export class BattleWindowsMWWManipulator {
 					manipulateResult,
 				};
 				result.simulationGroups.set(starStr, simGroup);
+
+				// 計算時間の記録
+				result.totalTime += elapsed;
+				if (elapsed > result.worstTime) result.worstTime = elapsed;
+			}
+
+			let current = manipulateResult;
+			const actions = [];
+			const sim = [];
+
+			// 実行ステップ定義
+			const steps = [
+				{ simIndex: 0, sim: (/**@type {ActionTable}*/a) => r.simulateMagician(a) },
+				{ simIndex: 1, sim: (/**@type {ActionTable}*/a) => r.simulateKnight(a, this.hammerThrow) },
+				{ simIndex: 2, sim: (/**@type {ActionTable}*/a) => r.simulateDragon(a) },
+				{ simIndex: 3, sim: (/**@type {ActionTable}*/a) => r.simulateDragonTurn2(a, this.allowDragonStar) },
+			];
+
+			// ツリーを辿りながらシミュレーションを実行
+			let difficulty = 0;
+			for (const step of steps) {
+				if (!current) break;
+				actions.push(current.action);
+
+				// 分岐の集計
+				const branchSize = current.branches.size;
+				result.turnBranchCounts[step.simIndex][branchSize] = (result.turnBranchCounts[step.simIndex][branchSize] ?? 0) + 1;
+
+				// 難易度加算
+				difficulty += current.action.difficulty ?? 0;
+				difficulty += branchSize * this.branchDifficulty;
+
+				const obs = step.sim(current.action);
+				if (obs === null) break;
+				sim.push(obs);
+
+				current = current.branches.get(obs) ?? current.default;
 			}
 
 			// 行動の結果を確認
@@ -755,18 +834,24 @@ export class BattleWindowsMWWManipulator {
 					simGroup.hasFail = true;
 					result.unsolvableSuccessCount += simGroup.success.length;
 				}
-			} else {			
+			} else {
 				simGroup.success.push(i);
 				result.successCount++;
+				result.successValue += Math.abs(Math.floor(result.total / 2) - result.count);
 				if (simGroup.hasFail) result.unsolvableSuccessCount++;
 
+				// 難易度の記録
+				result.totalDifficulty += difficulty;
+				if (difficulty > result.worstDifficulty) result.worstDifficulty = difficulty;
+
 				// 成功した行動の使用回数を集計する
-				result.magicianCountList.set(magician, (result.magicianCountList.get(magician) ?? 0) + 1);
-				result.knightCountList.set(chosenActionCombination.knight, (result.knightCountList.get(chosenActionCombination.knight) ?? 0) + 1);
-				result.dragonCountList.set(chosenActionCombination.dragon, (result.dragonCountList.get(chosenActionCombination.dragon) ?? 0) + 1);
-				result.dragonActionCountList.set(chosenActionCombination.dragonAction, (result.dragonActionCountList.get(chosenActionCombination.dragonAction) ?? 0) + 1);
+				result.magicianCountList.set(actions[0], (result.magicianCountList.get(actions[0]) ?? 0) + 1);
+				result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
+				result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
+				result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
 			}
 
+			result.count++;
 			yield result;
 		}
 	}
