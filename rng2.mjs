@@ -477,10 +477,44 @@ export class BattleWindowsMWWManipulator {
 		this.maxIndex = maxIndex;
 		this.branchDifficulty = branchDifficulty;
 
+		// 各ターンの行動リストを作成
 		this.magicianList = MagicianPrioritiesTable[this.magicianDifficulty];
 		this.knightList = actionsDifficultyTable.knight.map(e => ({ ...e,  fast: this.fastKnight }));
 		this.dragonList = actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon }));
 		this.dragonTurn2List = actionsDifficultyTable.dragonTurn2;
+
+		// 各状態からの遷移を作成
+		this.magicianStates = [];
+		this.knightStates = [];
+		this.dragonStates = [];
+		this.dragonTurn2States = [];
+		for(const r of KssRng.range(this.minIndex, this.maxIndex + 400)){
+			const i = r.getIndex();
+			this.magicianStates.push(this.magicianList.map(a => {
+				const r = new KssRng(i);
+				const powers = r.simulateMagician(a);
+				r.advance(-this.minIndex);
+				return { powers, index: r.getIndex() };
+			}));
+			this.knightStates.push(this.knightList.map(a => {
+				const r = new KssRng(i);
+				const powers = r.simulateKnight(a, this.hammerThrow);
+				r.advance(-this.minIndex);
+				return { powers, index: r.getIndex() };
+			}));
+			this.dragonStates.push(this.dragonList.map(a => {
+				const r = new KssRng(i);
+				const powers = r.simulateDragon(a);
+				r.advance(-this.minIndex);
+				return { powers, index: r.getIndex() };
+			}));
+			this.dragonTurn2States.push(this.dragonTurn2List.map(a => {
+				const r = new KssRng(i);
+				const powers = r.simulateDragonTurn2(a, this.allowDragonStar);
+				r.advance(-this.minIndex);
+				return { powers, index: r.getIndex() };
+			}));
+		}
 	}
 
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
