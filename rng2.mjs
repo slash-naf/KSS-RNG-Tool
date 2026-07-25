@@ -297,12 +297,12 @@ export class KssRng {
 	/** 連続する乱数位置のKssRngを順番に返す
 	 * @param {number} minIndex
 	 * @param {number} maxIndex
-	 * @returns {IterableIterator<KssRng>}
+	 * @returns {IterableIterator<RngIndex>}
 	 */
 	static *range(minIndex, maxIndex) {
 		let i = /**@type {RngIndex}*/ (minIndex);
 		while (true) {
-			yield new KssRng(i);
+			yield i;
 			if (i === maxIndex) break;
 			i = KssRng.calcIndex(i, 1);
 		}
@@ -326,7 +326,8 @@ export class KssRng {
 	static findIndicesByStars(stars, minIndex, maxIndex) {
 		/** @type {RngIndex[]} */
 		const indices = [];
-		for (const r of KssRng.range(minIndex, maxIndex)) {
+		for (const i of KssRng.range(minIndex, maxIndex)) {
+			const r = new KssRng(i);
 			if (stars.every(v => r.starDirection() === v)) {
 				indices.push(r.getIndex());
 			}
@@ -441,7 +442,7 @@ const MagicianPrioritiesTable = {
 };
 
 /**
- * @typedef {{ action: ActionTable, branches: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
+ * @typedef {{ action: ActionTable, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
  */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
@@ -477,54 +478,99 @@ export class BattleWindowsMWWManipulator {
 		this.maxIndex = maxIndex;
 		this.branchDifficulty = branchDifficulty;
 
-		// 各ターンの行動リストを作成
-		this.magicianList = MagicianPrioritiesTable[this.magicianDifficulty];
-		this.knightList = actionsDifficultyTable.knight.map(e => ({ ...e,  fast: this.fastKnight }));
-		this.dragonList = actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon }));
-		this.dragonTurn2List = actionsDifficultyTable.dragonTurn2;
+		// 各ターンの難易度低い順行動リストを作成
+		this.actionListTurns = [
+			MagicianPrioritiesTable[this.magicianDifficulty],
+			actionsDifficultyTable.knight.map(e => ({ ...e,  fast: this.fastKnight })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon })),
+			actionsDifficultyTable.dragonTurn2,
+		];
 
-		// 各状態からの遷移を作成
-		this.magicianStates = [];
-		this.knightStates = [];
-		this.dragonStates = [];
-		this.dragonTurn2States = [];
-		for(const r of KssRng.range(this.minIndex, this.maxIndex + 400)){
-			const i = r.getIndex();
-			this.magicianStates.push(this.magicianList.map(a => {
-				const r = new KssRng(i);
-				const powers = r.simulateMagician(a);
-				r.advance(-this.minIndex);
-				return { powers, index: r.getIndex() };
-			}));
-			this.knightStates.push(this.knightList.map(a => {
-				const r = new KssRng(i);
-				const powers = r.simulateKnight(a, this.hammerThrow);
-				r.advance(-this.minIndex);
-				return { powers, index: r.getIndex() };
-			}));
-			this.dragonStates.push(this.dragonList.map(a => {
-				const r = new KssRng(i);
-				const powers = r.simulateDragon(a);
-				r.advance(-this.minIndex);
-				return { powers, index: r.getIndex() };
-			}));
-			this.dragonTurn2States.push(this.dragonTurn2List.map(a => {
-				const r = new KssRng(i);
-				const powers = r.simulateDragonTurn2(a, this.allowDragonStar);
-				r.advance(-this.minIndex);
-				return { powers, index: r.getIndex() };
-			}));
-		}
+		// 各状態からの遷移を作成(turns[turnIndex][rngIndexOffset][actionIndex])
+		const r = new KssRng(/**@type {RngIndex}*/(0));
+		const steps = [
+			(/**@type {ActionTable}*/a) => r.simulateMagician(a),
+			(/**@type {ActionTable}*/a) => r.simulateKnight(a, this.hammerThrow),
+			(/**@type {ActionTable}*/a) => r.simulateDragon(a),
+			(/**@type {ActionTable}*/a) => r.simulateDragonTurn2(a, this.allowDragonStar),
+		];
+		this.turns = steps.map((step, i) => {
+			const turn = [];
+			for(const index of KssRng.range(this.minIndex, this.maxIndex + 500)){
+				turn.push(this.actionListTurns[i].map(a => {
+					r.index = index;
+					const obs = step(a);
+					return obs === null ? null : {obs, offset: this.RngIndexToOffset(r.index)};
+				}));
+			}
+			return turn;
+		});
 	}
 
+	/** minIndexからのオフセットを計算
+	 * @param {RngIndex} index 
+	*/
+	RngIndexToOffset(index) {
+		return KssRng.calcIndex(index, -this.minIndex);
+	}
+
+	/** あるターンからの乱数調整を探す
+	 * @param {number} turnIndex
+	 * @param {number} currentDifficulty
+	 * @param {number} bestDifficulty
+	 * @param {number} currentFailsCount
+	 * @param {number} bestFailsCount
+	 * @param {number[]} offsets
+	 * @returns {{result: ManipulateResult, bestDifficulty: number, bestFailsCount: number}}
+	 */
+	manipulateFrom(turnIndex, currentDifficulty, bestDifficulty, currentFailsCount, bestFailsCount, offsets) {
+		let result = null;
+
+		const actionList = this.actionListTurns[turnIndex];
+		const turn = this.turns[turnIndex];
+		actionLoop: for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
+			const a = actionList[actionIndex];
+			const nextDifficulty = currentDifficulty + (a.difficulty ?? actionIndex * 0x100000);
+
+			if(bestFailsCount === 0 && nextDifficulty >= bestDifficulty) break;	//難易度で枝刈り
+
+			//結果がより良いか判定
+			const nextOffsets = [];
+			let nextFailsCount = currentFailsCount;
+			for(let i=0; i < offsets.length; i++){
+				const offset = offsets[i];
+				const turnResult = turn[offset][actionIndex];
+				if(turnResult){
+					nextOffsets.push(turnResult.offset);
+				}else if((++nextFailsCount - bestFailsCount || nextDifficulty - bestDifficulty) >= 0){
+					continue actionLoop;
+				}
+			}
+
+			//次のターン
+			if(turnIndex !== 3){
+				const c = this.manipulateFrom(turnIndex + 1, nextDifficulty, bestDifficulty, nextFailsCount, bestFailsCount, nextOffsets);
+				if(c.result){
+					result = {action: a, default: c.result};
+					bestDifficulty = c.bestDifficulty;
+					bestFailsCount = c.bestFailsCount;
+				}
+			}else{
+				result = {action: a, default: null};
+				bestDifficulty = nextDifficulty;
+				bestFailsCount = nextFailsCount;
+			}
+		}
+		return {result, bestDifficulty, bestFailsCount};
+	}
 	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
 	 */
 	manipulate(stars) {
-		// 星の方向が全て一致する乱数位置を探す（探索後は星消費後の乱数位置が返る）
-		const indices = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex);
-
+		// 星の方向が全て一致する乱数位置を探す
+		const offsets = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex).map(v => this.RngIndexToOffset(v));
+		return this.manipulateFrom(0, 0, Infinity, 0, Infinity, offsets).result;
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
@@ -540,7 +586,7 @@ export class BattleWindowsMWWManipulator {
 			successCount: 0,         // 最後まで成功した回数
 			successValue: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
-			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [simIndex][branchSize] */
+			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [turnIndex][branchSize] */
 			turnBranchCounts: Array.from({ length: 4 }, () => []),
 			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
 			simulationGroups: new Map(),
@@ -561,10 +607,9 @@ export class BattleWindowsMWWManipulator {
 			total: this.maxIndex - this.minIndex + 1,
 		};
 
-		for (const r_ of KssRng.range(this.minIndex, this.maxIndex)) {
-			const i = r_.getIndex();
+		for (const i of KssRng.range(this.minIndex, this.maxIndex)) {
 			// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
-			const r = debugCallback ? r_.withProxy(debugCallback, ignore) : r_;
+			const r = debugCallback ? new KssRng(i).withProxy(debugCallback, ignore) : new KssRng(i);
 			// 星の方向の確認
 			const starDirectionList = [];
 			for (let j = 0; j < stars; j++) {
@@ -597,37 +642,34 @@ export class BattleWindowsMWWManipulator {
 				if (elapsed > result.worstTime) result.worstTime = elapsed;
 			}
 
-			let current = manipulateResult;
-			const actions = [];
-			const sim = [];
-
-			// 実行ステップ定義
-			const steps = [
-				{ simIndex: 0, sim: (/**@type {ActionTable}*/a) => r.simulateMagician(a) },
-				{ simIndex: 1, sim: (/**@type {ActionTable}*/a) => r.simulateKnight(a, this.hammerThrow) },
-				{ simIndex: 2, sim: (/**@type {ActionTable}*/a) => r.simulateDragon(a) },
-				{ simIndex: 3, sim: (/**@type {ActionTable}*/a) => r.simulateDragonTurn2(a, this.allowDragonStar) },
-			];
-
 			// ツリーを辿りながらシミュレーションを実行
 			let difficulty = 0;
-			for (const step of steps) {
+			const actions = [];
+			const sim = [];
+			const steps = [
+				(/**@type {ActionTable}*/a) => r.simulateMagician(a),
+				(/**@type {ActionTable}*/a) => r.simulateKnight(a, this.hammerThrow),
+				(/**@type {ActionTable}*/a) => r.simulateDragon(a),
+				(/**@type {ActionTable}*/a) => r.simulateDragonTurn2(a, this.allowDragonStar),
+			];
+			for(let turnIndex = 0, current = manipulateResult; turnIndex < steps.length; turnIndex++){
+				const step = steps[turnIndex];
 				if (!current) break;
 				actions.push(current.action);
 
 				// 分岐の集計
-				const branchSize = current.branches.size;
-				result.turnBranchCounts[step.simIndex][branchSize] = (result.turnBranchCounts[step.simIndex][branchSize] ?? 0) + 1;
+				const branchSize = current.branches ? current.branches.size : 0;
+				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
 				// 難易度加算
 				difficulty += current.action.difficulty ?? 0;
 				difficulty += branchSize * this.branchDifficulty;
 
-				const obs = step.sim(current.action);
+				const obs = step(current.action);
 				if (obs === null) break;
 				sim.push(obs);
 
-				current = current.branches.get(obs) ?? current.default;
+				current = current.branches ? (current.branches.get(obs) ?? current.default) : current.default;
 			}
 
 			// 行動の結果を確認
