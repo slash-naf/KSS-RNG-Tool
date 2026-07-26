@@ -474,13 +474,14 @@ export class BattleWindowsMWWManipulator {
 		this.fastDragon = fastDragon;
 		this.allowDragonStar = allowDragonStar;
 		this.hammerThrow = hammerThrow;
-		this.minIndex = minIndex;
-		this.maxIndex = maxIndex;
+		this.minIndex = /**@type {RngIndex}*/(minIndex);
+		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.branchDifficulty = branchDifficulty;
+		this.middleOffset = this.RngIndexToOffset(this.maxIndex) / 2;
 
 		// 各ターンの難易度低い順行動リストを作成
 		this.actionListTurns = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map((e, i) => ({ ...e, difficulty: i << 24 })),
+			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, difficulty: 0 })),
 			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight })),
 			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon })),
 			actionsDifficultyTable.dragonTurn2,
@@ -513,64 +514,69 @@ export class BattleWindowsMWWManipulator {
 	RngIndexToOffset(index) {
 		return KssRng.calcIndex(index, -this.minIndex);
 	}
+	/** 乱数範囲の中央からの差を計算
+	 * @param {number} offset
+	 */
+	offsetToDeviation(offset) {
+		return Math.abs(offset - this.middleOffset);
+	}
 
 	/** あるターンからの乱数調整を探す
 	 * @param {number} turnIndex
-	 * @param {number} currentDifficulty
-	 * @param {number} bestDifficulty
-	 * @param {number} currentFailsCount
-	 * @param {number} bestFailsCount
-	 * @param {number[]} offsets
-	 * @returns {{result: ManipulateResult, bestDifficulty: number, bestFailsCount: number}}
+	 * @param {number[]} currentOffsets
+	 * @param {{difficulty: number, failsCount: number, deviation: number}} best
+	 * @param {{difficulty: number, failsCount: number, deviation: number}} current
+	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, currentDifficulty, bestDifficulty, currentFailsCount, bestFailsCount, offsets) {
+	manipulateFrom(turnIndex, currentOffsets, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity}, current={difficulty: 0, failsCount: 0, deviation: 0}) {
 		let result = null;
 
 		const actionList = this.actionListTurns[turnIndex];
 		const turn = this.turns[turnIndex];
 		actionLoop: for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
-			const a = actionList[actionIndex];
-			const nextDifficulty = currentDifficulty + a.difficulty;
+			const action = actionList[actionIndex];
+			const difficulty = current.difficulty + action.difficulty;
 
-			if(bestFailsCount === 0 && nextDifficulty >= bestDifficulty) break;	//難易度で枝刈り
+			const difficultyDiff = turnIndex === 0 ? 1 : difficulty - best.difficulty;
+			if(best.failsCount === 0 && difficultyDiff >= 0) break;	//難易度で枝刈り
 
 			//結果がより良いか判定
-			const nextOffsets = [];
-			let nextFailsCount = currentFailsCount;
-			for(let i=0; i < offsets.length; i++){
-				const offset = offsets[i];
+			const offsets = [];
+			let failsCount = current.failsCount;
+			let deviation = current.deviation;
+			for(const offset of currentOffsets){
 				const turnResult = turn[offset][actionIndex];
 				if(turnResult){
-					nextOffsets.push(turnResult.offset);
-				}else if((++nextFailsCount - bestFailsCount || nextDifficulty - bestDifficulty) >= 0){
-					continue actionLoop;
+					offsets.push(turnResult.offset);
+				}else{
+					failsCount++;
+					deviation -= this.offsetToDeviation(offset);
+					if((failsCount - best.failsCount || deviation - best.deviation || difficultyDiff) >= 0){
+						continue actionLoop;
+					}
 				}
 			}
 
 			//次のターン
 			if(turnIndex !== 3){
-				const c = this.manipulateFrom(turnIndex + 1, nextDifficulty, bestDifficulty, nextFailsCount, bestFailsCount, nextOffsets);
-				if(c.result){
-					result = {action: a, default: c.result};
-					bestDifficulty = c.bestDifficulty;
-					bestFailsCount = c.bestFailsCount;
-				}
+				const c = this.manipulateFrom(turnIndex + 1, offsets, best, {difficulty, failsCount, deviation});
+				if(c) result = {action, default: c};
 			}else{
-				result = {action: a, default: null};
-				bestDifficulty = nextDifficulty;
-				bestFailsCount = nextFailsCount;
+				result = {action, default: null};
+				best.difficulty = difficulty;
+				best.failsCount = failsCount;
+				best.deviation = deviation;
 			}
 		}
-		return {result, bestDifficulty, bestFailsCount};
+		return result;
 	}
-	/** 銀河に願いをのバトルウィンドウズ戦の乱数調整のための行動を探す
+	/** 星の向きを基に乱数調整のための行動を探す
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
 	 * @returns {ManipulateResult}
 	 */
 	manipulate(stars) {
-		// 星の方向が全て一致する乱数位置を探す
 		const offsets = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex).map(v => this.RngIndexToOffset(v));
-		return this.manipulateFrom(0, 0, Infinity, 0, Infinity, offsets).result;
+		return this.manipulateFrom(0, offsets);
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
@@ -584,7 +590,7 @@ export class BattleWindowsMWWManipulator {
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
 			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
 			successCount: 0,         // 最後まで成功した回数
-			successValue: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
+			successDeviationsSum: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
 			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [turnIndex][branchSize] */
 			turnBranchCounts: Array.from({ length: 4 }, () => []),
@@ -685,7 +691,7 @@ export class BattleWindowsMWWManipulator {
 			} else {
 				simGroup.success.push(i);
 				result.successCount++;
-				result.successValue += Math.abs(Math.floor(result.total / 2) - result.count);
+				result.successDeviationsSum += this.offsetToDeviation(result.count);
 				if (simGroup.hasFail) result.unsolvableSuccessCount++;
 
 				// 難易度の記録
