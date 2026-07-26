@@ -2,7 +2,7 @@
 
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, fast?: boolean, frames?: number, name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, fast?: boolean, frames?: number, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -337,7 +337,7 @@ export class KssRng {
 }
 
 /** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonTurn2: ActionTable[] }} ActionsDifficultyTable */
-/** BattleWindowsMWWManipulatorのactionsDifficultyTableデフォルト値 @type {ActionsDifficultyTable} */
+/** BattleWindowsMWWManipulatorのactionsDifficultyTableのデフォルト値 @type {ActionsDifficultyTable} */
 const DefaultActionsDifficultyTable = {
 	knight: [
 		{ difficulty: 0 },
@@ -389,7 +389,7 @@ const DefaultActionsDifficultyTable = {
 	],
 };
 
-/** 魔法使いのFast @type {ActionTable[]} */
+/** 魔法使いのFast */
 export const FastMagicianList = [
 	{ lateAdvances: -8, frames: 1, name: "1st frame", fast: true, earlyHardHitCheck: true },
 	{ lateAdvances: -6, frames: 3, name: "Fast1",     fast: true, earlyHardHitCheck: true },
@@ -399,7 +399,7 @@ export const FastMagicianList = [
 	{ lateAdvances:  0, frames: 4, name: "Fast4",     fast: true },
 ];
 /** @typedef {keyof MagicianPrioritiesTable} MagicianDifficulty */
-/** 魔法使いでの行動の優先順位 @type {{ easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[] }} */
+/** 魔法使いでの行動の優先順位 */
 const MagicianPrioritiesTable = {
 	easy: [
 		{ },
@@ -480,9 +480,9 @@ export class BattleWindowsMWWManipulator {
 
 		// 各ターンの難易度低い順行動リストを作成
 		this.actionListTurns = [
-			MagicianPrioritiesTable[this.magicianDifficulty],
-			actionsDifficultyTable.knight.map(e => ({ ...e,  fast: this.fastKnight })),
-			actionsDifficultyTable.dragon.map(e => ({ ...e,  fast: this.fastDragon })),
+			MagicianPrioritiesTable[this.magicianDifficulty].map((e, i) => ({ ...e, difficulty: i << 24 })),
+			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon })),
 			actionsDifficultyTable.dragonTurn2,
 		];
 
@@ -530,7 +530,7 @@ export class BattleWindowsMWWManipulator {
 		const turn = this.turns[turnIndex];
 		actionLoop: for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
 			const a = actionList[actionIndex];
-			const nextDifficulty = currentDifficulty + (a.difficulty ?? actionIndex * 0x100000);
+			const nextDifficulty = currentDifficulty + a.difficulty;
 
 			if(bestFailsCount === 0 && nextDifficulty >= bestDifficulty) break;	//難易度で枝刈り
 
@@ -662,7 +662,7 @@ export class BattleWindowsMWWManipulator {
 				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
 				// 難易度加算
-				difficulty += current.action.difficulty ?? 0;
+				difficulty += current.action.difficulty;
 				difficulty += branchSize * this.branchDifficulty;
 
 				const obs = step(current.action);
