@@ -38,8 +38,9 @@ const parseBattleWindowsPower = (/**@type {PowerName}*/v) => /**@type {ID<PowerN
 export const BattleWindowsPowerMap = Uint8Array.from(BattleWindowsPowerNames, v => parseBattleWindowsPower(v));
 export const BattleWindowsPowerNone = parseBattleWindowsPower('None');
 /** @typedef {ID<'BattleWindowsPowersPair'>} BattleWindowsPowersPair コピーの元判定の結果 */
-export function getLeftPower(/**@type {BattleWindowsPowersPair}*/p) { return p >> 8; }
-export function getRightPower(/**@type {BattleWindowsPowersPair}*/p) { return p & 0xFF; }
+export function makePowersPair(/**@type {number}*/left, /**@type {number}*/right) { return /**@type {BattleWindowsPowersPair}*/(left << 8 | right); }
+export function getLeftPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p >> 8); }
+export function getRightPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p & 0xFF); }
 
 // --- 乱数消費数 --
 export const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星（1回は星の方向の判定）
@@ -108,11 +109,16 @@ export class KssRng {
 	/** ハンマーのヒット（ハードヒット判定 + ハードヒット時の乱数消費） */
 	hammerHit() {
 		const hardHit = this.checkHammerHardHit();
-		if (hardHit) this.advance(HammerHardHitAdvances);
+		this.hammerHardHit(hardHit);
 	}
 	/** ハンマーがハードヒットするかどうか */
 	checkHammerHardHit() {
 		return this.randi(4) === 0;
+	}
+	/** ハンマーのハードヒット
+	 * @param {boolean} hardHit */
+	hammerHardHit(hardHit){
+		if (hardHit) this.advance(HammerHardHitAdvances);
 	}
 	/** 鬼殺し火炎ハンマーをし、敵ににヒットさせる */
 	hammerFlipChargeAndHit() {
@@ -171,12 +177,12 @@ export class KssRng {
 			}
 		} while (left === right);
 
-		return /**@type {BattleWindowsPowersPair}*/(left << 8 | right);
+		return makePowersPair(left, right);
 	}
 	/** 鬼殺しのヒットとともに、バトルウィンドウズのコピーの元の出現を、ハードヒット判定の前か後に行う
 	 * @param {boolean} earlyHardHitCheck
 	 * @returns {BattleWindowsPowersPair} */
-	battleWindowsPowersWithHammerFlipHit(earlyHardHitCheck) {
+	battleWindowsPowersWithHammerFlipHit(earlyHardHitCheck=false) {
 		let hardHit, powers;
 		if (earlyHardHitCheck) {
 			hardHit = this.checkHammerHardHit();
@@ -185,7 +191,7 @@ export class KssRng {
 			powers = this.battleWindowsPowers();
 			hardHit = this.checkHammerHardHit();
 		}
-		if (hardHit) this.advance(HammerHardHitAdvances);
+		this.hammerHardHit(hardHit);
 		this.advance(HammerFlipFinishAdvances);
 		return powers;
 	}
@@ -206,7 +212,7 @@ export class KssRng {
 		// コピーの元判定
 		let powers;
 		if (action.fast) {
-			powers =this.battleWindowsPowersWithHammerFlipHit(action.earlyHardHitCheck ?? false);
+			powers =this.battleWindowsPowersWithHammerFlipHit(action.earlyHardHitCheck);
 		} else {
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
