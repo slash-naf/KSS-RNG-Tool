@@ -486,14 +486,14 @@ export class BattleWindowsMWWManipulator {
 		this.middleOffset = this.RngIndexToOffset(this.maxIndex) / 2;
 
 		// 各ターンの難易度低い順行動リストを作成
-		this.actionListTurns = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, difficulty: 0 })),
+		this.actionsListByTurn = [
+			MagicianPrioritiesTable[this.magicianDifficulty].map((e, i) => ({ ...e, difficulty: i * 1000000 })),
 			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight })),
 			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon })),
 			actionsDifficultyTable.dragonTurn2,
 		];
 
-		// 各状態からの遷移を作成(turns[turnIndex][rngIndexOffset][actionIndex])
+		// 各状態からの遷移を作成
 		const r = new KssRng(/**@type {RngIndex}*/(0));
 		const steps = [
 			(/**@type {ActionTable}*/a) => r.simulateMagician(a),
@@ -501,17 +501,15 @@ export class BattleWindowsMWWManipulator {
 			(/**@type {ActionTable}*/a) => r.simulateDragon(a),
 			(/**@type {ActionTable}*/a) => r.simulateDragonTurn2(a, this.allowDragonStar),
 		];
-		this.turns = steps.map((step, i) => {
-			const turn = [];
+		this.turns = steps.map((step, i) => this.actionsListByTurn[i].map(action => {
+			const byOffset = [];
 			for(const index of KssRng.range(this.minIndex, this.maxIndex + 500)){
-				turn.push(this.actionListTurns[i].map(a => {
-					r.index = index;
-					const obs = step(a);
-					return obs === null ? null : {obs, offset: this.RngIndexToOffset(r.index)};
-				}));
+				r.index = index;
+				const obs = step(action);
+				byOffset.push(obs === null ? null : {obs, offset: this.RngIndexToOffset(r.index)});
 			}
-			return turn;
-		});
+			return {action, byOffset};
+		}));
 	}
 
 	/** minIndexからのオフセットを計算
@@ -536,22 +534,16 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulateFrom(turnIndex, currentOffsets, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity}, current={difficulty: 0, failsCount: 0, deviation: 0}) {
 		let result = null;
-
-		const actionList = this.actionListTurns[turnIndex];
-		const turn = this.turns[turnIndex];
-		for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
-			const action = actionList[actionIndex];
-			const difficulty = current.difficulty + (turnIndex === 0 ? actionIndex << 24 : action.difficulty);
-
-			const difficultyDiff = difficulty - best.difficulty;
-			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficultyDiff >= 0) break;	//難易度で枝刈り
+		for(const {action, byOffset} of this.turns[turnIndex]){
+			const difficulty = current.difficulty + action.difficulty;
+			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficulty >= best.difficulty) break;	//難易度で枝刈り
 
 			//結果がより良いか判定
 			const offsets = [];
 			let failsCount = current.failsCount;
 			let deviation = current.deviation;
 			for(const offset of currentOffsets){
-				const turnResult = turn[offset][actionIndex];
+				const turnResult = byOffset[offset];
 				if(turnResult){
 					offsets.push(turnResult.offset);
 				}else{
@@ -559,7 +551,7 @@ export class BattleWindowsMWWManipulator {
 					deviation -= this.offsetToDeviation(offset);
 				}
 			}
-			if((failsCount - best.failsCount || deviation - best.deviation || difficultyDiff) >= 0) continue;
+			if((failsCount - best.failsCount || deviation - best.deviation || difficulty - best.difficulty) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
