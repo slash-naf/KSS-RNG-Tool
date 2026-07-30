@@ -539,12 +539,12 @@ export class BattleWindowsMWWManipulator {
 
 		const actionList = this.actionListTurns[turnIndex];
 		const turn = this.turns[turnIndex];
-		actionLoop: for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
+		for(let actionIndex=0; actionIndex < actionList.length; actionIndex++){
 			const action = actionList[actionIndex];
-			const difficulty = current.difficulty + action.difficulty;
+			const difficulty = current.difficulty + (turnIndex === 0 ? actionIndex << 24 : action.difficulty);
 
-			const difficultyDiff = turnIndex === 0 ? 1 : difficulty - best.difficulty;
-			if(best.failsCount === 0 && difficultyDiff >= 0) break;	//難易度で枝刈り
+			const difficultyDiff = difficulty - best.difficulty;
+			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficultyDiff >= 0) break;	//難易度で枝刈り
 
 			//結果がより良いか判定
 			const offsets = [];
@@ -557,16 +557,14 @@ export class BattleWindowsMWWManipulator {
 				}else{
 					failsCount++;
 					deviation -= this.offsetToDeviation(offset);
-					if((failsCount - best.failsCount || deviation - best.deviation || difficultyDiff) >= 0){
-						continue actionLoop;
-					}
 				}
 			}
+			if((failsCount - best.failsCount || deviation - best.deviation || difficultyDiff) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
-				const c = this.manipulateFrom(turnIndex + 1, offsets, best, {difficulty, failsCount, deviation});
-				if(c) result = {action, default: c};
+				const cont = this.manipulateFrom(turnIndex + 1, offsets, best, {difficulty, failsCount, deviation});
+				if(cont) result = {action, default: cont};
 			}else{
 				result = {action, default: null};
 				best.difficulty = difficulty;
