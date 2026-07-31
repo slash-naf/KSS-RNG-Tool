@@ -526,43 +526,47 @@ export class BattleWindowsMWWManipulator {
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{obs: BattleWindowsPowersPair, offsetGroups: {offset: number, deviation: number}[], cont: ManipulateResult, best: {difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
-	 * @param {{offset: number, deviation: number}[]} startingOffsetGroups
+	 * @param {{offset: number, deviation: number}[]} currentOffsetGroups
 	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} best
 	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} current
 	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, startingOffsetGroups, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null}, current={difficulty: 0, failsCount: 0, deviation: 0, branchGroups: null}) {
+	manipulateFrom(turnIndex, currentOffsetGroups, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null}, current={difficulty: 0, failsCount: 0, deviation: 0, branchGroups: null}) {
 		let result = null;
 		for(const {action, byOffset} of this.turns[turnIndex]){
 			let difficulty = current.difficulty + action.difficulty;
-			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficulty >= best.difficulty) break;	//難易度で枝刈り
+
+			//事前評価で枝刈り
+			if((current.failsCount - best.failsCount || current.deviation - best.deviation || difficulty - best.difficulty) >= 0) break;
 
 			//次の状態を計算
+			let offsetGroups = currentOffsetGroups;
 			let branchGroups;
 			let failsCount = current.failsCount;
 			let deviation = current.deviation;
 			if(current.branchGroups){
 				//失敗するところは分岐を使うとして進める
-				branchGroups = current.branchGroups.flatMap(branchGroup => {
+				branchGroups = current.branchGroups.flatMap(b => {
 					const offsetGroups = [];
-					for(const g of branchGroup.offsetGroups){
+					for(const g of b.offsetGroups){
 						const turnResult = byOffset[g.offset];
 						if(turnResult){
 							offsetGroups.push({offset: turnResult.offset, deviation: g.deviation});
 						}else{
-							difficulty += branchGroup.best.difficulty;
-							failsCount += branchGroup.best.failsCount;
-							deviation += branchGroup.best.deviation;
+							difficulty += b.best.difficulty;
+							failsCount += b.best.failsCount;
+							deviation += b.best.deviation;
 							return [];
 						}
 					}
-					return {...branchGroup, offsetGroups};
+					return [{...b, offsetGroups}];
 				});
+				if(branchGroups.length === 0) continue;
 			}else{
 				//観測値ごとに分ける
 				/** @type {Map<BattleWindowsPowersPair, {offset: number, deviation: number}[]>} */
 				const groups = new Map();
-				for(const g of startingOffsetGroups){
+				for(const g of offsetGroups){
 					const turnResult = byOffset[g.offset];
 					if(turnResult){
 						let group = groups.get(turnResult.obs);
@@ -574,20 +578,30 @@ export class BattleWindowsMWWManipulator {
 					}
 				}
 
-				//分岐ごとの最適解を探しておく
-				branchGroups = [];
-				if(turnIndex !== 3){
+				if(groups.size === 0){
+					continue;
+				}else if(groups.size === 1){
+					//分岐が一つなら次を分岐作成ターンにする
+					branchGroups = null;
+					offsetGroups = [...groups.values()][0];
+				}else{
+					//分岐ごとの最適解を探しておく
+					branchGroups = [];
 					for(const [obs, offsetGroups] of groups.entries()){
 						const best = {difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null};
-						const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best);
-						best.difficulty = (difficulty + best.difficulty + 100000000) * offsetGroups.length;
-						if(cont){
-							branchGroups.push({obs, offsetGroups, cont, best});
-						}else{
-							for(const g of offsetGroups){
-								failsCount++;
-								deviation -= g.deviation;
+						if(turnIndex !== 3){
+							const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best);
+							best.difficulty = (best.difficulty + 100000000) * offsetGroups.length;
+							if(cont){
+								branchGroups.push({obs, offsetGroups, cont, best});
+							}else{
+								for(const g of offsetGroups){
+									failsCount++;
+									deviation -= g.deviation;
+								}
 							}
+						}else{
+							branchGroups.push({obs, offsetGroups, cont: null, best});
 						}
 					}
 				}
@@ -596,15 +610,15 @@ export class BattleWindowsMWWManipulator {
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, startingOffsetGroups, best, {difficulty, failsCount, deviation, branchGroups});
+				const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best, {difficulty, failsCount, deviation, branchGroups});
 				if(cont){
 					//分岐が作られたターンでbranchesに登録する
 					const branches = new Map();
-					if(!current.branchGroups && best.branchGroups){
+					if(!current.branchGroups && best.branchGroups && branchGroups){
 						const bestObsSet = new Set(best.branchGroups.map(b => b.obs));
-						for(const bg of branchGroups){
-							if(!bestObsSet.has(bg.obs)){
-								branches.set(bg.obs, bg.cont);
+						for(const b of branchGroups){
+							if(!bestObsSet.has(b.obs)){
+								branches.set(b.obs, b.cont);
 							}
 						}
 					}
@@ -618,6 +632,7 @@ export class BattleWindowsMWWManipulator {
 				best.branchGroups = branchGroups;
 			}
 		}
+
 		return result;
 	}
 	/** 星の向きを基に乱数調整のための行動を探す
