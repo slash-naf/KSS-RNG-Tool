@@ -576,16 +576,18 @@ export class BattleWindowsMWWManipulator {
 
 				//分岐ごとの最適解を探しておく
 				branchGroups = [];
-				for(const [obs, offsetGroups] of groups.entries()){
-					const best = {difficulty: Infinity, failsCount: offsetGroups.length, deviation: 0, branchGroups: null};
-					const cont = turnIndex === 3 ? null : this.manipulateFrom(turnIndex + 1, offsetGroups, best);
-					best.difficulty = (difficulty + best.difficulty + 100000000) * offsetGroups.length;
-					if(cont){
-						branchGroups.push({obs, offsetGroups, cont, best});
-					}else{
-						for(const g of offsetGroups){
-							failsCount++;
-							deviation -= g.deviation;
+				if(turnIndex !== 3){
+					for(const [obs, offsetGroups] of groups.entries()){
+						const best = {difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null};
+						const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best);
+						best.difficulty = (difficulty + best.difficulty + 100000000) * offsetGroups.length;
+						if(cont){
+							branchGroups.push({obs, offsetGroups, cont, best});
+						}else{
+							for(const g of offsetGroups){
+								failsCount++;
+								deviation -= g.deviation;
+							}
 						}
 					}
 				}
@@ -595,16 +597,19 @@ export class BattleWindowsMWWManipulator {
 			//次のターン
 			if(turnIndex !== 3){
 				const cont = this.manipulateFrom(turnIndex + 1, startingOffsetGroups, best, {difficulty, failsCount, deviation, branchGroups});
-				const branches = new Map();
-				if(best.branchGroups){
-					const bestObsSet = new Set(best.branchGroups.map(b => b.obs));
-					for(const bg of branchGroups){
-						if(!bestObsSet.has(bg.obs)){
-							branches.set(bg.obs, bg.cont);
+				if(cont){
+					//分岐が作られたターンでbranchesに登録する
+					const branches = new Map();
+					if(!current.branchGroups && best.branchGroups){
+						const bestObsSet = new Set(best.branchGroups.map(b => b.obs));
+						for(const bg of branchGroups){
+							if(!bestObsSet.has(bg.obs)){
+								branches.set(bg.obs, bg.cont);
+							}
 						}
 					}
+					result = {action, branches, default: cont};
 				}
-				if(cont) result = {action, branches, default: cont};
 			}else{
 				result = {action, default: null};
 				best.difficulty = difficulty;
