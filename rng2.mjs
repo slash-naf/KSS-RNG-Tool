@@ -473,7 +473,6 @@ export class BattleWindowsMWWManipulator {
 		hammerThrow = 1,
 		minIndex = 2800,
 		maxIndex = 3376,
-		branchDifficulty = 100,
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
@@ -482,7 +481,6 @@ export class BattleWindowsMWWManipulator {
 		this.hammerThrow = hammerThrow;
 		this.minIndex = /**@type {RngIndex}*/(minIndex);
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
-		this.branchDifficulty = branchDifficulty;
 		this.middleOffset = this.RngIndexToOffset(this.maxIndex) / 2;
 
 		// 各ターンの難易度低い順行動リストを作成
@@ -526,42 +524,93 @@ export class BattleWindowsMWWManipulator {
 	}
 
 	/** あるターンからの乱数調整を探す
+	 * @typedef {{obs: BattleWindowsPowersPair, offsetGroups: {offset: number, deviation: number}[], cont: ManipulateResult, best: {difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
-	 * @param {{offset: number, deviation: number}[]} currentOffsetGroups
-	 * @param {{difficulty: number, failsCount: number, deviation: number}} best
-	 * @param {{difficulty: number, failsCount: number, deviation: number}} current
+	 * @param {{offset: number, deviation: number}[]} startingOffsetGroups
+	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} best
+	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} current
 	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, currentOffsetGroups, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity}, current={difficulty: 0, failsCount: 0, deviation: 0}) {
+	manipulateFrom(turnIndex, startingOffsetGroups, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null}, current={difficulty: 0, failsCount: 0, deviation: 0, branchGroups: null}) {
 		let result = null;
 		for(const {action, byOffset} of this.turns[turnIndex]){
-			const difficulty = current.difficulty + action.difficulty;
+			let difficulty = current.difficulty + action.difficulty;
 			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficulty >= best.difficulty) break;	//難易度で枝刈り
 
-			//結果がより良いか判定
-			const offsetGroups = [];
+			//次の状態を計算
+			let branchGroups;
 			let failsCount = current.failsCount;
 			let deviation = current.deviation;
-			for(const g of currentOffsetGroups){
-				const turnResult = byOffset[g.offset];
-				if(turnResult){
-					offsetGroups.push({offset: turnResult.offset, deviation: g.deviation});
-				}else{
-					failsCount++;
-					deviation -= g.deviation;
+			if(current.branchGroups){
+				//失敗するところは分岐を使うとして進める
+				branchGroups = current.branchGroups.flatMap(branchGroup => {
+					const offsetGroups = [];
+					for(const g of branchGroup.offsetGroups){
+						const turnResult = byOffset[g.offset];
+						if(turnResult){
+							offsetGroups.push({offset: turnResult.offset, deviation: g.deviation});
+						}else{
+							difficulty += branchGroup.best.difficulty;
+							failsCount += branchGroup.best.failsCount;
+							deviation += branchGroup.best.deviation;
+							return [];
+						}
+					}
+					return {...branchGroup, offsetGroups};
+				});
+			}else{
+				//観測値ごとに分ける
+				/** @type {Map<BattleWindowsPowersPair, {offset: number, deviation: number}[]>} */
+				const groups = new Map();
+				for(const g of startingOffsetGroups){
+					const turnResult = byOffset[g.offset];
+					if(turnResult){
+						let group = groups.get(turnResult.obs);
+						if(!group) groups.set(turnResult.obs, group = []);
+						group.push({offset: turnResult.offset, deviation: g.deviation});
+					}else{
+						failsCount++;
+						deviation -= g.deviation;
+					}
+				}
+
+				//分岐ごとの最適解を探しておく
+				branchGroups = [];
+				for(const [obs, offsetGroups] of groups.entries()){
+					const best = {difficulty: Infinity, failsCount: offsetGroups.length, deviation: 0, branchGroups: null};
+					const cont = turnIndex === 3 ? null : this.manipulateFrom(turnIndex + 1, offsetGroups, best);
+					best.difficulty = (difficulty + best.difficulty + 100000000) * offsetGroups.length;
+					if(cont){
+						branchGroups.push({obs, offsetGroups, cont, best});
+					}else{
+						for(const g of offsetGroups){
+							failsCount++;
+							deviation -= g.deviation;
+						}
+					}
 				}
 			}
 			if((failsCount - best.failsCount || deviation - best.deviation || difficulty - best.difficulty) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best, {difficulty, failsCount, deviation});
-				if(cont) result = {action, default: cont};
+				const cont = this.manipulateFrom(turnIndex + 1, startingOffsetGroups, best, {difficulty, failsCount, deviation, branchGroups});
+				const branches = new Map();
+				if(best.branchGroups){
+					const bestObsSet = new Set(best.branchGroups.map(b => b.obs));
+					for(const bg of branchGroups){
+						if(!bestObsSet.has(bg.obs)){
+							branches.set(bg.obs, bg.cont);
+						}
+					}
+				}
+				if(cont) result = {action, branches, default: cont};
 			}else{
 				result = {action, default: null};
 				best.difficulty = difficulty;
 				best.failsCount = failsCount;
 				best.deviation = deviation;
+				best.branchGroups = branchGroups;
 			}
 		}
 		return result;
@@ -665,7 +714,6 @@ export class BattleWindowsMWWManipulator {
 
 				// 難易度加算
 				difficulty += current.action.difficulty;
-				difficulty += branchSize * this.branchDifficulty;
 
 				const obs = step(current.action);
 				if (obs === null) break;
