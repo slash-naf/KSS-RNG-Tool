@@ -14,7 +14,6 @@ import {
 } from './rng2.mjs';
 
 /** @typedef {import('./rng2.mjs').RngIndex} RngIndex */
-/** @typedef {import('./rng2.mjs').SimIndex} SimIndex */
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {'en' | 'ja'} LangKey */
 /** @typedef {'easiest' | 'fastest' | 'custom'} PresetMode */
@@ -23,11 +22,9 @@ import {
 /** @typedef {'indexOnly' | 'hex' | 'split'} IndexDisplayMode */
 /** @typedef {import('./rng2.mjs').MagicianDifficulty} MagicianDifficulty */
 /** @typedef {import('./rng2.mjs').ActionTable} ActionTable */
-/** @typedef {import('./rng2.mjs').ActionCombination} ActionCombination */
 /** @typedef {import('./rng2.mjs').PowerName} PowerName */
 /** @typedef {import('./rng2.mjs').BattleWindowsPowersPair} BattleWindowsPowersPair */
 /** @typedef {import('./rng2.mjs').DragonAction} DragonAction */
-/** @typedef {import('./rng2.mjs').Branch} Branch */
 /** @typedef {import('./rng2.mjs').ManipulateResult} ManipulateResult */
 /** @typedef {'easy' | 'fast'} DifficultyMode */
 
@@ -474,8 +471,8 @@ function boolMsg(/** @type {boolean} */ b) {
 	return b ? '✅' : '❌';
 }
 
-/** SimIndexを対応する敵の名前に変換する
- * @param {SimIndex} simIndex */
+/** ターンを対応する敵の名前に変換する
+ * @param {number} simIndex */
 function branchIndexToEnemy(simIndex) {
 	return [
 		t('enemyMagician'),
@@ -561,7 +558,7 @@ function renderTimingTable(starIndices) {
 				}
 				lastIndex = endingIndex;
 			});
-			rng.simulateMagician(v);
+			rng.simulateMagician(/** @type {ActionTable} */ (v));
 			row.endingIndex = rng.getIndex();
 			return row;
 		});
@@ -608,89 +605,130 @@ function renderTimingTable(starIndices) {
 }
 
 /** 全体の行動手順テーブル（魔法使い〜レッドドラゴン2ターン目）を描画する
- * @param {ActionTable} magician 魔法使い行動
- * @param {ActionCombination} actionCombination 行動組み合わせ
- * @param {Branch | null} branch 分岐情報
+ * @param {ManipulateResult} manipulateResult 
  * @param {RngIndex[]} starIndices 候補となる乱数位置リスト
  * @param {ReturnType<typeof getSettings>} settings 現在の設定 */
-function renderMainResultTable(magician, actionCombination, branch, starIndices, settings) {
+function renderMainResultTable(manipulateResult, starIndices, settings) {
 	const detailMode = settings.detailMode;
+	const showColumns = detailMode !== 'none';
 	const showPowers = detailMode === 'withPowers' || detailMode === 'withFailPowers';
 	const showFailPowers = detailMode === 'withFailPowers';
 	const showTransitions = detailMode === 'withTransitions';
-	const hasBranch = branch !== null;
-
-	// 分岐がある場合、どの敵のターンで観測するか (simIndex)
-	// simIndex 0 = 魔法使い後, 1 = 悪魔の騎士後, 2 = レッドドラゴン後
-	const branchSimIndex = hasBranch ? branch.simIndex : -1;
 
 	/** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
-	/** @typedef {{ arrivalIndex: RngIndex, sim: SimEntry[], dragonAction?: ID<DragonAction> }} ArrivalSim */
+	/** @typedef {{ arrivalIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} ArrivalSim */
 
 	// 各候補乱数ごとのシミュレーションデータ（詳細表示時のみ計算）
 	/** @type {ArrivalSim[]} */
 	let arrivalSims = [];
-	if (showPowers || showTransitions) {
-		arrivalSims = Array.from(starIndices).map(index => {
-			/** @type {ID<DragonAction> | undefined} */
-			let dragonAction;
-			let chosenActionCombination = actionCombination;
-			if (hasBranch) {
-				const tempSim = new KssRng(index).simulateBattleWindowsMWW(magician, actionCombination, settings.hammerThrow, settings.allowDragonStar);
-				if (tempSim.length > branch.simIndex && tempSim[branch.simIndex] === branch.value) {
-					chosenActionCombination = branch.fallbackActionCombination;
+	for (const index of starIndices) {
+		/** @type {ID<DragonAction> | undefined} */
+		let dragonAction;
+		
+		/** @type {RngIndex[]} */
+		const powersIndices = [];
+		/** @type {string[]} */
+		const logs = [];
+		const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
+			switch (p) {
+				case 'takeAction': {
+					logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+					break;
+				}
+				case 'magicianAttacksFirst':
+				case 'knightAttacksFirst':
+				case 'dragonAttacksFirst': {
+					/** @type {boolean} */
+					const a = !result;
+					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
+					break;
+				}
+				case 'checkHammerHardHit': {
+					/** @type {boolean} */
+					const a = result;
+					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
+					break;
+				}
+				case 'battleWindowsPowers': {
+					/** @type {BattleWindowsPowersPair} */
+					const a = result;
+					logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
+
+					powersIndices.push(startingIndex);
+					break;
+				}
+				case 'dragonActs': {
+					/** @type {ID<DragonAction>} */
+					const a = result;
+					logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
+
+					dragonAction = a;
+					break;
 				}
 			}
-			/** @type {RngIndex[]} */
-			const powersIndices = [];
-			/** @type {string[]} */
-			const logs = [];
-			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
-				switch (p) {
-					case 'takeAction': {
-						logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
-						break;
-					}
-					case 'magicianAttacksFirst':
-					case 'knightAttacksFirst':
-					case 'dragonAttacksFirst': {
-						/** @type {boolean} */
-						const a = !result;
-						logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
-						break;
-					}
-					case 'checkHammerHardHit': {
-						/** @type {boolean} */
-						const a = result;
-						logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
-						break;
-					}
-					case 'battleWindowsPowers': {
-						/** @type {BattleWindowsPowersPair} */
-						const a = result;
-						logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
-
-						powersIndices.push(startingIndex);
-						break;
-					}
-					case 'dragonActs': {
-						/** @type {ID<DragonAction>} */
-						const a = result;
-						logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
-
-						dragonAction = a;
-						break;
-					}
-				}
-			});
-			const simRaw = rng.simulateBattleWindowsMWW(magician, chosenActionCombination, settings.hammerThrow, settings.allowDragonStar);
-			const sim = simRaw.map((entry, i) => ({ pair: entry, powersStartingIndex: powersIndices[i] ?? /** @type {RngIndex} */(0), log: logs[i] ?? '' }));
-
-			return {
-				arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
-				sim, dragonAction,
-			};
 		});
+
+		const steps = [
+			(/**@type {ActionTable}*/a) => rng.simulateMagician(a),
+			(/**@type {ActionTable}*/a) => rng.simulateKnight(a, settings.hammerThrow),
+			(/**@type {ActionTable}*/a) => rng.simulateDragon(a),
+			(/**@type {ActionTable}*/a) => rng.simulateDragonTurn2(a, settings.allowDragonStar),
+		];
+
+		const actions = [];
+		const sim = [];
+		let current = manipulateResult;
+		for(let turnIndex = 0; turnIndex < steps.length; turnIndex++){
+			if (!current) break;
+			actions.push(current.action);
+			const step = steps[turnIndex];
+			const obs = step(current.action);
+			if (obs === null) break;
+			sim.push({
+				pair: obs,
+				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */(0),
+				log: logs[turnIndex] ?? ''
+			});
+			current = (current.branches && current.branches.has(obs) ? current.branches.get(obs) : current.default) ?? null;
+		}
+
+		arrivalSims.push({
+			arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
+			sim, dragonAction, actions,
+		});
+	}
+
+	let currentForMain = manipulateResult;
+	const mainActions = [];
+	let branchSimIndex = -1;
+	/** @type {Map<BattleWindowsPowersPair, ManipulateResult> | undefined} */
+	let branchMap;
+	for (let i = 0; i < 4; i++) {
+		if (!currentForMain) break;
+		mainActions.push(currentForMain.action);
+		if (currentForMain.branches && currentForMain.branches.size > 0 && branchSimIndex === -1) {
+			branchSimIndex = i;
+			branchMap = currentForMain.branches;
+		}
+		currentForMain = currentForMain.default;
+	}
+
+	const hasBranch = branchSimIndex !== -1;
+	let firstBranchObs = null;
+	let fallbackActions = null;
+	if (hasBranch && branchMap) {
+		const firstEntry = branchMap.entries().next().value;
+		if (firstEntry) {
+			firstBranchObs = firstEntry[0];
+			fallbackActions = [];
+			for (let j = 0; j <= branchSimIndex; j++) fallbackActions.push(null);
+			let branchCurrent = firstEntry[1];
+			for (let j = branchSimIndex + 1; j < 4; j++) {
+				if (!branchCurrent) break;
+				fallbackActions.push(branchCurrent.action);
+				branchCurrent = branchCurrent.default;
+			}
+		}
 	}
 
 	// テーブル構築
@@ -701,20 +739,16 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 	const thead = document.createElement('thead');
 	let headerHtml = `<tr><th></th><th>${t('thAction')}</th>`;
 	if (hasBranch) headerHtml += `<th>${t('thBranch')}</th>`;
-	for (const s of arrivalSims) {
-		headerHtml += `<th>${formatIndex(s.arrivalIndex)}</th>`;
+	if (showColumns) {
+		for (const s of arrivalSims) {
+			headerHtml += `<th>${formatIndex(s.arrivalIndex)}</th>`;
+		}
 	}
 	headerHtml += '</tr>';
 	thead.innerHTML = headerHtml;
 	table.appendChild(thead);
 
 	const tbody = document.createElement('tbody');
-
-	// 各ターンの行データ [0]=magician, [1]=knight, [2]=dragon, [3]=dragonTurn2
-	const mainActions = [magician, actionCombination.knight, actionCombination.dragon, actionCombination.dragonAction];
-	const fallbackActions = hasBranch
-		? /** @type {(ActionTable|null)[]} */ ([null, branch.fallbackActionCombination.knight, branch.fallbackActionCombination.dragon, branch.fallbackActionCombination.dragonAction])
-		: null;
 
 	for (let i = 0; i < 4; i++) {
 		const tr = document.createElement('tr');
@@ -724,15 +758,13 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 		html += `<td class="enemy-cell">${img(Assets.enemies[i])}</td>`;
 
 		// メイン行動
-		html += `<td>${msg(mainActions[i])}</td>`;
+		html += `<td>${mainActions[i] ? msg(mainActions[i]) : ''}</td>`;
 
 		// 分岐列
 		if (hasBranch) {
-			if (i === branchSimIndex) {
-				// この行で観測が行われる → コピーの元を表示
-				html += `<td>${formatPowers(branch.value)}</td>`;
-			} else if (i > branchSimIndex && fallbackActions?.[i]) {
-				// 観測後の行 → 分岐先の行動を表示
+			if (i === branchSimIndex && firstBranchObs !== null) {
+				html += `<td>${formatPowers(firstBranchObs)}</td>`;
+			} else if (i > branchSimIndex && fallbackActions && fallbackActions[i]) {
 				html += `<td>${msg(/** @type {ActionTable} */ (fallbackActions[i]))}</td>`;
 			} else {
 				html += '<td></td>';
@@ -740,36 +772,38 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 		}
 
 		// 各乱数ごとの詳細情報
-		for (const s of arrivalSims) {
-			const p = s.sim[i];
-			html += '<td>';
-			if (p !== undefined) {
-				if (showTransitions) {
-					// 乱数位置の推移
-					html += '<span style="font-size: 12px;">';
-					html += p.log;
-					html += '</span>';
-				} else if (showPowers) {
-					html += formatPowers(p.pair);
+		if (showColumns) {
+			for (const s of arrivalSims) {
+				const p = s.sim[i];
+				html += '<td>';
+				if (p !== undefined) {
+					if (showTransitions) {
+						// 乱数位置の推移
+						html += '<span style="font-size: 12px;">';
+						html += p.log;
+						html += '</span>';
+					} else if (showPowers) {
+						html += formatPowers(p.pair);
 
-					// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元を表示
-					if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
-						// 本来より1つ前のインデックスからコピーの元判定が始まる
-						const failRng = new KssRng(p.powersStartingIndex);
-						failRng.advance(-1);
-						const failPowers = failRng.battleWindowsPowers();
-						html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
-					}
+						// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元を表示
+						if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
+							// 本来より1つ前のインデックスからコピーの元判定が始まる
+							const failRng = new KssRng(p.powersStartingIndex);
+							failRng.advance(-1);
+							const failPowers = failRng.battleWindowsPowers();
+							html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
+						}
 
-					if (i === 3 && settings.allowDragonStar) {
-						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-						if (s.dragonAction !== undefined) {
-							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
+						if (i === 3 && settings.allowDragonStar) {
+							// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
+							if (s.dragonAction !== undefined) {
+								html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
+							}
 						}
 					}
 				}
+				html += '</td>';
 			}
-			html += '</td>';
 		}
 
 		tr.innerHTML = html;
@@ -778,6 +812,30 @@ function renderMainResultTable(magician, actionCombination, branch, starIndices,
 
 	table.appendChild(tbody);
 	el.result.appendChild(table);
+}
+
+/** @type {BattleWindowsMWWManipulator | null} */
+let cachedManipulator = null;
+let cachedManipulatorSettingsStr = '';
+
+/** 設定からBattleWindowsMWWManipulatorのインスタンスを取得（または再利用）する
+ * @param {ReturnType<typeof getSettings>} settings */
+function getManipulator(settings) {
+	const logicSettings = {
+		minIndex: settings.minIndex,
+		maxIndex: settings.maxIndex,
+		magicianDifficulty: settings.magicianDifficulty,
+		fastKnight: settings.fastKnight,
+		fastDragon: settings.fastDragon,
+		allowDragonStar: settings.allowDragonStar,
+		hammerThrow: settings.hammerThrow,
+	};
+	const str = JSON.stringify(logicSettings);
+	if (cachedManipulatorSettingsStr !== str || !cachedManipulator) {
+		cachedManipulator = new BattleWindowsMWWManipulator(logicSettings);
+		cachedManipulatorSettingsStr = str;
+	}
+	return cachedManipulator;
 }
 
 /** 現在の入力状況と設定に基づき、乱数調整結果を画面に表示する */
@@ -807,20 +865,16 @@ function displayResult() {
 	}
 
 	// 乱数調整シミュレーション実行
-	const manipulator = new BattleWindowsMWWManipulator(settings);
+	const manipulator = getManipulator(settings);
 	const result = manipulator.manipulate(stars);
 
-	if (result.magician === null) {
-		el.result.innerHTML = `<p>${t('noMagicianAction')}</p>`;
-		return;
-	}
-	if (result.actionCombination === null) {
+	if (result === null) {
 		el.result.innerHTML = `<p>${t('noActionCombination')}</p>`;
 		return;
 	}
 
 	// メイン結果テーブルの描画
-	renderMainResultTable(result.magician, result.actionCombination, result.branch, starIndices, settings);
+	renderMainResultTable(result, starIndices, settings);
 
 	// シミュレーション付き表示かつ魔法使いがFastの場合のみタイミングテーブルを追加
 	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
@@ -842,7 +896,7 @@ async function runTest() {
 
 	// ジェネレーターを用いて処理を分割実行し、ブラウザのフリーズを防ぐ
 	let time = performance.now();
-	const manipulator = new BattleWindowsMWWManipulator(settings);
+	const manipulator = getManipulator(settings);
 	for (const result of manipulator.testGenerator(starsCount)) {
 		if (result.count === result.total) {
 			renderTestResult(result, el.testResult); // 結果を表示
@@ -906,29 +960,36 @@ function renderTestResult(result, testResultEl) {
 	}
 
 	// --- 分岐パターンの統計表示 ---
-	const branchEntries = Array.from(result.branchGroups.entries());
-	if (branchEntries.length > 0) {
-		html += `<b>${t('testBranches')}</b>`;
-		html += '<table class="test-table"><thead><tr>';
-		html += `<th>${t('thStars')}</th><th>${t('thEnemy')}</th><th>${t('thPowers')}</th><th>${t('thMatch')}</th><th>${t('thNoMatch')}</th>`;
+	let hasBranches = result.turnBranchCounts.some(counts => counts.length > 1 && counts.slice(1).some(c => c > 0));
+	if (hasBranches) {
+		html += `<div style="margin-top: 15px;"><b>${t('branchOccurrences')}</b>`;
+		html += '<table class="test-table" style="margin-top: 5px;"><thead><tr>';
+		html += `<th>${t('thEnemy')}</th>`;
+		
+		let maxBranchSize = 0;
+		for (const counts of result.turnBranchCounts) {
+			if (counts.length - 1 > maxBranchSize) maxBranchSize = counts.length - 1;
+		}
+		for (let i = 1; i <= maxBranchSize; i++) {
+			html += `<th>${i} ${t('thBranch')}</th>`;
+		}
 		html += '</tr></thead><tbody>';
-		for (const [starStr, g] of branchEntries) {
+		for (let i = 0; i < 4; i++) {
+			const counts = result.turnBranchCounts[i];
+			let hasAnyBranch = false;
+			for (let j = 1; j <= maxBranchSize; j++) {
+				if (counts[j] > 0) hasAnyBranch = true;
+			}
+			if (!hasAnyBranch) continue;
+			
 			html += '<tr>';
-			html += `<td>${starStr}</td>`;
-			html += `<td>${branchIndexToEnemy(g.simIndex)}</td>`;
-			html += `<td>${formatPowers(g.value, 'height:1em;')}</td>`;
-			html += `<td>${g.true.length > 0 ? g.true.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
-			html += `<td>${g.false.length > 0 ? g.false.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${branchIndexToEnemy(i)}</td>`;
+			for (let j = 1; j <= maxBranchSize; j++) {
+				html += `<td>${counts[j] || 0}</td>`;
+			}
 			html += '</tr>';
 		}
-
-		html += `</tbody><tfoot><tr>`;
-		html += `<th colspan="3" rowspan="2">${t('thCount')}</th>`;
-		html += `<td>${result.totalBranchMatch}</td>`;
-		html += `<td>${result.totalBranchNoMatch}</td>`;
-		html += `</tr><tr>`;
-		html += `<td colspan="2">${result.branchCount}</td>`;
-		html += `</tr></tfoot></table>`;
+		html += '</tbody></table></div>';
 	}
 
 	// --- 採用された各行動の頻度統計 ---
@@ -949,7 +1010,7 @@ function renderTestResult(result, testResultEl) {
 	html += renderActionTable(t('magicianActions'), result.magicianCountList);
 	html += renderActionTable(t('knightActions'), result.knightCountList);
 	html += renderActionTable(t('dragonActions'), result.dragonCountList);
-	html += renderActionTable(t('dragonTurn2Actions'), result.dragonActionCountList);
+	html += renderActionTable(t('dragonTurn2Actions'), result.dragonTurn2CountList);
 	html += `</div>`;
 
 	testResultEl.innerHTML = html;
