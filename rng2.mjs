@@ -527,35 +527,35 @@ export class BattleWindowsMWWManipulator {
 
 	/** あるターンからの乱数調整を探す
 	 * @param {number} turnIndex
-	 * @param {number[]} currentOffsets
+	 * @param {{offset: number, deviation: number}[]} currentOffsetGroups
 	 * @param {{difficulty: number, failsCount: number, deviation: number}} best
 	 * @param {{difficulty: number, failsCount: number, deviation: number}} current
 	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, currentOffsets, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity}, current={difficulty: 0, failsCount: 0, deviation: 0}) {
+	manipulateFrom(turnIndex, currentOffsetGroups, best={difficulty: Infinity, failsCount: Infinity, deviation: Infinity}, current={difficulty: 0, failsCount: 0, deviation: 0}) {
 		let result = null;
 		for(const {action, byOffset} of this.turns[turnIndex]){
 			const difficulty = current.difficulty + action.difficulty;
 			if(current.failsCount === best.failsCount && current.deviation === best.deviation && difficulty >= best.difficulty) break;	//難易度で枝刈り
 
 			//結果がより良いか判定
-			const offsets = [];
+			const offsetGroups = [];
 			let failsCount = current.failsCount;
 			let deviation = current.deviation;
-			for(const offset of currentOffsets){
-				const turnResult = byOffset[offset];
+			for(const g of currentOffsetGroups){
+				const turnResult = byOffset[g.offset];
 				if(turnResult){
-					offsets.push(turnResult.offset);
+					offsetGroups.push({offset: turnResult.offset, deviation: g.deviation});
 				}else{
 					failsCount++;
-					deviation -= this.offsetToDeviation(offset);
+					deviation -= g.deviation;
 				}
 			}
 			if((failsCount - best.failsCount || deviation - best.deviation || difficulty - best.difficulty) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, offsets, best, {difficulty, failsCount, deviation});
+				const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best, {difficulty, failsCount, deviation});
 				if(cont) result = {action, default: cont};
 			}else{
 				result = {action, default: null};
@@ -572,7 +572,7 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulate(stars) {
 		const offsets = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex).map(v => this.RngIndexToOffset(v));
-		return this.manipulateFrom(0, offsets);
+		return this.manipulateFrom(0, offsets.map(offset => ({offset, deviation: this.offsetToDeviation(offset)})));
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
