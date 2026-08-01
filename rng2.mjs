@@ -526,7 +526,7 @@ export class BattleWindowsMWWManipulator {
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{obs: BattleWindowsPowersPair, offsetGroups: {offset: number, deviation: number}[], cont: ManipulateResult, best: {difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
-	 * @param {{offset: number, deviation: number}[]} currentOffsetGroups
+	 * @param {{offset: number, deviation: number}[] | null} currentOffsetGroups
 	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} best
 	 * @param {{difficulty: number, failsCount: number, deviation: number, branchGroups: BranchGroups}} current
 	 * @returns {ManipulateResult}
@@ -540,8 +540,8 @@ export class BattleWindowsMWWManipulator {
 			if((current.failsCount - best.failsCount || current.deviation - best.deviation || difficulty - best.difficulty) >= 0) break;
 
 			//次の状態を計算
-			let offsetGroups = currentOffsetGroups;
-			let branchGroups;
+			let offsetGroups = null;
+			let branchGroups = null;
 			let failsCount = current.failsCount;
 			let deviation = current.deviation;
 			if(current.branchGroups){
@@ -562,11 +562,11 @@ export class BattleWindowsMWWManipulator {
 					return [{...b, offsetGroups}];
 				});
 				if(branchGroups.length === 0) continue;
-			}else{
+			}else if(currentOffsetGroups){
 				//観測値ごとに分ける
 				/** @type {Map<BattleWindowsPowersPair, {offset: number, deviation: number}[]>} */
 				const groups = new Map();
-				for(const g of offsetGroups){
+				for(const g of currentOffsetGroups){
 					const turnResult = byOffset[g.offset];
 					if(turnResult){
 						let group = groups.get(turnResult.obs);
@@ -582,7 +582,6 @@ export class BattleWindowsMWWManipulator {
 					continue;
 				}else if(groups.size === 1){
 					//分岐が一つなら次を分岐作成ターンにする
-					branchGroups = null;
 					offsetGroups = [...groups.values()][0];
 				}else{
 					//分岐ごとの最適解を探しておく
@@ -591,7 +590,7 @@ export class BattleWindowsMWWManipulator {
 						const best = {difficulty: Infinity, failsCount: Infinity, deviation: Infinity, branchGroups: null};
 						if(turnIndex !== 3){
 							const cont = this.manipulateFrom(turnIndex + 1, offsetGroups, best);
-							best.difficulty = (best.difficulty + 100000000) * offsetGroups.length;
+							best.difficulty = (difficulty + best.difficulty + 100000000) * offsetGroups.length;
 							if(cont){
 								branchGroups.push({obs, offsetGroups, cont, best});
 							}else{
@@ -605,6 +604,8 @@ export class BattleWindowsMWWManipulator {
 						}
 					}
 				}
+			}else{
+				break;
 			}
 			if((failsCount - best.failsCount || deviation - best.deviation || difficulty - best.difficulty) >= 0) continue;
 
