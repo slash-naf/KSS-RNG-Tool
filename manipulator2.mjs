@@ -607,8 +607,10 @@ function renderTimingTable(starIndices) {
 /** 全体の行動手順テーブル（魔法使い〜レッドドラゴン2ターン目）を描画する
  * @param {ManipulateResult} manipulateResult 
  * @param {RngIndex[]} starIndices 候補となる乱数位置リスト
- * @param {ReturnType<typeof getSettings>} settings 現在の設定 */
-function renderMainResultTable(manipulateResult, starIndices, settings) {
+ * @param {ReturnType<typeof getSettings>} settings 現在の設定
+ * @param {BattleWindowsMWWManipulator} manipulator
+ */
+function renderMainResultTable(manipulateResult, starIndices, settings, manipulator) {
 	const detailMode = settings.detailMode;
 	const showColumns = detailMode !== 'none';
 	const showPowers = detailMode === 'withPowers' || detailMode === 'withFailPowers';
@@ -668,12 +670,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings) {
 			}
 		});
 
-		const steps = [
-			(/**@type {ActionTable}*/a) => rng.simulateMagician(a),
-			(/**@type {ActionTable}*/a) => rng.simulateKnight(a, settings.hammerThrow),
-			(/**@type {ActionTable}*/a) => rng.simulateDragon(a),
-			(/**@type {ActionTable}*/a) => rng.simulateDragonTurn2(a, settings.allowDragonStar),
-		];
+		const steps = manipulator.createSimulationSteps(rng);
 
 		const actions = [];
 		const sim = [];
@@ -874,7 +871,7 @@ function displayResult() {
 	}
 
 	// メイン結果テーブルの描画
-	renderMainResultTable(result, starIndices, settings);
+	renderMainResultTable(result, starIndices, settings, manipulator);
 
 	// シミュレーション付き表示かつ魔法使いがFastの場合のみタイミングテーブルを追加
 	if (mode === 'withSimulation' && settings.magicianDifficulty !== 'easy') {
