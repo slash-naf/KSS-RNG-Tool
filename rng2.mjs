@@ -504,6 +504,7 @@ export class BattleWindowsMWWManipulator {
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
 		this.turns = steps.map((step, i) => this.actionsListByTurn[i].map(action => {
 			let nextMaxIndex = maxIndexByTurn;
+			/**@type {({obs: BattleWindowsPowersPair, stateId: number} | null)[]}*/
 			const byStateId = [];
 			for(const index of KssRng.range(this.minIndex, maxIndexByTurn)){
 				for(const hasSeenPowers of [false, true]){
@@ -571,14 +572,14 @@ export class BattleWindowsMWWManipulator {
 
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{stateId: number, score: number}} StateGroup
-	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult, best: {difficulty: number, failScore: number, branchGroups: BranchGroups}}[] | null} BranchGroups
+	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult, best: {difficulty: number, failScore: number, resolvedBranchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
 	 * @param {StateGroup[] | null} currentStateGroups
-	 * @param {{difficulty: number, failScore: number, branchGroups: BranchGroups}} best
-	 * @param {{difficulty: number, failScore: number, branchGroups: BranchGroups}} current
+	 * @param {{difficulty: number, failScore: number, resolvedBranchGroups: BranchGroups}} best
+	 * @param {{difficulty: number, failScore: number, activeBranchGroups: BranchGroups, resolvedBranchGroups: BranchGroups}} current
 	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, currentStateGroups, best={difficulty: Infinity, failScore: Infinity, branchGroups: null}, current={difficulty: 0, failScore: 0, branchGroups: null}) {
+	manipulateFrom(turnIndex, currentStateGroups, best={difficulty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={difficulty: 0, failScore: 0, activeBranchGroups: null, resolvedBranchGroups: null}) {
 		let result = null;
 		for(const {action, byStateId} of this.turns[turnIndex]){
 			let difficulty = current.difficulty + action.difficulty;
@@ -588,25 +589,34 @@ export class BattleWindowsMWWManipulator {
 
 			//次の状態を計算
 			let nextStateGroups = null;
-			let branchGroups = null;
+			let activeBranchGroups = null;
+			let resolvedBranchGroups = null;
 			let failScore = current.failScore;
-			if(current.branchGroups){
+			if(current.activeBranchGroups && current.resolvedBranchGroups){
 				//失敗するところは分岐を使うとして進める
-				branchGroups = current.branchGroups.flatMap(b => {
+				activeBranchGroups = [];
+				resolvedBranchGroups = [...current.resolvedBranchGroups];
+				for(const b of current.activeBranchGroups){
 					const stateGroups = [];
+					let failed = false;
 					for(const g of b.stateGroups){
 						const turnResult = byStateId[g.stateId];
 						if(turnResult){
 							stateGroups.push({stateId: turnResult.stateId, score: g.score});
 						}else{
-							difficulty += b.best.difficulty;
-							failScore += b.best.failScore;
-							return [];
+							failed = true;
+							break;
 						}
 					}
-					return [{...b, stateGroups}];
-				});
-				if(branchGroups.length === 0) continue;
+					if(failed){
+						difficulty += b.best.difficulty;
+						failScore += b.best.failScore;
+						resolvedBranchGroups.push(b);
+					}else{
+						activeBranchGroups.push({...b, stateGroups});
+					}
+				}
+				if(activeBranchGroups.length === 0) continue;
 			}else if(currentStateGroups){
 				//観測値ごとに分ける
 				/** @type {Map<BattleWindowsPowersPair, StateGroup[]>} */
@@ -629,23 +639,25 @@ export class BattleWindowsMWWManipulator {
 					nextStateGroups = [...groups.values()][0];
 				}else{
 					//分岐ごとの最適解を探しておく
-					branchGroups = [];
+					activeBranchGroups = [];
+					resolvedBranchGroups = [];
 					for(const [obs, stateGroups] of groups.entries()){
-						const best = {difficulty: Infinity, failScore: Infinity, branchGroups: null};
+						const best = {difficulty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
 						if(turnIndex !== 3){
 							const cont = this.manipulateFrom(turnIndex + 1, stateGroups, best);
 							best.difficulty = (difficulty + best.difficulty + 100000000) * stateGroups.length;
 							if(cont){
-								branchGroups.push({obs, stateGroups, cont, best});
+								activeBranchGroups.push({obs, stateGroups, cont, best});
 							}else{
 								for(const g of stateGroups){
 									failScore += g.score;
 								}
 							}
 						}else{
-							branchGroups.push({obs, stateGroups, cont: null, best});
+							activeBranchGroups.push({obs, stateGroups, cont: null, best});
 						}
 					}
+					if(activeBranchGroups.length === 0) continue;
 				}
 			}else{
 				break;
@@ -654,16 +666,13 @@ export class BattleWindowsMWWManipulator {
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {difficulty, failScore, branchGroups});
+				const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {difficulty, failScore, activeBranchGroups, resolvedBranchGroups});
 				if(cont){
 					//分岐が作られたターンでbranchesに登録する
 					const branches = new Map();
-					if(!current.branchGroups && best.branchGroups && branchGroups){
-						const bestObsSet = new Set(best.branchGroups.map(b => b.obs));
-						for(const b of branchGroups){
-							if(!bestObsSet.has(b.obs)){
-								branches.set(b.obs, b.cont);
-							}
+					if(!current.activeBranchGroups && best.resolvedBranchGroups && activeBranchGroups){
+						for(const b of best.resolvedBranchGroups){
+							branches.set(b.obs, b.cont);
 						}
 					}
 					result = {action, branches, default: cont};
@@ -672,7 +681,7 @@ export class BattleWindowsMWWManipulator {
 				result = {action, default: null};
 				best.difficulty = difficulty;
 				best.failScore = failScore;
-				best.branchGroups = branchGroups;
+				best.resolvedBranchGroups = resolvedBranchGroups;
 			}
 		}
 
