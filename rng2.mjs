@@ -478,6 +478,7 @@ export class BattleWindowsMWWManipulator {
 		hammerThrow = 1,
 		minIndex = 2800,
 		maxIndex = 3376,
+		branchDifficulty = 100000000,
 		maxStarsCount = 6,
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
@@ -488,6 +489,7 @@ export class BattleWindowsMWWManipulator {
 		this.minIndex = /**@type {RngIndex}*/(minIndex);
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.middleOffset = this.rngIndexToOffset(this.maxIndex) / 2;
+		this.branchDifficulty = branchDifficulty;
 		this.maxStarsCount = maxStarsCount;
 
 		// 各ターンの難易度低い順行動リストを作成
@@ -569,6 +571,31 @@ export class BattleWindowsMWWManipulator {
 	rngIndexToScore(index) {
 		return 0x10000 - this.offsetToDeviation(this.rngIndexToOffset(index));
 	}
+	/** 平均難易度を計算
+	 * @param {number} difficulty
+	 * @param {BranchGroups} activeBranchGroups
+	 * @param {BranchGroups} resolvedBranchGroups
+	*/
+	calcAverageDifficulty(difficulty, activeBranchGroups, resolvedBranchGroups) {
+		if(activeBranchGroups && resolvedBranchGroups && resolvedBranchGroups.length > 0){
+			let sumOfScore = 0;
+			for(const b of activeBranchGroups){
+				for(const g of b.stateGroups){
+					sumOfScore += g.score;
+				}
+			}
+			let sumOfDifficulty = sumOfScore * difficulty;
+			for(const b of resolvedBranchGroups){
+				for(const g of b.stateGroups){
+					sumOfScore += g.score;
+					sumOfDifficulty += g.score * b.best.difficulty;
+				}
+			}
+			return sumOfDifficulty / sumOfScore + resolvedBranchGroups.length * this.branchDifficulty;
+		}else{
+			return difficulty;
+		}
+	}
 
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{stateId: number, score: number}} StateGroup
@@ -585,7 +612,7 @@ export class BattleWindowsMWWManipulator {
 			let difficulty = current.difficulty + action.difficulty;
 
 			//事前評価で枝刈り
-			if((current.failScore - best.failScore || difficulty - best.difficulty) >= 0) break;
+			if((current.failScore - best.failScore || this.calcAverageDifficulty(difficulty, current.activeBranchGroups, current.resolvedBranchGroups) - best.difficulty) >= 0) break;
 
 			//次の状態を計算
 			let nextStateGroups = null;
@@ -609,7 +636,6 @@ export class BattleWindowsMWWManipulator {
 						}
 					}
 					if(failed){
-						difficulty += b.best.difficulty;
 						failScore += b.best.failScore;
 						resolvedBranchGroups.push(b);
 					}else{
@@ -645,7 +671,7 @@ export class BattleWindowsMWWManipulator {
 						const best = {difficulty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
 						if(turnIndex !== 3){
 							const cont = this.manipulateFrom(turnIndex + 1, stateGroups, best);
-							best.difficulty = (difficulty + best.difficulty + 100000000) * stateGroups.length;
+							best.difficulty = difficulty + best.difficulty;
 							if(cont){
 								activeBranchGroups.push({obs, stateGroups, cont, best});
 							}else{
@@ -662,7 +688,7 @@ export class BattleWindowsMWWManipulator {
 			}else{
 				break;
 			}
-			if((failScore - best.failScore || difficulty - best.difficulty) >= 0) continue;
+			if((failScore - best.failScore || this.calcAverageDifficulty(difficulty, activeBranchGroups, resolvedBranchGroups) - best.difficulty) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
@@ -679,7 +705,7 @@ export class BattleWindowsMWWManipulator {
 				}
 			}else{
 				result = {action, default: null};
-				best.difficulty = difficulty;
+				best.difficulty = this.calcAverageDifficulty(difficulty, activeBranchGroups, resolvedBranchGroups);
 				best.failScore = failScore;
 				best.resolvedBranchGroups = resolvedBranchGroups;
 			}
@@ -784,7 +810,7 @@ export class BattleWindowsMWWManipulator {
 				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
 				// 難易度加算
-				difficulty += current.action.difficulty;
+				difficulty += current.action.difficulty + branchSize * this.branchDifficulty;
 
 				const obs = step(current.action);
 				if (obs === null) break;
