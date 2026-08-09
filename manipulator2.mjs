@@ -604,6 +604,183 @@ function renderTimingTable(starIndices) {
 	el.result.appendChild(div);
 }
 
+/** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
+/** @typedef {{ arrivalIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} ArrivalSim */
+/** @typedef {{ simIndex: number, obs: BattleWindowsPowersPair, actions: (ActionTable|null)[], label: string }} BranchColumn */
+
+/**
+ * 指定された星の乱数位置リストに対し、実際の行動を通したシミュレーションを行い、
+ * 各ターンの到達乱数や出現するコピーの元、ログなどの情報を収集して返します。
+ * @param {ManipulateResult} manipulateResult 調整結果のツリー
+ * @param {RngIndex[]} starIndices 対象となる乱数位置の配列
+ * @param {BattleWindowsMWWManipulator} manipulator マニピュレーターのインスタンス
+ * @returns {ArrivalSim[]} 各乱数位置ごとのシミュレーション結果
+ */
+function generateArrivalSims(manipulateResult, starIndices, manipulator) {
+	/** @type {ArrivalSim[]} */
+	const arrivalSims = [];
+	
+	for (const index of starIndices) {
+		/** @type {ID<DragonAction> | undefined} */
+		let dragonAction;
+		/** @type {RngIndex[]} */
+		const powersIndices = [];
+		/** @type {string[]} */
+		const logs = [];
+
+		// 各シミュレーションのステップごとにプロキシを通して乱数遷移を記録する
+		const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
+			switch (p) {
+				case 'takeAction': {
+					logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+					break;
+				}
+				case 'magicianAttacksFirst':
+				case 'knightAttacksFirst':
+				case 'dragonAttacksFirst': {
+					const a = !/** @type {boolean} */ (result);
+					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
+					break;
+				}
+				case 'checkHammerHardHit': {
+					const a = /** @type {boolean} */ (result);
+					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
+					break;
+				}
+				case 'battleWindowsPowers': {
+					const a = /** @type {BattleWindowsPowersPair} */ (result);
+					logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
+					powersIndices.push(startingIndex);
+					break;
+				}
+				case 'dragonActs': {
+					const a = /** @type {ID<DragonAction>} */ (result);
+					logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
+					dragonAction = a;
+					break;
+				}
+			}
+		});
+
+		const steps = manipulator.createSimulationSteps(rng);
+		const actions = [];
+		const sim = [];
+		let current = manipulateResult;
+
+		// 4ターン分の行動を評価し、実際に辿るルートを追跡する
+		for (let turnIndex = 0; turnIndex < steps.length; turnIndex++) {
+			if (!current) break; // 途中でルートが途切れた場合は終了
+			actions.push(current.action);
+			
+			const step = steps[turnIndex];
+			const obs = step(current.action);
+			if (obs === null) break; // 攻撃の先制などにより失敗した場合
+
+			sim.push({
+				pair: obs,
+				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
+				log: logs[turnIndex] ?? ''
+			});
+
+			// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
+			current = (current.branches && current.branches.has(obs) ? current.branches.get(obs) : current.default) ?? null;
+		}
+
+		arrivalSims.push({
+			arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
+			sim, dragonAction, actions,
+		});
+	}
+	return arrivalSims;
+}
+
+/**
+ * 調整結果のツリーから、一切分岐しなかった場合のメイン行動ルート（デフォルトパス）を抽出します。
+ * @param {ManipulateResult} manipulateResult 調整結果のツリー
+ * @returns {(ActionTable | null)[]} メインルートの行動リスト
+ */
+function extractMainActions(manipulateResult) {
+	let currentForMain = manipulateResult;
+	const mainActions = [];
+	for (let i = 0; i < 4; i++) {
+		if (!currentForMain) {
+			mainActions.push(null);
+			break;
+		}
+		mainActions.push(currentForMain.action);
+		currentForMain = currentForMain.default;
+	}
+	return mainActions;
+}
+
+/**
+ * 調整結果のツリー全体を再帰的にトラバースし、メインパスから派生する全ての分岐（サブ分岐も含む）を抽出します。
+ * 抽出された各分岐は、分岐が発生したターン (simIndex) と分岐条件 (obs)、およびその後の行動リストを持ちます。
+ * @param {ManipulateResult} manipulateResult 調整結果のツリー
+ * @returns {BranchColumn[]} 全ての分岐情報を含む配列
+ */
+function extractAllBranches(manipulateResult) {
+	/** @type {BranchColumn[]} */
+	const branchesList = [];
+
+	let topLevelBranchCount = 0;
+
+	/**
+	 * 与えられたノードについて、その子孫に存在するすべての分岐を走査・抽出する再帰関数。
+	 * @param {ManipulateResult} node 現在のノード
+	 * @param {number} turnIndex 現在のターンインデックス
+	 * @param {string} prefix 階層ごとのプレフィックス (例: "1", "1.1")
+	 */
+	function traverse(node, turnIndex, prefix) {
+		if (!node) return;
+		
+		// 現在のノードに分岐先が設定されている場合
+		if (node.branches && node.branches.size > 0) {
+			let branchIndex = 1;
+			for (const [obs, branchRoot] of node.branches.entries()) {
+				const fallbackActions = new Array(4).fill(null);
+				let temp = branchRoot;
+				
+				// この分岐先を通った場合のデフォルト行動ルートを収集
+				for (let j = turnIndex + 1; j < 4; j++) {
+					if (!temp) break;
+					fallbackActions[j] = temp.action;
+					temp = temp.default;
+				}
+				
+				let label;
+				if (prefix) {
+					label = `${prefix}.${branchIndex}`;
+					branchIndex++;
+				} else {
+					topLevelBranchCount++;
+					label = `${topLevelBranchCount}`;
+				}
+
+				branchesList.push({ simIndex: turnIndex, obs, actions: fallbackActions, label });
+
+				// 分岐先のルート内にさらに分岐が存在するか再帰的に走査（ネストされた分岐への対応）
+				let subNode = branchRoot;
+				for (let j = turnIndex + 1; j < 4; j++) {
+					if (!subNode) break;
+					traverse(subNode, j, label);
+					subNode = subNode.default;
+				}
+			}
+		}
+	}
+
+	// メインルートを走査し、派生するすべての分岐を洗い出す
+	let tempMain = manipulateResult;
+	for (let i = 0; i < 4; i++) {
+		if (!tempMain) break;
+		traverse(tempMain, i, '');
+		tempMain = tempMain.default;
+	}
+
+	return branchesList;
+}
+
 /** 全体の行動手順テーブル（魔法使い〜レッドドラゴン2ターン目）を描画する
  * @param {ManipulateResult} manipulateResult 
  * @param {RngIndex[]} starIndices 候補となる乱数位置リスト
@@ -617,125 +794,23 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 	const showFailPowers = detailMode === 'withFailPowers';
 	const showTransitions = detailMode === 'withTransitions';
 
-	/** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
-	/** @typedef {{ arrivalIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} ArrivalSim */
-
-	// 各候補乱数ごとのシミュレーションデータ（詳細表示時のみ計算）
-	/** @type {ArrivalSim[]} */
-	let arrivalSims = [];
-	for (const index of starIndices) {
-		/** @type {ID<DragonAction> | undefined} */
-		let dragonAction;
-		
-		/** @type {RngIndex[]} */
-		const powersIndices = [];
-		/** @type {string[]} */
-		const logs = [];
-		const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
-			switch (p) {
-				case 'takeAction': {
-					logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
-					break;
-				}
-				case 'magicianAttacksFirst':
-				case 'knightAttacksFirst':
-				case 'dragonAttacksFirst': {
-					/** @type {boolean} */
-					const a = !result;
-					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
-					break;
-				}
-				case 'checkHammerHardHit': {
-					/** @type {boolean} */
-					const a = result;
-					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
-					break;
-				}
-				case 'battleWindowsPowers': {
-					/** @type {BattleWindowsPowersPair} */
-					const a = result;
-					logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
-
-					powersIndices.push(startingIndex);
-					break;
-				}
-				case 'dragonActs': {
-					/** @type {ID<DragonAction>} */
-					const a = result;
-					logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
-
-					dragonAction = a;
-					break;
-				}
-			}
-		});
-
-		const steps = manipulator.createSimulationSteps(rng);
-
-		const actions = [];
-		const sim = [];
-		let current = manipulateResult;
-		for(let turnIndex = 0; turnIndex < steps.length; turnIndex++){
-			if (!current) break;
-			actions.push(current.action);
-			const step = steps[turnIndex];
-			const obs = step(current.action);
-			if (obs === null) break;
-			sim.push({
-				pair: obs,
-				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */(0),
-				log: logs[turnIndex] ?? ''
-			});
-			current = (current.branches && current.branches.has(obs) ? current.branches.get(obs) : current.default) ?? null;
-		}
-
-		arrivalSims.push({
-			arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
-			sim, dragonAction, actions,
-		});
-	}
-
-	let currentForMain = manipulateResult;
-	const mainActions = [];
-	let branchSimIndex = -1;
-	/** @type {Map<BattleWindowsPowersPair, ManipulateResult> | undefined} */
-	let branchMap;
-	for (let i = 0; i < 4; i++) {
-		if (!currentForMain) break;
-		mainActions.push(currentForMain.action);
-		if (currentForMain.branches && currentForMain.branches.size > 0 && branchSimIndex === -1) {
-			branchSimIndex = i;
-			branchMap = currentForMain.branches;
-		}
-		currentForMain = currentForMain.default;
-	}
-
-	const hasBranch = branchSimIndex !== -1;
-	let firstBranchObs = null;
-	let fallbackActions = null;
-	if (hasBranch && branchMap) {
-		const firstEntry = branchMap.entries().next().value;
-		if (firstEntry) {
-			firstBranchObs = firstEntry[0];
-			fallbackActions = [];
-			for (let j = 0; j <= branchSimIndex; j++) fallbackActions.push(null);
-			let branchCurrent = firstEntry[1];
-			for (let j = branchSimIndex + 1; j < 4; j++) {
-				if (!branchCurrent) break;
-				fallbackActions.push(branchCurrent.action);
-				branchCurrent = branchCurrent.default;
-			}
-		}
-	}
+	// シミュレーション結果やルート情報を抽出
+	const arrivalSims = showColumns ? generateArrivalSims(manipulateResult, starIndices, manipulator) : [];
+	const mainActions = extractMainActions(manipulateResult);
+	const branchesList = extractAllBranches(manipulateResult);
 
 	// テーブル構築
 	const table = document.createElement('table');
 	table.className = 'result-table';
 
-	// ヘッダー
+	// ヘッダー生成
 	const thead = document.createElement('thead');
 	let headerHtml = `<tr><th></th><th>${t('thAction')}</th>`;
-	if (hasBranch) headerHtml += `<th>${t('thBranch')}</th>`;
+	// 存在するすべての分岐に対して分岐列ヘッダーを追加
+	for (let k = 0; k < branchesList.length; k++) {
+		headerHtml += `<th>${t('thBranch')}${branchesList[k].label}</th>`;
+	}
+	// 詳細モード時は各シミュレーションの乱数位置を列として追加
 	if (showColumns) {
 		for (const s of arrivalSims) {
 			headerHtml += `<th>${formatIndex(s.arrivalIndex)}</th>`;
@@ -745,8 +820,8 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 	thead.innerHTML = headerHtml;
 	table.appendChild(thead);
 
+	// ボディ生成
 	const tbody = document.createElement('tbody');
-
 	for (let i = 0; i < 4; i++) {
 		const tr = document.createElement('tr');
 		let html = '';
@@ -755,31 +830,36 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 		html += `<td class="enemy-cell">${img(Assets.enemies[i])}</td>`;
 
 		// メイン行動
-		html += `<td>${mainActions[i] ? msg(mainActions[i]) : ''}</td>`;
+		const mainAction = mainActions[i];
+		html += `<td>${mainAction ? msg(mainAction) : ''}</td>`;
 
-		// 分岐列
-		if (hasBranch) {
-			if (i === branchSimIndex && firstBranchObs !== null) {
-				html += `<td>${formatPowers(firstBranchObs)}</td>`;
-			} else if (i > branchSimIndex && fallbackActions && fallbackActions[i]) {
-				html += `<td>${msg(/** @type {ActionTable} */ (fallbackActions[i]))}</td>`;
+		// 分岐列（抽出された全分岐をそれぞれ表示）
+		for (const branch of branchesList) {
+			if (i === branch.simIndex) {
+				// 分岐の発生ターンにはトリガーとなったコピーの元を表示
+				html += `<td>${formatPowers(branch.obs)}</td>`;
+			} else if (i > branch.simIndex) {
+				// 発生ターン以降は分岐先ルートにおける行動を表示
+				const branchAction = branch.actions[i];
+				html += `<td>${branchAction ? msg(branchAction) : ''}</td>`;
 			} else {
 				html += '<td></td>';
 			}
 		}
 
-		// 各乱数ごとの詳細情報
+		// 各乱数ごとの詳細情報（詳細モード時のみ）
 		if (showColumns) {
 			for (const s of arrivalSims) {
 				const p = s.sim[i];
 				html += '<td>';
 				if (p !== undefined) {
 					if (showTransitions) {
-						// 乱数位置の推移
+						// 乱数位置の推移ログ
 						html += '<span style="font-size: 12px;">';
 						html += p.log;
 						html += '</span>';
 					} else if (showPowers) {
+						// 出現したコピーの元を表示
 						html += formatPowers(p.pair);
 
 						// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元を表示
@@ -791,11 +871,9 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 							html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
 						}
 
-						if (i === 3 && settings.allowDragonStar) {
-							// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-							if (s.dragonAction !== undefined) {
-								html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
-							}
+						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
+						if (i === 3 && settings.allowDragonStar && s.dragonAction !== undefined) {
+							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
 						}
 					}
 				}
