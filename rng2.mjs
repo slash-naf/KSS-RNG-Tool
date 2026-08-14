@@ -2,7 +2,7 @@
 
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, earlyHardHitCheck?: boolean, fast?: boolean, frames?: number, name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -205,22 +205,21 @@ export class KssRng {
 	 */
 	simulateMagician(action) {
 		this.takeAction(action);
-
-		// 魔法使いが先制するかの判定
-		if (this.magicianAttacksFirst()) return null;
-
-		// 先制判定後からコピーの元判定前までの消費
-		this.advance((action.lateAdvances ?? 0) + (action.fast ? HammerFlipChargeAdvances : 0));
-
-		// コピーの元判定
 		let powers;
 		if (action.fast) {
-			powers =this.battleWindowsPowersWithHammerFlipHit(action.earlyHardHitCheck);
+			const earlyHardHitCheck = action.fast <= 1;
+			const advances1 = 8 - Math.floor(action.fast) * 2;
+			const advances2 = HammerFlipChargeAdvances - advances1;
+			this.advance(advances1);
+			if (this.magicianAttacksFirst()) return null;
+			this.advance(advances2);
+			powers =this.battleWindowsPowersWithHammerFlipHit(earlyHardHitCheck);
 		} else {
+			if (this.magicianAttacksFirst()) return null;
+			this.advance(action.lateAdvances ?? 0);
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-
 		return powers;
 	}
 
@@ -399,17 +398,17 @@ const DefaultActionsDifficultyTable = {
 	],
 };
 
-/** 魔法使いのFast */
+/** 魔法使いのFast @type {ActionTable[]}*/
 export const FastMagicianList = [
-	{ lateAdvances: -8, frames: 1, name: "1st frame", fast: true, earlyHardHitCheck: true },
-	{ lateAdvances: -6, frames: 3, name: "Fast1",     fast: true, earlyHardHitCheck: true },
-	{ lateAdvances: -6, frames: 1, name: "5th frame", fast: true },
-	{ lateAdvances: -4, frames: 4, name: "Fast2",     fast: true },
-	{ lateAdvances: -2, frames: 4, name: "Fast3",     fast: true },
-	{ lateAdvances:  0, frames: 4, name: "Fast4",     fast: true },
+	{ fast: 0.5, name: "1st frame" },
+	{ fast: 1,   name: "Fast1" },
+	{ fast: 1.5, name: "5th frame" },
+	{ fast: 2,   name: "Fast2" },
+	{ fast: 3,   name: "Fast3" },
+	{ fast: 4,   name: "Fast4" },
 ];
 /** @typedef {keyof MagicianPrioritiesTable} MagicianDifficulty */
-/** 魔法使いでの行動の優先順位 */
+/** 魔法使いでの行動の優先順位 @type {{easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[]}}*/
 const MagicianPrioritiesTable = {
 	easy: [
 		{ },
@@ -452,7 +451,8 @@ const MagicianPrioritiesTable = {
 };
 
 /**
- * @typedef {{ action: ActionTable, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
+ * @typedef {ActionTable & {difficulty: number}} ActionTableEx
+ * @typedef {{ action: ActionTableEx, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
  */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
@@ -493,11 +493,12 @@ export class BattleWindowsMWWManipulator {
 		this.maxStarsCount = maxStarsCount;
 
 		// 各ターンの難易度低い順行動リストを作成
+		/**@type {ActionTableEx[][]}*/
 		this.actionsListByTurn = [
 			MagicianPrioritiesTable[this.magicianDifficulty].map((e, i) => ({ ...e, difficulty: i * 1000000 })),
-			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight })),
-			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon })),
-			actionsDifficultyTable.dragonTurn2,
+			actionsDifficultyTable.knight.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })),
+			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, difficulty: e.difficulty ?? 0})),
 		];
 
 		// 各状態からの遷移を作成

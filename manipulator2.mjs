@@ -452,11 +452,14 @@ function formatIndex(index) {
 
 /** 行動テーブルの内容を翻訳テキストと画像を用いて説明文字列に変換する
  * @param {ActionTable} action */
-function msg({ dashes, slides, hammerFlips, stars, lateAdvances, name }) {
+function msg(action) {
+	const { dashes, slides, hammerFlips, stars, lateAdvances, name } = action;
 	const result = [];
-	if (lateAdvances !== undefined) {
-		if (lateAdvances <= 0) result.push(name);
-		else if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
+
+	if (name) {
+		result.push(name);
+	} else if (lateAdvances) {
+		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
 		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash')][dashes]);
 		if (stars) result.push([, t('actionStar'), t('action2Stars')][stars]);
@@ -510,9 +513,6 @@ function renderRngIndices(starIndices) {
 	el.status.innerHTML = t('rngIndex') + arrivalIndices.map(v => formatIndex(v)).join(', ');
 }
 
-/** Fast魔法使いの1行分のシミュレーション結果 */
-/** @typedef {{ name: string|undefined, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {pair:BattleWindowsPowersPair, powersStartingIndex:RngIndex, powersEndingIndex:RngIndex}|null, endingIndex: number|null }} TimingRow */
-
 /** Fast魔法使いのタイミング詳細テーブルを描画する
  * @param {RngIndex[]} starIndices */
 function renderTimingTable(starIndices) {
@@ -534,8 +534,10 @@ function renderTimingTable(starIndices) {
 			<th>${t('thSmoke')}<br>(+2)</th>
 		</tr></thead><tbody>`;
 
+		/** @typedef {{ name: string|undefined, earlyHardHitCheck: boolean, advances1: number|null, advances2: number|null, magicianAttacksFirst: boolean, magicianAttacksFirstEndingIndex: number|null, hardHitCheck: boolean, hardHitCheckEndingIndex: number|null, powers: {pair:BattleWindowsPowersPair, powersStartingIndex:RngIndex, powersEndingIndex:RngIndex}|null, endingIndex: number|null }} TimingRow */
 		const timings = FastMagicianList.map(v => {
-			const row = /** @type {TimingRow} */ ({ name: v.name, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null });
+			/** @type {TimingRow} */
+			const row = { name: v.name, earlyHardHitCheck: v.fast !== undefined && v.fast <= 1, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null };
 			let lastIndex = index;
 			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
 				switch (p) {
@@ -547,23 +549,22 @@ function renderTimingTable(starIndices) {
 				case 'checkHammerHardHit': 
 					row.hardHitCheck = result;
 					row.hardHitCheckEndingIndex = endingIndex;
-					if (v.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
+					if (row.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
 					break;
 				case 'battleWindowsPowers':
 					row.powers = { pair: result, powersStartingIndex: startingIndex, powersEndingIndex: endingIndex };
-					if (!v.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
+					if (!row.earlyHardHitCheck) row.advances2 = startingIndex - lastIndex;
 					break;
 				default:
 					return;
 				}
 				lastIndex = endingIndex;
 			});
-			rng.simulateMagician(/** @type {ActionTable} */ (v));
+			rng.simulateMagician(v);
 			row.endingIndex = rng.getIndex();
 			return row;
 		});
 		for (let i = 0; i < timings.length; i++) {
-			const v = FastMagicianList[i];
 			const row = timings[i];
 
 			html += `<tr>
@@ -579,9 +580,9 @@ function renderTimingTable(starIndices) {
 				const rep = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
 				const span = groupEnd - i;
 
-				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでvから参照
-				const hh1 = v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
-				const hh2 = !v.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
+				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでrowから参照
+				const hh1 = row.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
+				const hh2 = !row.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
 				const powersStr = rep && rep.powers
 					? `+${rep.powers.powersEndingIndex - rep.powers.powersStartingIndex}<br>${formatIndex(rep.powers.powersEndingIndex)}<br>${formatPowers(rep.powers.pair)}`
 					: '-';
