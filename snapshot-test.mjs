@@ -125,7 +125,19 @@ async function main() {
 			b.push([args[0], endingIndex]);
 			n = endingIndex;
 		}, p => p !== 'randi');
-		console.log(JSON.stringify(result));
+
+		/**
+		 * @param {string} key
+		 * @param {any} value
+		 */
+		function mapReplacer(key, value) {
+			if (value instanceof Map) {
+				return Array.from(value.entries());
+			}
+			return value;
+		}
+		console.log(JSON.stringify(result, mapReplacer));
+
 		return a;
 	});
 

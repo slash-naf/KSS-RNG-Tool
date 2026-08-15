@@ -406,7 +406,7 @@ export const FastMagicianList = [
 	{ fast: 2,   name: "Fast2", timeloss: 4 },
 	{ fast: 3,   name: "Fast3", timeloss: 8 },
 	{ fast: 4,   name: "Fast4", timeloss: 12 },
-].map(e => ({...e, difficulty: 1500}));
+];
 /** @typedef {keyof MagicianPrioritiesTable} MagicianDifficulty */
 /** 魔法使いでの行動の優先順位 @type {{easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[]}}*/
 const MagicianPrioritiesTable = {
@@ -434,7 +434,7 @@ const MagicianPrioritiesTable = {
 		FastMagicianList[3],
 		FastMagicianList[4],
 		FastMagicianList[5],
-	],
+	].map(e => ({...e, difficulty: e.difficulty ?? 1500})),
 	aggressiveFast: [
 		FastMagicianList[1],
 		FastMagicianList[3],
@@ -449,7 +449,7 @@ const MagicianPrioritiesTable = {
 };
 
 /**
- * @typedef {ActionTable & {difficulty: number}} ActionTableEx
+ * @typedef {ActionTable & {penalty: number}} ActionTableEx
  * @typedef {{ action: ActionTableEx, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
  */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
@@ -511,10 +511,10 @@ export class BattleWindowsMWWManipulator {
 		// 各ターンの難易度低い順行動リストを作成
 		/**@type {ActionTableEx[][]}*/
 		this.actionsListByTurn = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, difficulty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })),
-			actionsDifficultyTable.knight.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })),
-			actionsDifficultyTable.dragon.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })),
-			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, difficulty: e.difficulty ?? 0})),
+			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })),
+			actionsDifficultyTable.knight.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })),
+			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, penalty: e.difficulty ?? 0})),
 		];
 
 		// 各状態からの遷移を作成
@@ -588,12 +588,12 @@ export class BattleWindowsMWWManipulator {
 	rngIndexToScore(index) {
 		return Math.max(10000 - this.offsetToDeviation(this.rngIndexToOffset(index)), 0);
 	}
-	/** 平均難易度を計算
-	 * @param {number} difficulty
+	/** 平均ペナルティを計算
+	 * @param {number} penalty
 	 * @param {BranchGroups} activeBranchGroups
 	 * @param {BranchGroups} resolvedBranchGroups
 	*/
-	calcAverageDifficulty(difficulty, activeBranchGroups, resolvedBranchGroups) {
+	calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups) {
 		if(activeBranchGroups && resolvedBranchGroups && resolvedBranchGroups.length > 0){
 			let sumOfScore = 0;
 			for(const b of activeBranchGroups){
@@ -601,38 +601,38 @@ export class BattleWindowsMWWManipulator {
 					sumOfScore += g.score;
 				}
 			}
-			let sumOfDifficulty = sumOfScore * difficulty;
+			let sumOfPenalty = sumOfScore * penalty;
 			for(const b of resolvedBranchGroups){
 				for(const g of b.stateGroups){
 					sumOfScore += g.score;
-					sumOfDifficulty += g.score * b.best.difficulty;
+					sumOfPenalty += g.score * b.best.penalty;
 				}
 			}
-			return sumOfDifficulty / sumOfScore + resolvedBranchGroups.length * this.branchDifficulty;
+			return sumOfPenalty / sumOfScore + resolvedBranchGroups.length * this.branchDifficulty;
 		}else{
-			return difficulty;
+			return penalty;
 		}
 	}
 
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{stateId: number, score: number}} StateGroup
-	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult, best: {difficulty: number, failScore: number, resolvedBranchGroups: BranchGroups}}[] | null} BranchGroups
+	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult, best: {penalty: number, failScore: number, resolvedBranchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
 	 * @param {StateGroup[] | null} currentStateGroups
-	 * @param {{difficulty: number, failScore: number, resolvedBranchGroups: BranchGroups}} best
-	 * @param {{difficulty: number, failScore: number, activeBranchGroups: BranchGroups, resolvedBranchGroups: BranchGroups}} current
+	 * @param {{penalty: number, failScore: number, resolvedBranchGroups: BranchGroups}} best
+	 * @param {{penalty: number, failScore: number, activeBranchGroups: BranchGroups, resolvedBranchGroups: BranchGroups}} current
 	 * @returns {ManipulateResult}
 	 */
-	manipulateFrom(turnIndex, currentStateGroups, best={difficulty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={difficulty: 0, failScore: 0, activeBranchGroups: null, resolvedBranchGroups: null}) {
+	manipulateFrom(turnIndex, currentStateGroups, best={penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={penalty: 0, failScore: 0, activeBranchGroups: null, resolvedBranchGroups: null}) {
 		let result = null;
 		for(const {action, byStateId} of this.turns[turnIndex]){
-			let difficulty = current.difficulty + action.difficulty;
+			let penalty = current.penalty + action.penalty;
 
 			//事前評価で枝刈り（下限値を計算）
-			let minAverageDifficulty = difficulty;
+			let minAveragePenalty = penalty;
 			if(current.activeBranchGroups && current.resolvedBranchGroups) {
 				let sumOfScore = 0;
-				let sumOfDifficulty = 0;
+				let sumOfPenalty = 0;
 				for (const b of current.resolvedBranchGroups) {
 					for (const g of b.stateGroups) sumOfScore += g.score;
 				}
@@ -644,7 +644,7 @@ export class BattleWindowsMWWManipulator {
 				for (const b of current.resolvedBranchGroups) {
 					let bScore = 0;
 					for (const g of b.stateGroups) bScore += g.score;
-					sumOfDifficulty += bScore * b.best.difficulty;
+					sumOfPenalty += bScore * b.best.penalty;
 				}
 				
 				let minResolvedBranches = current.resolvedBranchGroups.length;
@@ -652,22 +652,22 @@ export class BattleWindowsMWWManipulator {
 					let bScore = 0;
 					for (const g of b.stateGroups) bScore += g.score;
 					
-					let costIfSucceed = bScore * difficulty;
-					let costIfFail = bScore * b.best.difficulty + totalScore * this.branchDifficulty;
+					let costIfSucceed = bScore * penalty;
+					let costIfFail = bScore * b.best.penalty + totalScore * this.branchDifficulty;
 					
 					if (costIfFail < costIfSucceed) {
-						sumOfDifficulty += bScore * b.best.difficulty;
+						sumOfPenalty += bScore * b.best.penalty;
 						minResolvedBranches++;
 					} else {
-						sumOfDifficulty += costIfSucceed;
+						sumOfPenalty += costIfSucceed;
 					}
 				}
-				minAverageDifficulty = sumOfDifficulty / totalScore + minResolvedBranches * this.branchDifficulty;
+				minAveragePenalty = sumOfPenalty / totalScore + minResolvedBranches * this.branchDifficulty;
 			} else {
-				minAverageDifficulty = this.calcAverageDifficulty(difficulty, current.activeBranchGroups, current.resolvedBranchGroups);
+				minAveragePenalty = this.calcAveragePenalty(penalty, current.activeBranchGroups, current.resolvedBranchGroups);
 			}
 
-			if((current.failScore - best.failScore || minAverageDifficulty - best.difficulty) >= 0) break;
+			if((current.failScore - best.failScore || minAveragePenalty - best.penalty) >= 0) break;
 
 			//次の状態を計算
 			let nextStateGroups = null;
@@ -723,10 +723,10 @@ export class BattleWindowsMWWManipulator {
 					activeBranchGroups = [];
 					resolvedBranchGroups = [];
 					for(const [obs, stateGroups] of groups.entries()){
-						const best = {difficulty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
+						const best = {penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
 						if(turnIndex !== 3){
 							const cont = this.manipulateFrom(turnIndex + 1, stateGroups, best);
-							best.difficulty = difficulty + best.difficulty;
+							best.penalty = penalty + best.penalty;
 							if(cont){
 								activeBranchGroups.push({obs, stateGroups, cont, best});
 							}else{
@@ -743,12 +743,12 @@ export class BattleWindowsMWWManipulator {
 			}else{
 				break;
 			}
-			const averageDifficulty = this.calcAverageDifficulty(difficulty, activeBranchGroups, resolvedBranchGroups);
-			if((failScore - best.failScore || averageDifficulty - best.difficulty) >= 0) continue;
+			const averagePenalty = this.calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups);
+			if((failScore - best.failScore || averagePenalty - best.penalty) >= 0) continue;
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {difficulty, failScore, activeBranchGroups, resolvedBranchGroups});
+				const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {penalty, failScore, activeBranchGroups, resolvedBranchGroups});
 				if(cont){
 					//分岐が作られたターンでbranchesに登録する
 					const branches = new Map();
@@ -761,7 +761,7 @@ export class BattleWindowsMWWManipulator {
 				}
 			}else{
 				result = {action, default: null};
-				best.difficulty = averageDifficulty;
+				best.penalty = averagePenalty;
 				best.failScore = failScore;
 				best.resolvedBranchGroups = resolvedBranchGroups;
 			}
@@ -788,17 +788,59 @@ export class BattleWindowsMWWManipulator {
 	 * @param {(p: string) => boolean} [ignore]
 	 */
 	*testGenerator(stars, debugCallback, ignore) {
+		/** @param {number[]} arr */
+		const calcMedian = (arr) => {
+			if (arr.length === 0) return 0;
+			const sorted = [...arr].sort((a, b) => a - b);
+			const half = Math.floor(sorted.length / 2);
+			return sorted.length % 2 === 0 ? (sorted[half - 1] + sorted[half]) / 2 : sorted[half];
+		};
+
 		const result = {
+			// 進捗確認用
+			count: 0,
+			total: this.maxIndex - this.minIndex + 1,
+
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
 			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
 			successCount: 0,         // 最後まで成功した回数
 			successDeviationsSum: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
+
+			// manipulate()の計算時間（ms）
+			totalTime: 0,
+			worstTime: 0,
+
+			// 難易度（本来の行動難易度）
+			totalDifficulty: 0,
+			worstDifficulty: 0,
+			averageDifficulty: 0,
+			medianDifficulty: 0,
+
+			// ペナルティ（探索用コスト・タイムロスペナルティ含む）
+			totalPenalty: 0,
+			worstPenalty: 0,
+			averagePenalty: 0,
+			medianPenalty: 0,
+
+			// タイムロス
+			totalTimeloss: 0,
+			worstTimeloss: 0,
+			averageTimeloss: 0,
+			medianTimeloss: 0,
+
+			// 中央値計算用の一時配列（JSON出力には含めない）
+			/** @type {number[]} */ _difficulties: [],
+			/** @type {number[]} */ _penalties: [],
+			/** @type {number[]} */ _timelosses: [],
+
 			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [turnIndex][branchSize] */
 			turnBranchCounts: Array.from({ length: 4 }, () => []),
+
 			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
 			simulationGroups: new Map(),
+
 			/** @type {Map<ActionTable, number>} 魔法使いでの行動ごとの使用回数 */
 			magicianCountList: new Map(),
 			/** @type {Map<ActionTable, number>} 悪魔の騎士での行動ごとの使用回数 */
@@ -807,14 +849,13 @@ export class BattleWindowsMWWManipulator {
 			dragonCountList: new Map(),
 			/** @type {Map<ActionTable, number>} ドラゴン2ターン目での行動ごとの使用回数 */
 			dragonTurn2CountList: new Map(),
-			totalTime: 0,            // manipulate()の合計計算時間（ms）
-			worstTime: 0,            // manipulate()の最悪計算時間（ms）
-			totalDifficulty: 0,	// 合計難易度
-			worstDifficulty: 0,	// 最悪難易度
-			// 進捗確認用
-			count: 0,
-			total: this.maxIndex - this.minIndex + 1,
 		};
+
+		Object.defineProperties(result, {
+			_difficulties: { enumerable: false },
+			_penalties: { enumerable: false },
+			_timelosses: { enumerable: false },
+		});
 
 		for (const i of KssRng.range(this.minIndex, this.maxIndex)) {
 			// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
@@ -853,6 +894,8 @@ export class BattleWindowsMWWManipulator {
 
 			// ツリーを辿りながらシミュレーションを実行
 			let difficulty = 0;
+			let penalty = 0;
+			let timeloss = 0;
 			const actions = [];
 			const sim = [];
 			const steps = this.createSimulationSteps(r);
@@ -866,7 +909,9 @@ export class BattleWindowsMWWManipulator {
 				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
 				// 難易度加算
-				difficulty += current.action.difficulty + branchSize * this.branchDifficulty;
+				difficulty += current.action.difficulty ?? 0;
+				penalty += current.action.penalty + branchSize * this.branchDifficulty;
+				timeloss += current.action.timeloss ?? 0;
 
 				const obs = step(current.action);
 				if (obs === null) break;
@@ -891,9 +936,18 @@ export class BattleWindowsMWWManipulator {
 				result.successDeviationsSum += this.offsetToDeviation(result.count);
 				if (simGroup.hasFail) result.unsolvableSuccessCount++;
 
-				// 難易度の記録
+				// 各種指標（難易度、ペナルティ、タイムロス）の記録
 				result.totalDifficulty += difficulty;
 				if (difficulty > result.worstDifficulty) result.worstDifficulty = difficulty;
+				result._difficulties.push(difficulty);
+
+				result.totalPenalty += penalty;
+				if (penalty > result.worstPenalty) result.worstPenalty = penalty;
+				result._penalties.push(penalty);
+
+				result.totalTimeloss += timeloss;
+				if (timeloss > result.worstTimeloss) result.worstTimeloss = timeloss;
+				result._timelosses.push(timeloss);
 
 				// 成功した行動の使用回数を集計する
 				result.magicianCountList.set(actions[0], (result.magicianCountList.get(actions[0]) ?? 0) + 1);
@@ -903,6 +957,22 @@ export class BattleWindowsMWWManipulator {
 			}
 
 			result.count++;
+			if (result.count === result.total) {
+				// 全てのイテレーションが完了したタイミングで、平均値と中央値を一括計算
+				const c = result.successCount || 1; // ゼロ除算回避
+
+				// 難易度の集計
+				result.averageDifficulty = result.totalDifficulty / c;
+				result.medianDifficulty = calcMedian(result._difficulties);
+
+				// ペナルティの集計
+				result.averagePenalty = result.totalPenalty / c;
+				result.medianPenalty = calcMedian(result._penalties);
+
+				// タイムロスの集計
+				result.averageTimeloss = result.totalTimeloss / c;
+				result.medianTimeloss = calcMedian(result._timelosses);
+			}
 			yield result;
 		}
 	}
