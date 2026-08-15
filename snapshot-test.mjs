@@ -1,3 +1,4 @@
+//@ts-check
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,7 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const SNAPSHOT_FILE = path.join(__dirname, 'test-snapshot.json');
 
+/** @type {NonNullable<ConstructorParameters<typeof BattleWindowsMWWManipulator>[0]>[]} */
 const settingsList = [
+	// 1. Easy（標準設定・分岐削減high）
 	{
 		magicianDifficulty: 'easy',
 		fastKnight: false,
@@ -17,7 +20,9 @@ const settingsList = [
 		hammerThrow: 1,
 		minIndex: 2800,
 		maxIndex: 3161,
+		branchReduction: 'high',
 	},
+	// 2. Conservative Fast（標準設定・分岐削減high）
 	{
 		magicianDifficulty: 'conservativeFast',
 		fastKnight: true,
@@ -26,7 +31,9 @@ const settingsList = [
 		hammerThrow: 1,
 		minIndex: 2800,
 		maxIndex: 3161,
+		branchReduction: 'high',
 	},
+	// 3. Aggressive Fast（標準設定・分岐削減high）
 	{
 		magicianDifficulty: 'aggressiveFast',
 		fastKnight: true,
@@ -35,15 +42,84 @@ const settingsList = [
 		hammerThrow: 1,
 		minIndex: 2800,
 		maxIndex: 3161,
+		branchReduction: 'high',
+	},
+	// 4. Medium 分岐削減（Conservative Fast）
+	{
+		magicianDifficulty: 'conservativeFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 2800,
+		maxIndex: 3161,
+		branchReduction: 'medium',
+	},
+	// 5. Medium 分岐削減（Aggressive Fast）
+	{
+		magicianDifficulty: 'aggressiveFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 2800,
+		maxIndex: 3161,
+		branchReduction: 'medium',
+	},
+	// 6. Low 分岐削減（分岐度外視・Aggressive Fast）
+	{
+		magicianDifficulty: 'aggressiveFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 2800,
+		maxIndex: 3161,
+		branchReduction: 'low',
+	},
+	// 7. 騎士のみFast（変則設定）
+	{
+		magicianDifficulty: 'easy',
+		fastKnight: true,
+		fastDragon: false,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 2800,
+		maxIndex: 3161,
+		branchReduction: 'high',
+	},
+	// 8. ハンマー投げ消費変更（hammerThrow: 2）
+	{
+		magicianDifficulty: 'conservativeFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 2,
+		minIndex: 2800,
+		maxIndex: 3161,
+		branchReduction: 'high',
+	},
+	// 9. 乱数探索範囲の拡大（デフォルト上限 3376）
+	{
+		magicianDifficulty: 'aggressiveFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 2800,
+		maxIndex: 3376,
+		branchReduction: 'high',
 	},
 ];
 
 async function main() {
 	const newData = settingsList.map(v => {
 		const manipulator = new BattleWindowsMWWManipulator(v);
+		/** @type {Array<Array<[number, number]>>} */
 		const a = [];
+		/** @type {Array<[number, number]>} */
 		let b;
-		let n = 0x10000;
+		let n = Infinity;
 		const result = manipulator.test(3, ({endingIndex, args}) => {
 			if (endingIndex <= n) a.push(b = []);
 			b.push([args[0], endingIndex]);
@@ -70,9 +146,9 @@ async function main() {
 					console.error("❌ 現在のロジックとスナップショットの間に差異が見つかりました！");
 					console.log(JSON.stringify(settingsList[settings_index]));
 
-					for (let i = 0; i < oldChunk.length; i++) {
-						const oldLine = JSON.stringify(oldChunk[i]);
-						const newLine = JSON.stringify(newChunk[i]);
+					for (let j = 0; j < oldChunk.length; j++) {
+						const oldLine = JSON.stringify(oldChunk[j]);
+						const newLine = JSON.stringify(newChunk[j]);
 						if (oldLine === newLine) {
 							console.log(oldLine);
 						} else {
