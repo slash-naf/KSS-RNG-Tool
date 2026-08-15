@@ -125,50 +125,75 @@ details summary {
 </div>
 
 <div class="settings-area">
-	<label id="label-lang">Language:</label>
-	<select id="lang">
-		<option value="en">English</option>
-		<option value="ja">日本語</option>
-	</select>
-	<br>
-
-	<label>Min:</label>
-	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="min" value="2800">
-	<label>Max:</label>
-	<input type="number" style="width: 60px; font-size:16px" maxlength="5" type="text" id="max" value="3376">
-	<br>
-
-	<label id="label-magician" data-t="magician">Magician:</label>
-	<select id="difficulty-magician">
-		<option value="easy" selected>Easy</option>
-		<option value="conservativeFast">Conservative Fast</option>
-		<option value="aggressiveFast">Aggressive Fast</option>
-	</select>
-
-	<label id="label-knight" data-t="knight">Knight:</label>
-	<select id="difficulty-knight">
-		<option value="easy" selected>Easy</option>
-		<option value="fast">Fast</option>
-	</select>
-
-	<label id="label-dragon" data-t="dragon">Dragon:</label>
-	<select id="difficulty-dragon">
-		<option value="easy" selected>Easy</option>
-		<option value="fast">Fast</option>
-	</select>
-	<label><input type="checkbox" id="allow-dragon-star"><span id="label-dragon-star" data-t="dragonStar">Include Star Attack</span></label>
-	<br>
-
-	<label id="label-hammer-throw" data-t="hammerThrow">Hammer throw dash advances:</label>
-	<select id="hammer-throw">
-		<option value="0">0</option>
-		<option value="1" selected>1</option>
-		<option value="2">2</option>
-	</select>
-	<br>
+	<div>
+		<label id="label-lang">Language:</label>
+		<select id="lang">
+			<option value="en">English</option>
+			<option value="ja">日本語</option>
+		</select>
+	</div>
 
 	<details>
-		<summary id="label-settings" data-t="settings">Settings</summary>
+		<summary id="label-manipulation-settings" data-t="manipulationSettings">Manipulation Settings</summary>
+		<div style="padding-left: 2em">
+			<div>
+				<label id="label-preset" data-t="preset">Preset:</label>
+				<select id="preset">
+					<option value="easiest" data-t="presetEasiest">Easiest</option>
+					<option value="fastest" data-t="presetFastest">Fastest</option>
+					<option value="custom" data-t="presetCustom" selected>Custom</option>
+				</select>
+			</div>
+			<div>
+				<label>Min:</label>
+				<input type="number" style="width: 60px; font-size:16px" maxlength="5" id="min" value="2800">
+				<label>Max:</label>
+				<input type="number" style="width: 60px; font-size:16px" maxlength="5" id="max" value="3376">
+			</div>
+			<div>
+				<label id="label-magician" data-t="magician">Magician:</label>
+				<select id="difficulty-magician">
+					<option value="easy" selected>Easy</option>
+					<option value="conservativeFast">Conservative Fast</option>
+					<option value="aggressiveFast">Aggressive Fast</option>
+				</select>
+			</div>
+			<div>
+				<label id="label-knight" data-t="knight">Knight:</label>
+				<select id="difficulty-knight">
+					<option value="easy" selected>Easy</option>
+					<option value="fast">Fast</option>
+				</select>
+			</div>
+			<div>
+				<label id="label-dragon" data-t="dragon">Dragon:</label>
+				<select id="difficulty-dragon">
+					<option value="easy" selected>Easy</option>
+					<option value="fast">Fast</option>
+				</select>
+				<label><input type="checkbox" id="allow-dragon-star"><span id="label-dragon-star" data-t="dragonStar">Include Star Attack</span></label>
+			</div>
+			<div>
+				<label id="label-hammer-throw" data-t="hammerThrow">Hammer throw dash advances:</label>
+				<select id="hammer-throw">
+					<option value="0">0</option>
+					<option value="1" selected>1</option>
+					<option value="2">2</option>
+				</select>
+			</div>
+			<div>
+				<label id="label-branch-reduction" data-t="branchReduction">Branch reduction:</label>
+				<select id="branch-reduction">
+					<option value="low" data-t="branchReductionLow">Low</option>
+					<option value="medium" data-t="branchReductionMedium" selected>Medium (Time priority)</option>
+					<option value="high" data-t="branchReductionHigh">High</option>
+				</select>
+			</div>
+		</div>
+	</details>
+
+	<details>
+		<summary id="label-display-settings" data-t="displaySettings">Display Settings</summary>
 		<div style="padding-left: 2em">
 			<div><label><input type="checkbox" id="no-numpad"><span id="label-no-numpad" data-t="noNumpad">No Numpad</span></label></div>
 			<div>
@@ -194,14 +219,6 @@ details summary {
 					<option value="indexOnly" data-t="indexDisplayModeIndexOnly" selected>Only RNG Index</option>
 					<option value="hex" data-t="indexDisplayModeHex">With Hex RNG Value</option>
 					<option value="split" data-t="indexDisplayModeSplit">With Split RNG Value</option>
-				</select>
-			</div>
-			<div>
-				<label id="label-preset" data-t="preset">Preset:</label>
-				<select id="preset">
-					<option value="easiest" data-t="presetEasiest">Easiest</option>
-					<option value="fastest" data-t="presetFastest">Fastest</option>
-					<option value="custom" data-t="presetCustom" selected>Custom</option>
 				</select>
 			</div>
 		</div>

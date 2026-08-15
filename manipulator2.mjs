@@ -27,6 +27,7 @@ import {
 /** @typedef {import('./rng2.mjs').DragonAction} DragonAction */
 /** @typedef {import('./rng2.mjs').ManipulateResult} ManipulateResult */
 /** @typedef {'easy' | 'fast'} DifficultyMode */
+/** @typedef {'low' | 'medium' | 'high'} BranchReductionMode */
 
 /** 
  * ユーザー独自のカスタム設定
@@ -37,7 +38,8 @@ import {
  *   knight: DifficultyMode,
  *   dragon: DifficultyMode,
  *   allowDragonStar: boolean,
- *   hammerThrow: string
+ *   hammerThrow: string,
+ *   branchReduction: BranchReductionMode,
  * }} CustomState
  */
 
@@ -75,6 +77,7 @@ const DEFAULT_SETTINGS = {
 	knight: 'easy',
 	dragon: 'easy',
 	hammerThrow: '1',
+	branchReduction: 'medium',
 	noNumpad: false,
 	displayMode: 'actionOnly',
 	detailMode: 'none',
@@ -92,13 +95,14 @@ let customState = {
 	dragon: DEFAULT_SETTINGS.dragon,
 	allowDragonStar: DEFAULT_SETTINGS.allowDragonStar,
 	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
+	branchReduction: DEFAULT_SETTINGS.branchReduction,
 };
 
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '2' },
-	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '2', branchReduction: 'high' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium' },
 };
 
 /** 画像アセットのパス定義 */
@@ -119,7 +123,6 @@ const Assets = {
 
 /** 言語リソース辞書 */
 const L = {
-	langLabel: { en: 'Language:', ja: '言語:' },
 	preset: { en: 'Preset:', ja: 'プリセット:' },
 	presetEasiest: { en: 'Easiest', ja: 'Easiest' },
 	presetFastest: { en: 'Fastest', ja: 'Fastest' },
@@ -128,6 +131,12 @@ const L = {
 	knight: { en: 'Knight:', ja: '悪魔の騎士:' },
 	dragon: { en: 'Dragon:', ja: 'レッドドラゴン:' },
 	hammerThrow: { en: 'Hammer throw dash advances:', ja: 'ハンマー投げのダッシュ消費数:' },
+	branchReduction: { en: 'Branch reduction:', ja: '分岐削減:' },
+	branchReductionLow: { en: 'Low', ja: '低（度外視）' },
+	branchReductionMedium: { en: 'Medium (Time priority)', ja: '中（タイム優先）' },
+	branchReductionHigh: { en: 'High', ja: '高' },
+	manipulationSettings: { en: 'Manipulation Settings', ja: '乱数調整設定' },
+	displaySettings: { en: 'Display Settings', ja: '表示設定' },
 	settings: { en: 'Settings', ja: '設定' },
 	noNumpad: { en: 'No Numpad', ja: 'テンキーなし' },
 	displayMode: { en: 'View Type:', ja: '表示の種類:' },
@@ -277,6 +286,7 @@ const el = {
 	testRunBtn: $('test-run-btn', HTMLButtonElement),
 	testStars: $('test-stars', HTMLInputElement),
 	hammerThrow: $('hammer-throw', HTMLSelectElement),
+	branchReduction: $('branch-reduction', HTMLSelectElement),
 	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') || document.body),
 };
 
@@ -290,6 +300,7 @@ const presetTargetElements = {
 	dragon: el.difficultyDragon,
 	allowDragonStar: el.allowDragonStar,
 	hammerThrow: el.hammerThrow,
+	branchReduction: el.branchReduction,
 };
 
 // --- 設定・ストレージ管理 ---
@@ -304,6 +315,7 @@ function getSettings() {
 		fastDragon: el.difficultyDragon.value === 'fast',
 		allowDragonStar: el.allowDragonStar.checked,
 		hammerThrow: parseInt(el.hammerThrow.value, 10),
+		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
@@ -395,6 +407,7 @@ function loadSettings() {
 
 			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
 			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
+			if (s.branchReduction) customState.branchReduction = s.branchReduction;
 
 			// --- 他の基本設定を復元 ---
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
@@ -905,6 +918,7 @@ function getManipulator(settings) {
 		fastDragon: settings.fastDragon,
 		allowDragonStar: settings.allowDragonStar,
 		hammerThrow: settings.hammerThrow,
+		branchReduction: settings.branchReduction,
 	};
 	const str = JSON.stringify(logicSettings);
 	if (cachedManipulatorSettingsStr !== str || !cachedManipulator) {
