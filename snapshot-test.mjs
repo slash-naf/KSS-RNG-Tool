@@ -110,6 +110,17 @@ const settingsList = [
 		maxIndex: 3376,
 		branchReduction: 'high',
 	},
+	// 10. 過大評価による誤った枝刈りの発生テスト（branchReduction: low）
+	{
+		magicianDifficulty: 'aggressiveFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: 1,
+		minIndex: 0,
+		maxIndex: 155,
+		branchReduction: 'low',
+	},
 ];
 
 async function main() {
@@ -131,9 +142,9 @@ async function main() {
 		 * @param {any} value
 		 */
 		function mapReplacer(key, value) {
-			if (value instanceof Map) {
-				return Array.from(value.entries());
-			}
+	//		if (value instanceof Map) {
+	//			return Array.from(value.entries());
+	//		}
 			return value;
 		}
 		console.log(JSON.stringify(result, mapReplacer));

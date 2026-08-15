@@ -628,46 +628,8 @@ export class BattleWindowsMWWManipulator {
 		for(const {action, byStateId} of this.turns[turnIndex]){
 			let penalty = current.penalty + action.penalty;
 
-			//事前評価で枝刈り（下限値を計算）
-			let minAveragePenalty = penalty;
-			if(current.activeBranchGroups && current.resolvedBranchGroups) {
-				let sumOfScore = 0;
-				let sumOfPenalty = 0;
-				for (const b of current.resolvedBranchGroups) {
-					for (const g of b.stateGroups) sumOfScore += g.score;
-				}
-				let totalScore = sumOfScore;
-				for (const b of current.activeBranchGroups) {
-					for (const g of b.stateGroups) totalScore += g.score;
-				}
-				
-				for (const b of current.resolvedBranchGroups) {
-					let bScore = 0;
-					for (const g of b.stateGroups) bScore += g.score;
-					sumOfPenalty += bScore * b.best.penalty;
-				}
-				
-				let minResolvedBranches = current.resolvedBranchGroups.length;
-				for (const b of current.activeBranchGroups) {
-					let bScore = 0;
-					for (const g of b.stateGroups) bScore += g.score;
-					
-					let costIfSucceed = bScore * penalty;
-					let costIfFail = bScore * b.best.penalty + totalScore * this.branchDifficulty;
-					
-					if (costIfFail < costIfSucceed) {
-						sumOfPenalty += bScore * b.best.penalty;
-						minResolvedBranches++;
-					} else {
-						sumOfPenalty += costIfSucceed;
-					}
-				}
-				minAveragePenalty = sumOfPenalty / totalScore + minResolvedBranches * this.branchDifficulty;
-			} else {
-				minAveragePenalty = this.calcAveragePenalty(penalty, current.activeBranchGroups, current.resolvedBranchGroups);
-			}
-
-			if((current.failScore - best.failScore || minAveragePenalty - best.penalty) >= 0) break;
+			//事前評価で枝刈り
+			if((current.failScore - best.failScore || this.calcAveragePenalty(penalty, current.activeBranchGroups, current.resolvedBranchGroups) - best.penalty) >= 0) break;
 
 			//次の状態を計算
 			let nextStateGroups = null;
@@ -739,6 +701,15 @@ export class BattleWindowsMWWManipulator {
 						}
 					}
 					if(activeBranchGroups.length === 0) continue;
+
+					//分岐削減度外視（low）の場合は全ての分岐を使う
+					if(this.branchDifficulty === 0){
+						for(const b of activeBranchGroups){
+							failScore += b.best.failScore;
+							resolvedBranchGroups.push(b);
+						}
+						activeBranchGroups = [];
+					}
 				}
 			}else{
 				break;
@@ -748,16 +719,27 @@ export class BattleWindowsMWWManipulator {
 
 			//次のターン
 			if(turnIndex !== 3){
-				const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {penalty, failScore, activeBranchGroups, resolvedBranchGroups});
-				if(cont){
-					//分岐が作られたターンでbranchesに登録する
+				if(this.branchDifficulty === 0 && resolvedBranchGroups){
 					const branches = new Map();
-					if(!current.activeBranchGroups && best.resolvedBranchGroups && activeBranchGroups){
-						for(const b of best.resolvedBranchGroups){
-							branches.set(b.obs, b.cont);
-						}
+					for(const b of resolvedBranchGroups){
+						branches.set(b.obs, b.cont);
 					}
-					result = {action, branches, default: cont};
+					result = {action, branches, default: null};
+					best.penalty = averagePenalty;
+					best.failScore = failScore;
+					best.resolvedBranchGroups = resolvedBranchGroups;
+				}else{
+					const cont = this.manipulateFrom(turnIndex + 1, nextStateGroups, best, {penalty, failScore, activeBranchGroups, resolvedBranchGroups});
+					if(cont){
+						//分岐が作られたターンでbranchesに登録する
+						const branches = new Map();
+						if(!current.activeBranchGroups && best.resolvedBranchGroups && activeBranchGroups){
+							for(const b of best.resolvedBranchGroups){
+								branches.set(b.obs, b.cont);
+							}
+						}
+						result = {action, branches, default: cont};
+					}
 				}
 			}else{
 				result = {action, default: null};
