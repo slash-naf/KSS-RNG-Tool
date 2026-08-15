@@ -2,7 +2,7 @@
 
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -365,9 +365,9 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 43, dashes: 3, slides: 1 },
 		{ difficulty: 44, dashes: 2, stars: 1, hammerFlips: 1 },
 		{ difficulty: 45, dashes: 2, stars: 1, slides: 1 },
-		{ difficulty: 150, dashes: 1 },
-		{ difficulty: 201, dashes: 1, hammerFlips: 1 },
-		{ difficulty: 202, dashes: 1, slides: 1 },
+		{ difficulty: 350, dashes: 1 },
+		{ difficulty: 401, dashes: 1, hammerFlips: 1 },
+		{ difficulty: 402, dashes: 1, slides: 1 },
 	],
 	dragon: [
 		{ difficulty: 0 },
@@ -380,8 +380,8 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 51, dashes: 3, stars: 1 },
 		{ difficulty: 52, dashes: 3, slides: 1 },
 		{ difficulty: 54, dashes: 2, stars: 1, slides: 1 },
-		{ difficulty: 200, dashes: 1 },
-		{ difficulty: 251, dashes: 1, slides: 1 },
+		{ difficulty: 400, dashes: 1 },
+		{ difficulty: 451, dashes: 1, slides: 1 },
 	],
 	dragonTurn2: [
 		{ difficulty: 0 },
@@ -392,45 +392,44 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 6, dashes: 2, stars: 1 },
 		{ difficulty: 7, dashes: 2, slides: 1 },
 		{ difficulty: 8, dashes: 2, hammerFlips: 1 },
-		{ difficulty: 250, dashes: 1 },
-		{ difficulty: 351, dashes: 1, slides: 1 },
-		{ difficulty: 352, dashes: 1, hammerFlips: 1 },
+		{ difficulty: 450, dashes: 1 },
+		{ difficulty: 501, dashes: 1, slides: 1 },
+		{ difficulty: 502, dashes: 1, hammerFlips: 1 },
 	],
 };
 
 /** 魔法使いのFast @type {ActionTable[]}*/
 export const FastMagicianList = [
 	{ fast: 0.5, name: "1st frame" },
-	{ fast: 1,   name: "Fast1" },
+	{ fast: 1,   name: "Fast1", timeloss: 0 },
 	{ fast: 1.5, name: "5th frame" },
-	{ fast: 2,   name: "Fast2" },
-	{ fast: 3,   name: "Fast3" },
-	{ fast: 4,   name: "Fast4" },
-];
+	{ fast: 2,   name: "Fast2", timeloss: 4 },
+	{ fast: 3,   name: "Fast3", timeloss: 8 },
+	{ fast: 4,   name: "Fast4", timeloss: 12 },
+].map(e => ({...e, difficulty: 1500}));
 /** @typedef {keyof MagicianPrioritiesTable} MagicianDifficulty */
 /** 魔法使いでの行動の優先順位 @type {{easy: ActionTable[], conservativeFast: ActionTable[], aggressiveFast: ActionTable[]}}*/
 const MagicianPrioritiesTable = {
 	easy: [
-		{ },
-		{ stars: 1 },
-		{ hammerFlips: 1 },
-		{ slides: 1 },
-		{ dashes: 3 },
-		{ dashes: 2, stars: 1 },
-		{ dashes: 2, slides: 1 },
-		{ dashes: 3, stars: 1 },
-		{ dashes: 3, slides: 1 },
-		{ slides: 2 },
-		{ dashes: 1 },
-		{ dashes: 1, slides: 1 },
+		{ difficulty: 0 },
+		{ difficulty: 150, stars: 1 },
+		{ difficulty: 151, hammerFlips: 1 },
+		{ difficulty: 152, slides: 1 },
+		{ difficulty: 165, dashes: 3 },
+		{ difficulty: 170, dashes: 2, stars: 1 },
+		{ difficulty: 171, dashes: 2, slides: 1 },
+		{ difficulty: 190, dashes: 3, stars: 1 },
+		{ difficulty: 191, dashes: 3, slides: 1 },
+		{ difficulty: 193, slides: 2 },
+		{ difficulty: 550, dashes: 1 },
+		{ difficulty: 600, dashes: 1, slides: 1 },
 	],
 	conservativeFast: [
-		{ },
-		{ dashes: 2 },
-		{ dashes: 3 },
-		{ slides: 1, lateAdvances: 2 },
-		{ slides: 1, lateAdvances: 1 },
-		{ dashes: 1 },
+		{ difficulty: 0 },
+		{ difficulty: 150, dashes: 2 },
+		{ difficulty: 250, slides: 1, lateAdvances: 2 },
+		{ difficulty: 300, slides: 1, lateAdvances: 1 },
+		{ difficulty: 600, dashes: 1 },
 		FastMagicianList[1],
 		FastMagicianList[3],
 		FastMagicianList[4],
@@ -441,13 +440,12 @@ const MagicianPrioritiesTable = {
 		FastMagicianList[3],
 		FastMagicianList[4],
 		FastMagicianList[5],
-		{ },
-		{ dashes: 2 },
-		{ dashes: 3 },
-		{ slides: 1, lateAdvances: 2 },
-		{ slides: 1, lateAdvances: 1 },
-		{ dashes: 1 },
-	],
+		{ difficulty: 0 },
+		{ difficulty: 150, dashes: 2 },
+		{ difficulty: 250, slides: 1, lateAdvances: 2 },
+		{ difficulty: 300, slides: 1, lateAdvances: 1 },
+		{ difficulty: 600, dashes: 1 },
+	].map(e => ({...e, timeloss: e.timeloss ?? 36})),
 };
 
 /**
@@ -466,7 +464,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
-	 * @param {number} [options.branchDifficulty] 分岐判断の1つあたりの追加難易度
+	 * @param {'low' | 'medium' | 'high'} [options.branchReduction] 分岐削減の度合い
 	 * @param {number} [options.maxStarsCount]
 	 */
 	constructor({
@@ -478,7 +476,7 @@ export class BattleWindowsMWWManipulator {
 		hammerThrow = 1,
 		minIndex = 2800,
 		maxIndex = 3376,
-		branchDifficulty = 100000000,
+		branchReduction = 'medium',
 		maxStarsCount = 6,
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
@@ -489,13 +487,31 @@ export class BattleWindowsMWWManipulator {
 		this.minIndex = /**@type {RngIndex}*/(minIndex);
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.middleOffset = this.rngIndexToOffset(this.maxIndex) / 2;
-		this.branchDifficulty = branchDifficulty;
 		this.maxStarsCount = maxStarsCount;
+
+		//分岐削減の度合いに応じて、分岐とタイムロスのペナルティを設定
+		switch(branchReduction){
+		case 'low':
+			//分岐数度外視
+			this.branchDifficulty = 0;
+			this.timelossPenalty = 1 << 15;
+			break;
+		case 'medium':
+			//タイム最優先
+			this.branchDifficulty = 1 << 15;
+			this.timelossPenalty = 1 << (15 + 7);
+			break;
+		case 'high':
+			//分岐削減最優先
+			this.timelossPenalty = 1 << 15;
+			this.branchDifficulty = 1 << (15 + 13);
+			break;
+		}
 
 		// 各ターンの難易度低い順行動リストを作成
 		/**@type {ActionTableEx[][]}*/
 		this.actionsListByTurn = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map((e, i) => ({ ...e, difficulty: i * 1000000 })),
+			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, difficulty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })),
 			actionsDifficultyTable.knight.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })),
 			actionsDifficultyTable.dragon.map(e => ({ ...e, difficulty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })),
 			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, difficulty: e.difficulty ?? 0})),
@@ -570,7 +586,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {RngIndex} index
 	*/
 	rngIndexToScore(index) {
-		return 0x10000 - this.offsetToDeviation(this.rngIndexToOffset(index));
+		return Math.max(10000 - this.offsetToDeviation(this.rngIndexToOffset(index)), 0);
 	}
 	/** 平均難易度を計算
 	 * @param {number} difficulty
