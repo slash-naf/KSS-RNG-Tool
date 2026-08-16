@@ -527,17 +527,25 @@ export class BattleWindowsMWWManipulator {
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
 		this.turns = steps.map((step, i) => this.actionsListByTurn[i].map(action => {
 			let nextMaxIndex = maxIndexByTurn;
-			/**@type {({obs: BattleWindowsPowersPair, stateId: number} | null)[]}*/
+			/**@type {({obs: BattleWindowsPowersPair, stateId: number, statePenalty: number} | null)[]}*/
 			const byStateId = [];
 			for(const index of KssRng.range(this.minIndex, maxIndexByTurn)){
 				for(const hasSeenPowers of [false, true]){
 					//遷移後の状態を作成
 					r.index = index;
-					const obs = step(action, hasSeenPowers);
-					byStateId.push(obs === null ? null : {obs, stateId: this.makeStateId(r.index, hasSeenPowers || obs !== NoPowersPair)});
+					const stepResult = step(action, hasSeenPowers);
+					const endingIndex = r.getIndex();
 
-					//次のターンで到達可能な最も先の乱数位置を探す
-					if(obs !== null && this.rngIndexToOffset(r.index) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = r.index;
+					if(stepResult === null){
+						byStateId.push(null);
+					}else{
+						const { obs, statePenalty } = stepResult;
+						const stateId = this.makeStateId(endingIndex, hasSeenPowers || obs !== NoPowersPair);
+						byStateId.push({obs, stateId, statePenalty});
+
+						//次のターンで到達可能な最も先の乱数位置を探す
+						if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
+					}
 				}
 			}
 			maxIndexByTurn = nextMaxIndex;
@@ -545,37 +553,46 @@ export class BattleWindowsMWWManipulator {
 		}));
 	}
 
+	/** @typedef {{ obs: BattleWindowsPowersPair, dragonAction?: ID<DragonAction>, statePenalty: number, stateTimeloss: number }} SimulationStepResult */
 	/** ターンごとのシミュレーション用の関数を生成する
 	 * @param {KssRng} rng 
-	 * @returns {(((a: ActionTable, forceHasSeenPowers?: boolean) => BattleWindowsPowersPair | null)[] & {getLastDragonAction: () => ID<DragonAction> | undefined})}
+	 * @returns {((a: ActionTable, forceHasSeenPowers?: boolean) => SimulationStepResult | null)[]}
 	 */
 	createSimulationSteps(rng) {
 		let currentHasSeenPowers = false;
-		/** @type {ID<DragonAction> | undefined} */
-		let lastDragonAction;
+		/** @type {((a: ActionTable, hasSeenPowers: boolean) => { obs: BattleWindowsPowersPair | null, dragonAction?: ID<DragonAction>, statePenalty?: number, stateTimeloss?: number })[]} */
 		const fns = [
-			(/**@type {ActionTable}*/a) => rng.simulateMagician(a),
-			(/**@type {ActionTable}*/a) => rng.simulateKnight(a, this.hammerThrow),
-			(/**@type {ActionTable}*/a) => rng.simulateDragon(a),
+			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateMagician(a) }),
+			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateKnight(a, this.hammerThrow) }),
+			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateDragon(a) }),
 			(/**@type {ActionTable}*/a, /** @type {boolean} */hasSeenPowers) => {
 				const dragonAction = rng.simulateDragonAction(a);
-				lastDragonAction = dragonAction;
-				if (dragonAction === DragonGuard || (this.allowDragonStar && dragonAction === DragonStar)) {
-					return rng.simulateDragonPowers({}, !hasSeenPowers);
+				if (dragonAction === DragonGuard || dragonAction === DragonStar) {
+					const obs = rng.simulateDragonPowers({}, !hasSeenPowers);
+					let stateTimeloss = 0;
+					let statePenalty = 0;
+					if (dragonAction === DragonStar && !this.allowDragonStar) {
+						stateTimeloss = 22;
+						statePenalty = stateTimeloss * this.timelossPenalty;
+					}
+					return { obs, dragonAction, statePenalty, stateTimeloss };
 				}
-				return null;
+				return { obs: null };
 			},
 		];
-		const steps = fns.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean|undefined}*/forceHasSeenPowers) => {
+		return fns.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean|undefined}*/forceHasSeenPowers) => {
 			const h = forceHasSeenPowers !== undefined ? forceHasSeenPowers : currentHasSeenPowers;
-			const obs = fn(a, h);
-			if (forceHasSeenPowers === undefined && obs !== null) {
-				currentHasSeenPowers ||= obs !== NoPowersPair;
+			const result = fn(a, h);
+			if (result.obs === null) return null;
+			if (forceHasSeenPowers === undefined && result.obs !== null) {
+				currentHasSeenPowers ||= result.obs !== NoPowersPair;
 			}
-			return obs;
-		});
-		return Object.assign(steps, {
-			getLastDragonAction: () => lastDragonAction,
+			return {
+				obs: result.obs,
+				dragonAction: result.dragonAction,
+				statePenalty: result.statePenalty ?? 0,
+				stateTimeloss: result.stateTimeloss ?? 0,
+			};
 		});
 	}
 
@@ -608,16 +625,19 @@ export class BattleWindowsMWWManipulator {
 	 * @param {number} penalty
 	 * @param {BranchGroups} activeBranchGroups
 	 * @param {BranchGroups} resolvedBranchGroups
+	 * @param {StateGroup[] | null} nextStateGroups
+	 * @returns {number}
 	*/
-	calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups) {
-		if(activeBranchGroups && resolvedBranchGroups && resolvedBranchGroups.length > 0){
-			let sumOfScore = 0;
+	calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups, nextStateGroups) {
+		let sumOfScore = 0;
+		let sumOfPenalty = 0;
+		if(activeBranchGroups && resolvedBranchGroups){
 			for(const b of activeBranchGroups){
 				for(const g of b.stateGroups){
 					sumOfScore += g.score;
+					sumOfPenalty += g.score * (penalty + g.statePenalty);
 				}
 			}
-			let sumOfPenalty = sumOfScore * penalty;
 			for(const b of resolvedBranchGroups){
 				for(const g of b.stateGroups){
 					sumOfScore += g.score;
@@ -625,13 +645,17 @@ export class BattleWindowsMWWManipulator {
 				}
 			}
 			return sumOfPenalty / sumOfScore + resolvedBranchGroups.length * this.branchDifficulty;
-		}else{
-			return penalty;
+		}else if(nextStateGroups){
+			for(const g of nextStateGroups){
+				sumOfScore += g.score;
+				sumOfPenalty += g.score * (penalty + g.statePenalty);
+			}
 		}
+		return sumOfPenalty / sumOfScore;
 	}
 
 	/** あるターンからの乱数調整を探す
-	 * @typedef {{stateId: number, score: number}} StateGroup
+	 * @typedef {{stateId: number, score: number, statePenalty: number}} StateGroup
 	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult, best: {penalty: number, failScore: number, resolvedBranchGroups: BranchGroups}}[] | null} BranchGroups
 	 * @param {number} turnIndex
 	 * @param {StateGroup[] | null} currentStateGroups
@@ -645,7 +669,7 @@ export class BattleWindowsMWWManipulator {
 			let penalty = current.penalty + action.penalty;
 
 			//事前評価で枝刈り
-			if((current.failScore - best.failScore || this.calcAveragePenalty(penalty, current.activeBranchGroups, current.resolvedBranchGroups) - best.penalty) >= 0) break;
+			if((current.failScore - best.failScore || this.calcAveragePenalty(penalty, current.activeBranchGroups, current.resolvedBranchGroups, currentStateGroups) - best.penalty) >= 0) break;
 
 			//次の状態を計算
 			let nextStateGroups = null;
@@ -662,7 +686,7 @@ export class BattleWindowsMWWManipulator {
 					for(const g of b.stateGroups){
 						const turnResult = byStateId[g.stateId];
 						if(turnResult){
-							stateGroups.push({stateId: turnResult.stateId, score: g.score});
+							stateGroups.push({stateId: turnResult.stateId, score: g.score, statePenalty: g.statePenalty + turnResult.statePenalty});
 						}else{
 							failed = true;
 							break;
@@ -685,7 +709,7 @@ export class BattleWindowsMWWManipulator {
 					if(turnResult){
 						let group = groups.get(turnResult.obs);
 						if(!group) groups.set(turnResult.obs, group = []);
-						group.push({stateId: turnResult.stateId, score: g.score});
+						group.push({stateId: turnResult.stateId, score: g.score, statePenalty: g.statePenalty + turnResult.statePenalty});
 					}else{
 						failScore += g.score;
 					}
@@ -730,7 +754,7 @@ export class BattleWindowsMWWManipulator {
 			}else{
 				break;
 			}
-			const averagePenalty = this.calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups);
+			const averagePenalty = this.calcAveragePenalty(penalty, activeBranchGroups, resolvedBranchGroups, nextStateGroups);
 			if((failScore - best.failScore || averagePenalty - best.penalty) >= 0) continue;
 
 			//次のターン
@@ -776,6 +800,7 @@ export class BattleWindowsMWWManipulator {
 		const stateGroups = indices.map(index => ({
 			stateId: this.makeStateId(index),
 			score: this.rngIndexToScore(KssRng.calcIndex(index, -stars.length * StarDirectionAdvances)),
+			statePenalty: 0,
 		}));
 		return this.manipulateFrom(0, stateGroups);
 	}
@@ -910,16 +935,19 @@ export class BattleWindowsMWWManipulator {
 				const branchSize = current.branches ? current.branches.size : 0;
 				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
+				const stepResult = step(current.action);
+				if (stepResult === null) break;
+				sim.push(stepResult.obs);
+
 				// 難易度加算
 				difficulty += current.action.difficulty ?? 0;
-				penalty += current.action.penalty + branchSize * this.branchDifficulty;
-				timeloss += current.action.timeloss ?? 0;
+				penalty += current.action.penalty + branchSize * this.branchDifficulty + stepResult.statePenalty;
+				timeloss += (current.action.timeloss ?? 0) + stepResult.stateTimeloss;
 
-				const obs = step(current.action);
-				if (obs === null) break;
-				sim.push(obs);
+				if (stepResult.dragonAction === DragonGuard) result.dragonGuardCount++;
+				else if (stepResult.dragonAction === DragonStar) result.dragonStarCount++;
 
-				current = current.branches ? (current.branches.get(obs) ?? current.default) : current.default;
+				current = current.branches ? (current.branches.get(stepResult.obs) ?? current.default) : current.default;
 			}
 
 			// 行動の結果を確認
@@ -956,10 +984,6 @@ export class BattleWindowsMWWManipulator {
 				result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
 				result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
 				result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
-
-				const lastDragonAction = steps.getLastDragonAction();
-				if (lastDragonAction === DragonGuard) result.dragonGuardCount++;
-				else if (lastDragonAction === DragonStar) result.dragonStarCount++;
 			}
 
 			result.count++;

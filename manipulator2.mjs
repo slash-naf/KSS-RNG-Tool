@@ -132,7 +132,7 @@ const L = {
 	dragon: { en: 'Dragon:', ja: 'レッドドラゴン:' },
 	hammerThrow: { en: 'Hammer throw dash advances:', ja: 'ハンマー投げのダッシュ消費数:' },
 	branchReduction: { en: 'Branch reduction:', ja: '分岐削減:' },
-	branchReductionLow: { en: 'Low', ja: '低（度外視）' },
+	branchReductionLow: { en: 'Low', ja: '低' },
 	branchReductionMedium: { en: 'Medium (Time priority)', ja: '中（タイム優先）' },
 	branchReductionHigh: { en: 'High', ja: '高' },
 	manipulationSettings: { en: 'Manipulation Settings', ja: '乱数調整設定' },
@@ -690,17 +690,17 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 			actions.push(current.action);
 			
 			const step = steps[turnIndex];
-			const obs = step(current.action);
-			if (obs === null) break; // 攻撃の先制などにより失敗した場合
+			const stepResult = step(current.action);
+			if (stepResult === null) break; // 攻撃の先制などにより失敗した場合
 
 			sim.push({
-				pair: obs,
+				pair: stepResult.obs,
 				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
 				log: logs[turnIndex] ?? ''
 			});
 
 			// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
-			current = (current.branches && current.branches.has(obs) ? current.branches.get(obs) : current.default) ?? null;
+			current = (current.branches && current.branches.has(stepResult.obs) ? current.branches.get(stepResult.obs) : current.default) ?? null;
 		}
 
 		arrivalSims.push({
