@@ -188,6 +188,9 @@ const L = {
 	knightActions: { en: 'Knight', ja: '悪魔の騎士' },
 	dragonActions: { en: 'Dragon', ja: 'レッドドラゴン' },
 	dragonTurn2Actions: { en: 'Dragon Turn 2', ja: 'レッドドラゴン2ターン目' },
+	dragonActualActions: { en: "Dragon's Action", ja: 'レッドドラゴンの行動' },
+	dragonGuard: { en: 'Guard', ja: 'ガード' },
+	dragonStarAction: { en: 'Star', ja: '星攻撃' },
 	thTiming: { en: 'Timing', ja: 'タイミング' },
 	thSmoke: { en: 'Smoke', ja: '煙' },
 	thAttacksFirst: { en: '1st Attack', ja: '先制' },
@@ -1096,11 +1099,29 @@ function renderTestResult(result, testResultEl) {
 		return s;
 	};
 
+	/** レッドドラゴンの行動（ガード/星攻撃）の頻度統計テーブルを描画する */
+	const renderDragonActualActionsTable = () => {
+		const entries = [
+			{ name: t('dragonGuard'), count: result.dragonGuardCount },
+			{ name: t('dragonStarAction'), count: result.dragonStarCount },
+		].filter(e => e.count > 0).sort((a, b) => b.count - a.count);
+
+		if (entries.length === 0) return '';
+		let s = `<div><b>${t('dragonActualActions')}</b>`;
+		s += `<table class="test-table" style="margin-top: 5px;"><thead><tr><th>${t('thAction')}</th><th>${t('thCount')}</th></tr></thead><tbody>`;
+		for (const e of entries) {
+			s += `<tr><td>${e.name}</td><td>${e.count}</td></tr>`;
+		}
+		s += '</tbody></table></div>';
+		return s;
+	};
+
 	html += `<div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px; align-items: flex-start;">`;
 	html += renderActionTable(t('magicianActions'), result.magicianCountList);
 	html += renderActionTable(t('knightActions'), result.knightCountList);
 	html += renderActionTable(t('dragonActions'), result.dragonCountList);
 	html += renderActionTable(t('dragonTurn2Actions'), result.dragonTurn2CountList);
+	html += renderDragonActualActionsTable();
 	html += `</div>`;
 
 	testResultEl.innerHTML = html;

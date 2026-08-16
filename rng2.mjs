@@ -224,14 +224,14 @@ export class KssRng {
 	}
 
 	/** 悪魔の騎士戦のシミュレーション
-	 * @param {ActionTable} knightAction 悪魔の騎士に対する行動
+	 * @param {ActionTable} action 悪魔の騎士に対する行動
 	 * @param {number} hammerThrow ハンマー投げのダッシュによる乱数消費数
 	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
 	 */
-	simulateKnight(knightAction, hammerThrow) {
-		this.takeAction(knightAction);
+	simulateKnight(action, hammerThrow) {
+		this.takeAction(action);
 		let powers;
-		if (knightAction.fast) {
+		if (action.fast) {
 			// Fastモード
 			this.advance(8);
 			const a = this.knightAttacksFirst();
@@ -253,13 +253,13 @@ export class KssRng {
 	}
 
 	/** レッドドラゴン戦1ターン目のシミュレーション
-	 * @param {ActionTable} dragonAction レッドドラゴンに対する行動
+	 * @param {ActionTable} action レッドドラゴンに対する行動
 	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
 	 */
-	simulateDragon(dragonAction) {
-		this.takeAction(dragonAction);
+	simulateDragon(action) {
+		this.takeAction(action);
 		let powers;
-		if (dragonAction.fast) {
+		if (action.fast) {
 			// Fastモード
 			this.advance(6);
 			const a = this.dragonAttacksFirst();
@@ -278,19 +278,23 @@ export class KssRng {
 		return powers;
 	}
 
-	/** レッドドラゴン戦2ターン目のシミュレーション
-	 * @param {ActionTable} action レッドドラゴン2ターン目の行動
-	 * @param {boolean} allowDragonStar 星攻撃も成功とするか
-	 * @param {boolean} noPowersFor3
-	 * @returns {BattleWindowsPowersPair | null} 望まない行動をされたらnull
+	/** レッドドラゴンの行動のシミュレーション
+	 * @param {ActionTable} action
+	 * @returns {ID<DragonAction>} レッドドラゴンの行動
 	 */
-	simulateDragonTurn2(action, allowDragonStar, noPowersFor3=false) {
+	simulateDragonAction(action) {
 		this.takeAction(action);
-		const dragonAction = this.dragonActs();
-		if (dragonAction === DragonGuard || (allowDragonStar && dragonAction === DragonStar)) {
-			return this.battleWindowsPowers(noPowersFor3);
-		}
-		return null;
+		return this.dragonActs();
+	}
+
+	/** レッドドラゴンが行動した後のコピーの元のシミュレーション
+	 * @param {ActionTable} action
+	 * @param {boolean} noPowersFor3
+	 * @returns {BattleWindowsPowersPair}
+	*/
+	simulateDragonPowers(action, noPowersFor3){
+		this.takeAction(action);
+		return this.battleWindowsPowers(noPowersFor3);
 	}
 
 	// --- ヘルパー関数 ---
@@ -533,7 +537,7 @@ export class BattleWindowsMWWManipulator {
 					byStateId.push(obs === null ? null : {obs, stateId: this.makeStateId(r.index, hasSeenPowers || obs !== NoPowersPair)});
 
 					//次のターンで到達可能な最も先の乱数位置を探す
-					if(obs !== null  && this.rngIndexToOffset(r.index) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = r.index;
+					if(obs !== null && this.rngIndexToOffset(r.index) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = r.index;
 				}
 			}
 			maxIndexByTurn = nextMaxIndex;
@@ -543,23 +547,35 @@ export class BattleWindowsMWWManipulator {
 
 	/** ターンごとのシミュレーション用の関数を生成する
 	 * @param {KssRng} rng 
-	 * @returns {((a: ActionTable, forceHasSeenPowers?: boolean) => BattleWindowsPowersPair | null)[]}
+	 * @returns {(((a: ActionTable, forceHasSeenPowers?: boolean) => BattleWindowsPowersPair | null)[] & {getLastDragonAction: () => ID<DragonAction> | undefined})}
 	 */
 	createSimulationSteps(rng) {
 		let currentHasSeenPowers = false;
+		/** @type {ID<DragonAction> | undefined} */
+		let lastDragonAction;
 		const fns = [
 			(/**@type {ActionTable}*/a) => rng.simulateMagician(a),
 			(/**@type {ActionTable}*/a) => rng.simulateKnight(a, this.hammerThrow),
 			(/**@type {ActionTable}*/a) => rng.simulateDragon(a),
-			(/**@type {ActionTable}*/a, /** @type {boolean} */hasSeenPowers) => rng.simulateDragonTurn2(a, this.allowDragonStar, !hasSeenPowers),
+			(/**@type {ActionTable}*/a, /** @type {boolean} */hasSeenPowers) => {
+				const dragonAction = rng.simulateDragonAction(a);
+				lastDragonAction = dragonAction;
+				if (dragonAction === DragonGuard || (this.allowDragonStar && dragonAction === DragonStar)) {
+					return rng.simulateDragonPowers({}, !hasSeenPowers);
+				}
+				return null;
+			},
 		];
-		return fns.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean|undefined}*/forceHasSeenPowers) => {
+		const steps = fns.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean|undefined}*/forceHasSeenPowers) => {
 			const h = forceHasSeenPowers !== undefined ? forceHasSeenPowers : currentHasSeenPowers;
 			const obs = fn(a, h);
 			if (forceHasSeenPowers === undefined && obs !== null) {
 				currentHasSeenPowers ||= obs !== NoPowersPair;
 			}
 			return obs;
+		});
+		return Object.assign(steps, {
+			getLastDragonAction: () => lastDragonAction,
 		});
 	}
 
@@ -790,6 +806,10 @@ export class BattleWindowsMWWManipulator {
 			successDeviationsSum: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
 
+			//レッドドラゴンの行動のカウント
+			dragonGuardCount: 0,
+			dragonStarCount: 0,
+
 			// manipulate()の計算時間（ms）
 			totalTime: 0,
 			worstTime: 0,
@@ -936,6 +956,10 @@ export class BattleWindowsMWWManipulator {
 				result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
 				result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
 				result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
+
+				const lastDragonAction = steps.getLastDragonAction();
+				if (lastDragonAction === DragonGuard) result.dragonGuardCount++;
+				else if (lastDragonAction === DragonStar) result.dragonStarCount++;
 			}
 
 			result.count++;
