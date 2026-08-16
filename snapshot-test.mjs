@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SNAPSHOT_FILE = path.join(__dirname, 'test-snapshot.json');
+const RESULT_FILE = path.join(__dirname, 'test-result.json');
 
 /** @type {NonNullable<ConstructorParameters<typeof BattleWindowsMWWManipulator>[0]>[]} */
 const settingsList = [
@@ -124,6 +125,8 @@ const settingsList = [
 ];
 
 async function main() {
+	/** @type {any[]} */
+	const newTestResults = [];
 	const newData = settingsList.map(v => {
 		const manipulator = new BattleWindowsMWWManipulator(v);
 		/** @type {Array<Array<[number, number]>>} */
@@ -137,21 +140,35 @@ async function main() {
 			n = endingIndex;
 		}, p => p !== 'randi');
 
-		/**
-		 * @param {string} key
-		 * @param {any} value
-		 */
-		function mapReplacer(key, value) {
-	//		if (value instanceof Map) {
-	//			return Array.from(value.entries());
-	//		}
-			return value;
-		}
-		console.log(JSON.stringify(result, mapReplacer));
+		newTestResults.push(result);
 
 		return a;
 	});
 
+	if (fs.existsSync(RESULT_FILE)) {
+		const oldTestResults = JSON.parse(fs.readFileSync(RESULT_FILE, 'utf8'));
+		for (let i = 0; i < newTestResults.length; i++) {
+			const oldResult = oldTestResults[i] || {};
+			const newResult = newTestResults[i] || {};
+			const allKeys = new Set([...Object.keys(oldResult), ...Object.keys(newResult)]);
+			const diffs = [];
+			for (const key of allKeys) {
+				if (key === 'totalTime' || key === 'worstTime') continue;
+				const oldVal = JSON.stringify(oldResult[key]);
+				const newVal = JSON.stringify(newResult[key]);
+				if (oldVal !== newVal) {
+					diffs.push(`  ${key}: ${oldVal} -> ${newVal}`);
+				}
+			}
+			if (diffs.length > 0) {
+				console.log(`setting ${i + 1}:`);
+				console.log(diffs.join('\n'));
+				console.log();
+			}
+		}
+	} else {
+		fs.writeFileSync(RESULT_FILE, JSON.stringify(newTestResults));
+	}
 
 	if (fs.existsSync(SNAPSHOT_FILE)) {
 		console.log(`\nスナップショットを ${SNAPSHOT_FILE} で発見しました。比較中...`);
