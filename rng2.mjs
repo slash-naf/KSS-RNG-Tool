@@ -39,7 +39,8 @@ export const BattleWindowsPowerMap = Uint8Array.from(BattleWindowsPowerNames, v 
 export const BattleWindowsPowerNone = parseBattleWindowsPower('None');
 /** @typedef {ID<'BattleWindowsPowersPair'>} BattleWindowsPowersPair コピーの元判定の結果 */
 export function makePowersPair(/**@type {number}*/left, /**@type {number}*/right) { return /**@type {BattleWindowsPowersPair}*/(left << 8 | right); }
-export const NoPowersPair = makePowersPair(BattleWindowsPowerNone, BattleWindowsPowerNone);
+export function parsePowersPair(/**@type {PowerName}*/left, /**@type {PowerName}*/right) { return makePowersPair(parseBattleWindowsPower(left), parseBattleWindowsPower(right)); }
+export const NoPowersPair = parsePowersPair('None', 'None');
 export function getLeftPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p >> 8); }
 export function getRightPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p & 0xFF); }
 
@@ -347,6 +348,22 @@ export class KssRng {
 		}
 		return indices;
 	}
+
+	/**
+	 * 条件に一致する開始乱数位置のリストを返す
+	 * @param {number} minIndex 探索開始の乱数位置
+	 * @param {number} maxIndex 探索終了の乱数位置
+	 * @param {(r: KssRng) => boolean} fn 条件
+	 * @returns {RngIndex[]} 条件に一致する開始乱数位置の配列
+	 */
+	static findIndices(minIndex, maxIndex, fn) {
+		/** @type {RngIndex[]} */
+		const indices = [];
+		for (const i of KssRng.range(minIndex, maxIndex)) {
+			if (fn(new KssRng(i))) indices.push(i);
+		}
+		return indices;
+	}
 }
 
 /** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonTurn2: ActionTable[] }} ActionsDifficultyTable */
@@ -545,6 +562,12 @@ export class BattleWindowsMWWManipulator {
 
 						//次のターンで到達可能な最も先の乱数位置を探す
 						if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
+
+						//最後のターン以外はhasSeenPowersでstepResultが変わらない
+						if(i !== 3){
+							byStateId.push({obs, stateId: this.makeStateId(endingIndex, hasSeenPowers), statePenalty});
+							break;
+						}
 					}
 				}
 			}
