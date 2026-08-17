@@ -642,37 +642,38 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 		let dragonAction;
 		/** @type {RngIndex[]} */
 		const powersIndices = [];
-		/** @type {string[]} */
+		/** @type {string[][]} */
 		const logs = [];
 
 		// 各シミュレーションのステップごとにプロキシを通して乱数遷移を記録する
 		const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
 			switch (p) {
 				case 'takeAction': {
-					logs.push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+					if (logs.length !== 4) logs.push([]);
+					if (endingIndex - startingIndex > 0) logs[logs.length - 1].push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
 					break;
 				}
 				case 'magicianAttacksFirst':
 				case 'knightAttacksFirst':
 				case 'dragonAttacksFirst': {
 					const a = !/** @type {boolean} */ (result);
-					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`;
+					logs[logs.length - 1].push(`${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`);
 					break;
 				}
 				case 'checkHammerHardHit': {
 					const a = /** @type {boolean} */ (result);
-					logs[logs.length - 1] += `<br>${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`;
+					logs[logs.length - 1].push(`${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`);
 					break;
 				}
 				case 'battleWindowsPowers': {
 					const a = /** @type {BattleWindowsPowersPair} */ (result);
-					logs[logs.length - 1] += `<br>${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`;
+					logs[logs.length - 1].push(`${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
 					powersIndices.push(startingIndex);
 					break;
 				}
 				case 'dragonActs': {
 					const a = /** @type {ID<DragonAction>} */ (result);
-					logs[logs.length - 1] += `<br>${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`;
+					logs[logs.length - 1].push(`${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`);
 					dragonAction = a;
 					break;
 				}
@@ -696,7 +697,7 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 			sim.push({
 				pair: stepResult.obs,
 				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
-				log: logs[turnIndex] ?? ''
+				log: (logs[turnIndex] ?? []).join('<br>')
 			});
 
 			// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
