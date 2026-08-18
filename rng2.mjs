@@ -565,7 +565,7 @@ export class BattleWindowsMWWManipulator {
 
 						//最後のターン以外はhasSeenPowersでstepResultが変わらない
 						if(i !== 3){
-							byStateId.push({obs, stateId: this.makeStateId(endingIndex, hasSeenPowers), statePenalty});
+							byStateId.push({obs, stateId: this.makeStateId(endingIndex, true), statePenalty});
 							break;
 						}
 					}
