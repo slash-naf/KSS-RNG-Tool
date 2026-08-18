@@ -756,13 +756,15 @@ export class BattleWindowsMWWManipulator {
 								}
 							}
 						}else{
+							childBest.penalty = penalty;
+							childBest.failScore = 0;
 							nextState.activeBranchGroups.push({obs, stateGroups, cont: null, best: childBest});
 						}
 					}
 					if(nextState.activeBranchGroups.length === 0) continue;
 
 					//分岐削減度外視（low）の場合は全ての分岐を使う
-					if(this.branchDifficulty === 0){
+					if(this.branchDifficulty === 0 && turnIndex !== 3){
 						for(const b of nextState.activeBranchGroups){
 							failScore += b.best.failScore;
 							nextState.resolvedBranchGroups.push(b);
