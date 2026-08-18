@@ -687,6 +687,7 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulateFrom(turnIndex, state, best={penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={penalty: 0, failScore: 0}) {
 		let result = null;
+		const isLastTurn = turnIndex === 3;
 		for(const {action, byStateId} of this.turns[turnIndex]){
 			let penalty = current.penalty + action.penalty;
 
@@ -740,31 +741,28 @@ export class BattleWindowsMWWManipulator {
 				}else if(groups.size === 1){
 					//分岐が一つなら次を分岐作成ターンにする
 					nextState = {stateGroups: [...groups.values()][0], activeBranchGroups: null, resolvedBranchGroups: null};
+				}else if(isLastTurn){
+					//最後のターンはその先の分岐が必要ない
+					nextState = {stateGroups: [...groups.values()].flat(), activeBranchGroups: null, resolvedBranchGroups: null};
 				}else{
 					//分岐ごとの最適解を探しておく
 					nextState = {stateGroups: null, activeBranchGroups: [], resolvedBranchGroups: []};
 					for(const [obs, stateGroups] of groups.entries()){
 						const childBest = {penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
-						if(turnIndex !== 3){
-							const cont = this.manipulateFrom(turnIndex + 1, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null}, childBest);
-							childBest.penalty = penalty + childBest.penalty;
-							if(cont){
-								nextState.activeBranchGroups.push({obs, stateGroups, cont, best: childBest});
-							}else{
-								for(const g of stateGroups){
-									failScore += g.score;
-								}
-							}
+						const cont = this.manipulateFrom(turnIndex + 1, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null}, childBest);
+						childBest.penalty = penalty + childBest.penalty;
+						if(cont){
+							nextState.activeBranchGroups.push({obs, stateGroups, cont, best: childBest});
 						}else{
-							childBest.penalty = penalty;
-							childBest.failScore = 0;
-							nextState.activeBranchGroups.push({obs, stateGroups, cont: null, best: childBest});
+							for(const g of stateGroups){
+								failScore += g.score;
+							}
 						}
 					}
 					if(nextState.activeBranchGroups.length === 0) continue;
 
 					//分岐削減度外視（low）の場合は全ての分岐を使う
-					if(this.branchDifficulty === 0 && turnIndex !== 3){
+					if(this.branchDifficulty === 0){
 						for(const b of nextState.activeBranchGroups){
 							failScore += b.best.failScore;
 							nextState.resolvedBranchGroups.push(b);
@@ -776,35 +774,35 @@ export class BattleWindowsMWWManipulator {
 			const averagePenalty = this.calcAveragePenalty(penalty, nextState);
 			if((failScore - best.failScore || averagePenalty - best.penalty) >= 0) continue;
 
-			//次のターン
-			if(turnIndex !== 3){
-				if(this.branchDifficulty === 0 && nextState.resolvedBranchGroups){
-					const branches = new Map();
-					for(const b of nextState.resolvedBranchGroups){
-						branches.set(b.obs, b.cont);
-					}
-					result = {action, branches, default: null};
-					best.penalty = averagePenalty;
-					best.failScore = failScore;
-					best.resolvedBranchGroups = nextState.resolvedBranchGroups;
-				}else{
-					const cont = this.manipulateFrom(turnIndex + 1, nextState, best, {penalty, failScore});
-					if(cont){
-						//分岐が作られたターンでbranchesに登録する
-						const branches = new Map();
-						if(!state.activeBranchGroups && best.resolvedBranchGroups && nextState.activeBranchGroups){
-							for(const b of best.resolvedBranchGroups){
-								branches.set(b.obs, b.cont);
-							}
-						}
-						result = {action, branches, default: cont};
-					}
-				}
-			}else{
+			if(isLastTurn){
+				//最後のターンなら更新
 				result = {action, default: null};
 				best.penalty = averagePenalty;
 				best.failScore = failScore;
 				best.resolvedBranchGroups = nextState.resolvedBranchGroups;
+			}else if(this.branchDifficulty === 0 && nextState.resolvedBranchGroups){
+				//分岐削減度外視（low）で分岐作成済みの場合
+				const branches = new Map();
+				for(const b of nextState.resolvedBranchGroups){
+					branches.set(b.obs, b.cont);
+				}
+				result = {action, branches, default: null};
+				best.penalty = averagePenalty;
+				best.failScore = failScore;
+				best.resolvedBranchGroups = nextState.resolvedBranchGroups;
+			}else{
+				//以降のターン
+				const cont = this.manipulateFrom(turnIndex + 1, nextState, best, {penalty, failScore});
+				if(cont){
+					//分岐が作られたターンでbranchesに登録する
+					const branches = new Map();
+					if(!state.activeBranchGroups && best.resolvedBranchGroups && nextState.activeBranchGroups){
+						for(const b of best.resolvedBranchGroups){
+							branches.set(b.obs, b.cont);
+						}
+					}
+					result = {action, branches, default: cont};
+				}
 			}
 		}
 
