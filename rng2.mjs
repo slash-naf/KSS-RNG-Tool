@@ -1,6 +1,7 @@
 // @ts-check
 
 /** @template T @typedef {number & {__brand: T}} ID */
+/** @template T @typedef {T extends Function | number | string | boolean | bigint | symbol | null | undefined ? T : T extends Array<infer U> ? ReadonlyArray<DeepReadonly<U>> : { readonly [K in keyof T]: DeepReadonly<T[K]> }} DeepReadonly */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
 /** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, name?: string }} ActionTable 行動テーブル */
 
@@ -646,7 +647,7 @@ export class BattleWindowsMWWManipulator {
 	}
 	/** 平均ペナルティを計算
 	 * @param {number} penalty
-	 * @param {ManipulateState} state
+	 * @param {DeepReadonly<ManipulateState>} state
 	 * @returns {number}
 	*/
 	calcAveragePenalty(penalty, state) {
@@ -677,12 +678,13 @@ export class BattleWindowsMWWManipulator {
 
 	/** あるターンからの乱数調整を探す
 	 * @typedef {{stateId: number, score: number, statePenalty: number}} StateGroup
-	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[], cont: ManipulateResult | null, best: {penalty: number, failScore: number, resolvedBranchGroups: BranchGroups | null}}[]} BranchGroups
-	 * @typedef {{stateGroups: null, activeBranchGroups: BranchGroups, resolvedBranchGroups: BranchGroups} | {stateGroups: StateGroup[], activeBranchGroups: null, resolvedBranchGroups: null}} ManipulateState
+	 * @typedef {{obs: BattleWindowsPowersPair, stateGroups: readonly StateGroup[], cont: ManipulateResult | null, best: {penalty: number, failScore: number, resolvedBranchGroups: readonly BranchGroup[] | null}}} BranchGroup
+	 * @typedef {readonly BranchGroup[]} BranchGroups
+	 * @typedef {{stateGroups: null, activeBranchGroups: BranchGroups, resolvedBranchGroups: BranchGroups} | {stateGroups: readonly StateGroup[], activeBranchGroups: null, resolvedBranchGroups: null}} ManipulateState
 	 * @param {number} turnIndex
-	 * @param {ManipulateState} state
-	 * @param {{penalty: number, failScore: number, resolvedBranchGroups: BranchGroups | null}} best
-	 * @param {{penalty: number, failScore: number}} current
+	 * @param {DeepReadonly<ManipulateState>} state
+	 * @param {{penalty: number, failScore: number, resolvedBranchGroups: readonly BranchGroup[] | null}} best
+	 * @param {DeepReadonly<{penalty: number, failScore: number}>} current
 	 * @returns {ManipulateResult}
 	 */
 	manipulateFrom(turnIndex, state, best={penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={penalty: 0, failScore: 0}) {
@@ -700,7 +702,8 @@ export class BattleWindowsMWWManipulator {
 			let failScore = current.failScore;
 			if(state.activeBranchGroups){
 				//失敗するところは分岐を使うとして進める
-				nextState = {stateGroups: null, activeBranchGroups: [], resolvedBranchGroups: [...state.resolvedBranchGroups]};
+				const resolvedBranchGroups = [...state.resolvedBranchGroups];
+				const activeBranchGroups = [];
 				for(const b of state.activeBranchGroups){
 					const stateGroups = [];
 					let failed = false;
@@ -715,12 +718,13 @@ export class BattleWindowsMWWManipulator {
 					}
 					if(failed){
 						failScore += b.best.failScore;
-						nextState.resolvedBranchGroups.push(b);
+						resolvedBranchGroups.push(b);
 					}else{
-						nextState.activeBranchGroups.push({...b, stateGroups});
+						activeBranchGroups.push({...b, stateGroups});
 					}
 				}
-				if(nextState.activeBranchGroups.length === 0) continue;
+				if(activeBranchGroups.length === 0) continue;
+				nextState = {stateGroups: null, activeBranchGroups, resolvedBranchGroups};
 			}else{
 				//観測値ごとに分ける
 				/** @type {Map<BattleWindowsPowersPair, StateGroup[]>} */
@@ -746,29 +750,32 @@ export class BattleWindowsMWWManipulator {
 					nextState = {stateGroups: [...groups.values()].flat(), activeBranchGroups: null, resolvedBranchGroups: null};
 				}else{
 					//分岐ごとの最適解を探しておく
-					nextState = {stateGroups: null, activeBranchGroups: [], resolvedBranchGroups: []};
+					const activeBranchGroups = [];
+					const resolvedBranchGroups = [];
 					for(const [obs, stateGroups] of groups.entries()){
 						const childBest = {penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null};
 						const cont = this.manipulateFrom(turnIndex + 1, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null}, childBest);
 						childBest.penalty = penalty + childBest.penalty;
 						if(cont){
-							nextState.activeBranchGroups.push({obs, stateGroups, cont, best: childBest});
+							activeBranchGroups.push({obs, stateGroups, cont, best: childBest});
 						}else{
 							for(const g of stateGroups){
 								failScore += g.score;
 							}
 						}
 					}
-					if(nextState.activeBranchGroups.length === 0) continue;
+					if(activeBranchGroups.length === 0) continue;
 
 					//分岐削減度外視（low）の場合は全ての分岐を使う
 					if(this.branchDifficulty === 0){
-						for(const b of nextState.activeBranchGroups){
+						for(const b of activeBranchGroups){
 							failScore += b.best.failScore;
-							nextState.resolvedBranchGroups.push(b);
+							resolvedBranchGroups.push(b);
 						}
-						nextState.activeBranchGroups = [];
+						activeBranchGroups.length = 0;
 					}
+
+					nextState = {stateGroups: null, activeBranchGroups, resolvedBranchGroups};
 				}
 			}
 			const averagePenalty = this.calcAveragePenalty(penalty, nextState);
