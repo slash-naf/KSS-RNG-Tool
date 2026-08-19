@@ -733,7 +733,6 @@ export class BattleWindowsMWWManipulator {
 						activeBranchGroups.push({...b, stateGroups});
 					}
 				}
-				if(activeBranchGroups.length === 0) continue;
 				nextState = {stateGroups: null, activeBranchGroups, resolvedBranchGroups};
 			}else{
 				//観測値ごとに分ける
