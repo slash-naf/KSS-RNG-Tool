@@ -39,11 +39,11 @@ const parseBattleWindowsPower = (/**@type {PowerName}*/v) => /**@type {ID<PowerN
 export const BattleWindowsPowerMap = Uint8Array.from(BattleWindowsPowerNames, v => parseBattleWindowsPower(v));
 export const BattleWindowsPowerNone = parseBattleWindowsPower('None');
 /** @typedef {ID<'BattleWindowsPowersPair'>} BattleWindowsPowersPair コピーの元判定の結果 */
-export function makePowersPair(/**@type {number}*/left, /**@type {number}*/right) { return /**@type {BattleWindowsPowersPair}*/(left << 8 | right); }
+export function makePowersPair(/**@type {number}*/left, /**@type {number}*/right) { return /**@type {BattleWindowsPowersPair}*/(left << 5 | right); }
 export function parsePowersPair(/**@type {PowerName}*/left, /**@type {PowerName}*/right) { return makePowersPair(parseBattleWindowsPower(left), parseBattleWindowsPower(right)); }
 export const NoPowersPair = parsePowersPair('None', 'None');
-export function getLeftPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p >> 8); }
-export function getRightPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p & 0xFF); }
+export function getLeftPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p >> 5); }
+export function getRightPower(/**@type {BattleWindowsPowersPair}*/p) { return /**@type {ID<PowerName>}*/(p & 0x1F); }
 
 // --- 乱数消費数 --
 export const StarDirectionAdvances = 2;	// 着地時・壁や天井にぶつかった時に出る小さな星（1回は星の方向の判定）
@@ -542,32 +542,27 @@ export class BattleWindowsMWWManipulator {
 		const r = new KssRng(/**@type {RngIndex}*/(0));
 		const steps = this.createSimulationSteps(r);
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
-		this.turns = steps.map((step, i) => this.actionsListByTurn[i].map(action => {
+		this.turns = steps.map((step, turnIndex) => this.actionsListByTurn[turnIndex].map(action => {
 			let nextMaxIndex = maxIndexByTurn;
-			/**@type {({obs: BattleWindowsPowersPair, stateId: number, statePenalty: number} | null)[]}*/
-			const byStateId = [];
+			const byStateId = new Int32Array((this.rngIndexToOffset(maxIndexByTurn) + 1) * 2);
+			let stateId = 0;
 			for(const index of KssRng.range(this.minIndex, maxIndexByTurn)){
 				for(const hasSeenPowers of [false, true]){
 					//遷移後の状態を作成
 					r.index = index;
 					const stepResult = step(action, hasSeenPowers);
 					const endingIndex = r.getIndex();
+					byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, hasSeenPowers, stepResult);
+					stateId++;
 
-					if(stepResult === null){
-						byStateId.push(null);
-					}else{
-						const { obs, statePenalty } = stepResult;
-						const stateId = this.makeStateId(endingIndex, hasSeenPowers || obs !== NoPowersPair);
-						byStateId.push({obs, stateId, statePenalty});
+					//次のターンで到達可能な最も先の乱数位置を探す
+					if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
 
-						//次のターンで到達可能な最も先の乱数位置を探す
-						if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
-
-						//最後のターン以外はhasSeenPowersでstepResultが変わらない
-						if(i !== BATTLE_WINDOWS_MWW_TURNS - 1){
-							byStateId.push({obs, stateId: this.makeStateId(endingIndex, true), statePenalty});
-							break;
-						}
+					//最後のターン以外はhasSeenPowersでstepResultが変わらない
+					if(turnIndex !== BATTLE_WINDOWS_MWW_TURNS - 1){
+						byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, true, stepResult);
+						stateId++;
+						break;
 					}
 				}
 			}
@@ -614,13 +609,34 @@ export class BattleWindowsMWWManipulator {
 		});
 	}
 
-	/** 遷移モデルの状態のIDを作成
+	/** 遷移モデルの状態を更新するための情報を作成
+	 * @param {number} oldStateId
 	 * @param {RngIndex} index
 	 * @param {boolean} hasSeenPowers
+	 * @param {SimulationStepResult | null} stepResult
 	*/
-	makeStateId(index, hasSeenPowers=false) {
-		return this.rngIndexToOffset(index) * 2 + (hasSeenPowers ? 1 : 0);
+	makeStateGroupUpdator(oldStateId, index, hasSeenPowers, stepResult) {
+		if (stepResult === null) return -1;
+		const stateId = (this.rngIndexToOffset(index) * 2) + ((hasSeenPowers || stepResult.obs !== NoPowersPair) ? 1 : 0);
+		let n = stepResult.stateTimeloss;
+		n = (n << 10) + stepResult.obs;
+		n = (n << 10) + (stateId - oldStateId);
+		return n;
 	}
+	/** 遷移後の状態と観測値を返す
+	 * @param {Readonly<StateGroup>} g
+	 * @param {Int32Array} byStateId
+	 * @returns {{obs: BattleWindowsPowersPair, stateGroup: StateGroup} | null}
+	*/
+	applyStateGroupUpdator(g, byStateId) {
+		let n = byStateId[g.stateId];
+		if(n === -1) return null;
+		const stateIdAdvances = n & (1 << 10) - 1; n >>>= 10;
+		const obs = /**@type {BattleWindowsPowersPair}*/(n & (1 << 10) - 1); n >>>= 10;
+		const timeloss = n;
+		return {obs, stateGroup: {stateId: g.stateId + stateIdAdvances, score: g.score, statePenalty: g.statePenalty + timeloss * this.timelossPenalty}};
+	}
+
 	/** minIndexからのオフセットを計算
 	 * @param {RngIndex} index 
 	*/
@@ -702,9 +718,9 @@ export class BattleWindowsMWWManipulator {
 					const stateGroups = [];
 					let failed = false;
 					for(const g of b.stateGroups){
-						const turnResult = byStateId[g.stateId];
+						const turnResult = this.applyStateGroupUpdator(g, byStateId);
 						if(turnResult){
-							stateGroups.push({stateId: turnResult.stateId, score: g.score, statePenalty: g.statePenalty + turnResult.statePenalty});
+							stateGroups.push(turnResult.stateGroup);
 						}else{
 							failed = true;
 							break;
@@ -724,11 +740,11 @@ export class BattleWindowsMWWManipulator {
 				/** @type {Map<BattleWindowsPowersPair, StateGroup[]>} */
 				const groups = new Map();
 				for(const g of state.stateGroups){
-					const turnResult = byStateId[g.stateId];
+					const turnResult = this.applyStateGroupUpdator(g, byStateId);
 					if(turnResult){
 						let group = groups.get(turnResult.obs);
 						if(!group) groups.set(turnResult.obs, group = []);
-						group.push({stateId: turnResult.stateId, score: g.score, statePenalty: g.statePenalty + turnResult.statePenalty});
+						group.push(turnResult.stateGroup);
 					}else{
 						failScore += g.score;
 					}
@@ -816,7 +832,7 @@ export class BattleWindowsMWWManipulator {
 	manipulate(stars) {
 		const indices = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex);
 		const stateGroups = indices.map(info => ({
-			stateId: this.makeStateId(info.endingIndex),
+			stateId: this.rngIndexToOffset(info.endingIndex) * 2,
 			score: this.rngIndexToScore(info.startingIndex),
 			statePenalty: 0,
 		}));
