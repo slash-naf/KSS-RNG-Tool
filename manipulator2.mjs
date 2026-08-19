@@ -10,7 +10,8 @@ import {
 	KssRng,
 	DragonActionNames, DragonGuard, DragonStar,
 	FastMagicianList,
-	RngCycle,
+	RngCycle, NoPowersPair,
+	BATTLE_WINDOWS_MWW_TURNS,
 } from './rng2.mjs';
 
 /** @typedef {import('./rng2.mjs').RngIndex} RngIndex */
@@ -58,6 +59,7 @@ import {
 //　--- 定数・初期状態 ---
 
 /** 結果表示を開始するために必要な最小の星入力数 */
+const MAX_STARS_INPUT = 6;
 const MIN_STARS_FOR_RESULT = 3;
 
 /** テンキーの数値（1-9）から星の方向インデックス（0-7）への変換マップ */
@@ -523,20 +525,19 @@ function resetInputs() {
 // --- 乱数計算と結果表示 ---
 
 /** 星消費後の「到着乱数位置」を整形してステータス欄に表示する
- * @param {RngIndex[]} starIndices */
+ * @param {{startingIndex: RngIndex, endingIndex: RngIndex}[]} starIndices */
 function renderRngIndices(starIndices) {
-	const arrivalIndices = Array.from(starIndices).map(idx => KssRng.getArrivalIndex(idx, stars.length));
-	el.status.innerHTML = t('rngIndex') + arrivalIndices.map(v => formatIndex(v)).join(', ');
+	const startingIndices = Array.from(starIndices).map(idx => idx.startingIndex);
+	el.status.innerHTML = t('rngIndex') + startingIndices.map(v => formatIndex(v)).join(', ');
 }
 
 /** Fast魔法使いのタイミング詳細テーブルを描画する
- * @param {RngIndex[]} starIndices */
+ * @param {{startingIndex: RngIndex, endingIndex: RngIndex}[]} starIndices */
 function renderTimingTable(starIndices) {
 	const starsAdvances = stars.length * StarDirectionAdvances;
 	let html = '';
-	for (const index of starIndices) {
-		const arrivalIndex = KssRng.getArrivalIndex(index, stars.length);
-		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${formatIndex(arrivalIndex)}</b>`;
+	for (const {startingIndex: sIndex, endingIndex: eIndex} of starIndices) {
+		html += `<div style="margin-top: 15px;"><b>${t('rngIndex')}${formatIndex(sIndex)}</b>`;
 		html += `<table class="test-table" style="font-size: 14px"><thead><tr>
 			<th>${t('thTiming')}</th>
 			<th>${t('thStars')}<br>(+${starsAdvances})</th>
@@ -554,8 +555,8 @@ function renderTimingTable(starIndices) {
 		const timings = FastMagicianList.map(v => {
 			/** @type {TimingRow} */
 			const row = { name: v.name, earlyHardHitCheck: v.fast !== undefined && v.fast <= 1, advances1: null, advances2: null, magicianAttacksFirst: false, magicianAttacksFirstEndingIndex: null, hardHitCheck: false, hardHitCheckEndingIndex: null, powers: null, endingIndex: null };
-			let lastIndex = index;
-			const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result}) => {
+			let lastIndex = eIndex;
+			const rng = new KssRng(eIndex).withProxy(({startingIndex, endingIndex, p, result}) => {
 				switch (p) {
 				case 'magicianAttacksFirst': 
 					row.magicianAttacksFirst = result;
@@ -580,35 +581,39 @@ function renderTimingTable(starIndices) {
 			row.endingIndex = rng.getIndex();
 			return row;
 		});
+		let groupEnd = 0;
 		for (let i = 0; i < timings.length; i++) {
 			const row = timings[i];
 
 			html += `<tr>
 				<td>${row.name ?? '-'}</td>
-				<td>${formatIndex(index)}</td>
+				<td>${formatIndex(eIndex)}</td>
 				<td>${row.advances1 ? `+${row.advances1}` : '-'}</td>
 				<td>${boolMsg(!row.magicianAttacksFirst)}${row.magicianAttacksFirstEndingIndex !== null ? formatIndex(row.magicianAttacksFirstEndingIndex) : '-'}</td>
 				<td>${row.advances2 ? `+${row.advances2}` : '-'}</td>`;
 
-			if (i === 0 || i === 2) {
-				// グループ内（i=0,1 or i=2..5）のうち先制されなかった最初の行を代表値として使う
-				const groupEnd = i === 0 ? 2 : 6;
-				const rep = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
+			if (i === groupEnd) {
+				// 同じ earlyHardHitCheck 値を持つ連続する行を探索
+				groupEnd = i;
+				while (groupEnd < timings.length && timings[groupEnd].earlyHardHitCheck === row.earlyHardHitCheck) {
+					groupEnd++;
+				}
+				
+				const representativeRow = timings.slice(i, groupEnd).find(r => r.powers !== null) ?? null;
 				const span = groupEnd - i;
 
-				// 先制判定が早い場合（earlyHardHitCheck）かどうかはグループ内共通なのでrowから参照
-				const hh1 = row.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
-				const hh2 = !row.earlyHardHitCheck && rep && rep.hardHitCheckEndingIndex !== null ? `${boolMsg(rep.hardHitCheck)}${formatIndex(rep.hardHitCheckEndingIndex)}` : '-';
-				const powersStr = rep && rep.powers
-					? `+${rep.powers.powersEndingIndex - rep.powers.powersStartingIndex}<br>${formatIndex(rep.powers.powersEndingIndex)}<br>${formatPowers(rep.powers.pair)}`
+				const earlyHardHitResult = row.earlyHardHitCheck && representativeRow && representativeRow.hardHitCheckEndingIndex !== null ? `${boolMsg(representativeRow.hardHitCheck)}${formatIndex(representativeRow.hardHitCheckEndingIndex)}` : '-';
+				const lateHardHitResult = !row.earlyHardHitCheck && representativeRow && representativeRow.hardHitCheckEndingIndex !== null ? `${boolMsg(representativeRow.hardHitCheck)}${formatIndex(representativeRow.hardHitCheckEndingIndex)}` : '-';
+				const powersStr = representativeRow && representativeRow.powers
+					? `+${representativeRow.powers.powersEndingIndex - representativeRow.powers.powersStartingIndex}<br>${formatIndex(representativeRow.powers.powersEndingIndex)}<br>${formatPowers(representativeRow.powers.pair)}`
 					: '-';
-				const hhSmoke = rep && rep.hardHitCheck && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex - 2)}` : '-';
-				const finishSmoke = rep && rep.endingIndex !== null ? `${formatIndex(rep.endingIndex)}` : '-';
+				const hardHitSmoke = representativeRow && representativeRow.hardHitCheck && representativeRow.endingIndex !== null ? `${formatIndex(representativeRow.endingIndex - 2)}` : '-';
+				const finishSmoke = representativeRow && representativeRow.endingIndex !== null ? `${formatIndex(representativeRow.endingIndex)}` : '-';
 
-				html += `<td rowspan="${span}">${hh1}</td>
+				html += `<td rowspan="${span}">${earlyHardHitResult}</td>
 				<td rowspan="${span}">${powersStr}</td>
-				<td rowspan="${span}">${hh2}</td>
-				<td rowspan="${span}">${hhSmoke}</td>
+				<td rowspan="${span}">${lateHardHitResult}</td>
+				<td rowspan="${span}">${hardHitSmoke}</td>
 				<td rowspan="${span}">${finishSmoke}</td>`;
 			}
 			html += `</tr>`;
@@ -622,22 +627,22 @@ function renderTimingTable(starIndices) {
 }
 
 /** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
-/** @typedef {{ arrivalIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} ArrivalSim */
+/** @typedef {{ startingIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} RouteSimulation */
 /** @typedef {{ simIndex: number, obs: BattleWindowsPowersPair, actions: (ActionTable|null)[], label: string }} BranchColumn */
 
 /**
  * 指定された星の乱数位置リストに対し、実際の行動を通したシミュレーションを行い、
  * 各ターンの到達乱数や出現するコピーの元、ログなどの情報を収集して返します。
  * @param {ManipulateResult} manipulateResult 調整結果のツリー
- * @param {RngIndex[]} starIndices 対象となる乱数位置の配列
+ * @param {{startingIndex: RngIndex, endingIndex: RngIndex}[]} starIndices 対象となる乱数位置の配列
  * @param {BattleWindowsMWWManipulator} manipulator マニピュレーターのインスタンス
- * @returns {ArrivalSim[]} 各乱数位置ごとのシミュレーション結果
+ * @returns {RouteSimulation[]} 各乱数位置ごとのシミュレーション結果
  */
-function generateArrivalSims(manipulateResult, starIndices, manipulator) {
-	/** @type {ArrivalSim[]} */
-	const arrivalSims = [];
+function generateRouteSimulations(manipulateResult, starIndices, manipulator) {
+	/** @type {RouteSimulation[]} */
+	const routeSims = [];
 	
-	for (const index of starIndices) {
+	for (const {startingIndex: sIndex, endingIndex: eIndex} of starIndices) {
 		/** @type {ID<DragonAction> | undefined} */
 		let dragonAction;
 		/** @type {RngIndex[]} */
@@ -646,10 +651,10 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 		const logs = [];
 
 		// 各シミュレーションのステップごとにプロキシを通して乱数遷移を記録する
-		const rng = new KssRng(index).withProxy(({startingIndex, endingIndex, p, result, args}) => {
+		const rng = new KssRng(eIndex).withProxy(({startingIndex, endingIndex, p, result, args}) => {
 			switch (p) {
 				case 'takeAction': {
-					if (logs.length !== 4) logs.push([]);
+					if (logs.length !== BATTLE_WINDOWS_MWW_TURNS) logs.push([]);
 					if (endingIndex - startingIndex > 0) logs[logs.length - 1].push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
 					break;
 				}
@@ -684,6 +689,7 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 		const actions = [];
 		const sim = [];
 		let current = manipulateResult;
+		let hasSeenPowers = false;
 
 		// 4ターン分の行動を評価し、実際に辿るルートを追跡する
 		for (let turnIndex = 0; turnIndex < steps.length; turnIndex++) {
@@ -691,7 +697,7 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 			actions.push(current.action);
 			
 			const step = steps[turnIndex];
-			const stepResult = step(current.action);
+			const stepResult = step(current.action, hasSeenPowers);
 			if (stepResult === null) break; // 攻撃の先制などにより失敗した場合
 
 			sim.push({
@@ -699,17 +705,18 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
 				log: (logs[turnIndex] ?? []).join('<br>')
 			});
+			if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
 
 			// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
 			current = (current.branches && current.branches.has(stepResult.obs) ? current.branches.get(stepResult.obs) : current.default) ?? null;
 		}
 
-		arrivalSims.push({
-			arrivalIndex: KssRng.getArrivalIndex(index, stars.length),
+		routeSims.push({
+			startingIndex: sIndex,
 			sim, dragonAction, actions,
 		});
 	}
-	return arrivalSims;
+	return routeSims;
 }
 
 /**
@@ -720,7 +727,7 @@ function generateArrivalSims(manipulateResult, starIndices, manipulator) {
 function extractMainActions(manipulateResult) {
 	let currentForMain = manipulateResult;
 	const mainActions = [];
-	for (let i = 0; i < 4; i++) {
+	for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
 		if (!currentForMain) {
 			mainActions.push(null);
 			break;
@@ -756,11 +763,11 @@ function extractAllBranches(manipulateResult) {
 		if (node.branches && node.branches.size > 0) {
 			let branchIndex = 1;
 			for (const [obs, branchRoot] of node.branches.entries()) {
-				const fallbackActions = new Array(4).fill(null);
+				const fallbackActions = new Array(BATTLE_WINDOWS_MWW_TURNS).fill(null);
 				let temp = branchRoot;
 				
 				// この分岐先を通った場合のデフォルト行動ルートを収集
-				for (let j = turnIndex + 1; j < 4; j++) {
+				for (let j = turnIndex + 1; j < BATTLE_WINDOWS_MWW_TURNS; j++) {
 					if (!temp) break;
 					fallbackActions[j] = temp.action;
 					temp = temp.default;
@@ -779,7 +786,7 @@ function extractAllBranches(manipulateResult) {
 
 				// 分岐先のルート内にさらに分岐が存在するか再帰的に走査（ネストされた分岐への対応）
 				let subNode = branchRoot;
-				for (let j = turnIndex + 1; j < 4; j++) {
+				for (let j = turnIndex + 1; j < BATTLE_WINDOWS_MWW_TURNS; j++) {
 					if (!subNode) break;
 					traverse(subNode, j, label);
 					subNode = subNode.default;
@@ -790,7 +797,7 @@ function extractAllBranches(manipulateResult) {
 
 	// メインルートを走査し、派生するすべての分岐を洗い出す
 	let tempMain = manipulateResult;
-	for (let i = 0; i < 4; i++) {
+	for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
 		if (!tempMain) break;
 		traverse(tempMain, i, '');
 		tempMain = tempMain.default;
@@ -801,7 +808,7 @@ function extractAllBranches(manipulateResult) {
 
 /** 全体の行動手順テーブル（魔法使い〜レッドドラゴン2ターン目）を描画する
  * @param {ManipulateResult} manipulateResult 
- * @param {RngIndex[]} starIndices 候補となる乱数位置リスト
+ * @param {{startingIndex: RngIndex, endingIndex: RngIndex}[]} starIndices 候補となる乱数位置リスト
  * @param {ReturnType<typeof getSettings>} settings 現在の設定
  * @param {BattleWindowsMWWManipulator} manipulator
  */
@@ -813,7 +820,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 	const showTransitions = detailMode === 'withTransitions';
 
 	// シミュレーション結果やルート情報を抽出
-	const arrivalSims = showColumns ? generateArrivalSims(manipulateResult, starIndices, manipulator) : [];
+	const routeSims = showColumns ? generateRouteSimulations(manipulateResult, starIndices, manipulator) : [];
 	const mainActions = extractMainActions(manipulateResult);
 	const branchesList = extractAllBranches(manipulateResult);
 
@@ -830,8 +837,8 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 	}
 	// 詳細モード時は各シミュレーションの乱数位置を列として追加
 	if (showColumns) {
-		for (const s of arrivalSims) {
-			headerHtml += `<th>${formatIndex(s.arrivalIndex)}</th>`;
+		for (const s of routeSims) {
+			headerHtml += `<th>${formatIndex(s.startingIndex)}</th>`;
 		}
 	}
 	headerHtml += '</tr>';
@@ -840,7 +847,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 
 	// ボディ生成
 	const tbody = document.createElement('tbody');
-	for (let i = 0; i < 4; i++) {
+	for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
 		const tr = document.createElement('tr');
 		let html = '';
 
@@ -867,7 +874,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 
 		// 各乱数ごとの詳細情報（詳細モード時のみ）
 		if (showColumns) {
-			for (const s of arrivalSims) {
+			for (const s of routeSims) {
 				const p = s.sim[i];
 				html += '<td>';
 				if (p !== undefined) {
@@ -889,8 +896,8 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 							html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
 						}
 
-						// レッドドラゴン2ターン目で星攻撃ありの場合はレッドドラゴンの行動画像も表示
-						if (i === 3 && settings.allowDragonStar && s.dragonAction !== undefined) {
+						// レッドドラゴン2ターン目の場合はレッドドラゴンの行動画像も表示
+						if (i === BATTLE_WINDOWS_MWW_TURNS - 1 && s.dragonAction !== undefined) {
 							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
 						}
 					}
@@ -1025,31 +1032,31 @@ function renderTestResult(result, testResultEl) {
 		html += `<b>${t('testUnsolvable')}</b>`;
 		html += `<table class="test-table"><thead><tr>`;
 		html += `<th>${t('thStars')}</th><th>${t('thSuccessIndices')}</th>`;
-		html += `<th>${t('thMagician')}</th><th>${t('thKnight')}</th><th>${t('thDragon')}</th><th>${t('thDragonTurn2')}</th>`;
+		for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
+			html += `<th>${branchIndexToEnemy(i)}</th>`;
+		}
 		html += `</tr></thead><tbody>`;
 
 		for (const [starStr, g] of unsolvableEntries) {
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
 			html += `<td>${g.success.length > 0 ? g.success.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
-			html += `<td>${g.fails[0].length > 0 ? g.fails[0].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
-			html += `<td>${g.fails[1].length > 0 ? g.fails[1].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
-			html += `<td>${g.fails[2].length > 0 ? g.fails[2].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
-			html += `<td>${g.fails[3].length > 0 ? g.fails[3].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
+				html += `<td>${g.fails[i].length > 0 ? g.fails[i].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			}
 			html += '</tr>';
 		}
 
-		const failTotal = result.wrongCounts[0] + result.wrongCounts[1] + result.wrongCounts[2] + result.wrongCounts[3];
+		const failTotal = result.incompleteSimCounts.reduce((acc, val) => acc + val, 0);
 
 		html += `</tbody><tfoot><tr>`;
 		html += `<th rowspan="2">${t('thCount')}</th>`;
 		html += `<td rowspan="2">${result.unsolvableSuccessCount}</td>`;
-		html += `<td>${result.wrongCounts[0]}</td>`;
-		html += `<td>${result.wrongCounts[1]}</td>`;
-		html += `<td>${result.wrongCounts[2]}</td>`;
-		html += `<td>${result.wrongCounts[3]}</td>`;
+		for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
+			html += `<td>${result.incompleteSimCounts[i]}</td>`;
+		}
 		html += `</tr><tr>`;
-		html += `<td colspan="4">${failTotal}</td>`;
+		html += `<td colspan="${BATTLE_WINDOWS_MWW_TURNS}">${failTotal}</td>`;
 		html += `</tr></tfoot></table>`;
 	}
 
@@ -1068,7 +1075,7 @@ function renderTestResult(result, testResultEl) {
 			html += `<th>${i} ${t('thBranch')}</th>`;
 		}
 		html += '</tr></thead><tbody>';
-		for (let i = 0; i < 4; i++) {
+		for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
 			const counts = result.turnBranchCounts[i];
 			let hasAnyBranch = false;
 			for (let j = 1; j <= maxBranchSize; j++) {
@@ -1152,8 +1159,8 @@ window.addEventListener('keydown', (e) => {
 	}
 
 	if (numpadKey !== null && NumpadToStarIndex[numpadKey] !== undefined) {
-		// 星の入力（最大6回まで）
-		if (stars.length < 6) {
+		// 星の入力
+		if (stars.length < MAX_STARS_INPUT) {
 			stars.push(NumpadToStarIndex[numpadKey]);
 			renderStarBoxes();
 			displayResult();

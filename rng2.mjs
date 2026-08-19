@@ -209,6 +209,8 @@ export class KssRng {
 		this.takeAction(action);
 		let powers;
 		if (action.fast) {
+			// 最速で8消費。earlyHardHitCheckの境界は6消費。
+			// fast: 0.5 (1st frame) -> 8消費, 1 (Fast1) -> 6消費, 1.5 (5th frame) -> 6消費, 2 (Fast2) -> 4消費, 3 (Fast3) -> 2消費, 4 (Fast4) -> 0消費
 			const earlyHardHitCheck = action.fast <= 1;
 			const advances1 = 8 - Math.floor(action.fast) * 2;
 			const advances2 = HammerFlipChargeAdvances - advances1;
@@ -323,45 +325,37 @@ export class KssRng {
 		}
 	}
 
-	/** 星消費後の乱数位置から、消費前の乱数位置（到着位置）を逆算する
-	 * @param {RngIndex} index 星消費後の乱数位置
-	 * @param {number} starsCount 消費した星の数
-	 * @returns {RngIndex} */
-	static getArrivalIndex(index, starsCount) {
-		return this.calcIndex(index, -starsCount * StarDirectionAdvances);
-	}
-
-	/**
-	 * 星の方向に一致する乱数位置を探索し、星を消費した後の乱数位置のリストを返す
+	/** 星の方向に一致する乱数位置を探索し、星を消費する前と後の乱数位置のリストを返す
 	 * @param {number[]} stars 観測された星の向きの配列
 	 * @param {number} minIndex 探索開始の乱数位置
 	 * @param {number} maxIndex 探索終了の乱数位置
-	 * @returns {RngIndex[]} 星消費後の乱数位置の配列
+	 * @returns {{startingIndex: RngIndex, endingIndex: RngIndex}[]} 条件に一致する乱数位置情報の配列
 	 */
 	static findIndicesByStars(stars, minIndex, maxIndex) {
-		/** @type {RngIndex[]} */
+		/** @type {{startingIndex: RngIndex, endingIndex: RngIndex}[]} */
 		const indices = [];
 		for (const i of KssRng.range(minIndex, maxIndex)) {
 			const r = new KssRng(i);
 			if (stars.every(v => r.starDirection() === v)) {
-				indices.push(r.getIndex());
+				indices.push({ startingIndex: i, endingIndex: r.getIndex() });
 			}
 		}
 		return indices;
 	}
 
 	/**
-	 * 条件に一致する開始乱数位置のリストを返す
+	 * 条件に一致する開始乱数位置と条件判定後の乱数位置のリストを返す
 	 * @param {number} minIndex 探索開始の乱数位置
 	 * @param {number} maxIndex 探索終了の乱数位置
 	 * @param {(r: KssRng) => boolean} fn 条件
-	 * @returns {RngIndex[]} 条件に一致する開始乱数位置の配列
+	 * @returns {{startingIndex: RngIndex, endingIndex: RngIndex}[]} 条件に一致する乱数位置の情報配列
 	 */
 	static findIndices(minIndex, maxIndex, fn) {
-		/** @type {RngIndex[]} */
+		/** @type {{startingIndex: RngIndex, endingIndex: RngIndex}[]} */
 		const indices = [];
 		for (const i of KssRng.range(minIndex, maxIndex)) {
-			if (fn(new KssRng(i))) indices.push(i);
+			const r = new KssRng(i);
+			if (fn(r)) indices.push({ startingIndex: i, endingIndex: r.getIndex() });
 		}
 		return indices;
 	}
@@ -470,6 +464,9 @@ const MagicianPrioritiesTable = {
 	].map(e => ({...e, timeloss: e.timeloss ?? 36})),
 };
 
+// バトルウィンドウズ戦のターン数
+export const BATTLE_WINDOWS_MWW_TURNS = 4;
+
 /**
  * @typedef {ActionTable & {penalty: number}} ActionTableEx
  * @typedef {{ action: ActionTableEx, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
@@ -528,15 +525,17 @@ export class BattleWindowsMWWManipulator {
 			this.timelossPenalty = 1 << 15;
 			this.branchDifficulty = 1 << (15 + 13);
 			break;
+		default:
+			throw new Error(`Invalid branchReduction: ${branchReduction}`);
 		}
 
-		// 各ターンの難易度低い順行動リストを作成
+		// 各ターンの難易度低い順行動リストを作成（枝刈りのためpenalty昇順でソート）
 		/**@type {ActionTableEx[][]}*/
 		this.actionsListByTurn = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })),
-			actionsDifficultyTable.knight.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })),
-			actionsDifficultyTable.dragon.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })),
-			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, penalty: e.difficulty ?? 0})),
+			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })).sort((a, b) => a.penalty - b.penalty),
+			actionsDifficultyTable.knight.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
+			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, penalty: e.difficulty ?? 0})).sort((a, b) => a.penalty - b.penalty),
 		];
 
 		// 各状態からの遷移を作成
@@ -565,7 +564,7 @@ export class BattleWindowsMWWManipulator {
 						if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
 
 						//最後のターン以外はhasSeenPowersでstepResultが変わらない
-						if(i !== 3){
+						if(i !== BATTLE_WINDOWS_MWW_TURNS - 1){
 							byStateId.push({obs, stateId: this.makeStateId(endingIndex, true), statePenalty});
 							break;
 						}
@@ -580,12 +579,11 @@ export class BattleWindowsMWWManipulator {
 	/** @typedef {{ obs: BattleWindowsPowersPair, dragonAction?: ID<DragonAction>, statePenalty: number, stateTimeloss: number }} SimulationStepResult */
 	/** ターンごとのシミュレーション用の関数を生成する
 	 * @param {KssRng} rng 
-	 * @returns {((a: ActionTable, forceHasSeenPowers?: boolean) => SimulationStepResult | null)[]}
+	 * @returns {((a: ActionTable, hasSeenPowers: boolean) => SimulationStepResult | null)[]}
 	 */
 	createSimulationSteps(rng) {
-		let currentHasSeenPowers = false;
 		/** @type {((a: ActionTable, hasSeenPowers: boolean) => { obs: BattleWindowsPowersPair | null, dragonAction?: ID<DragonAction>, statePenalty?: number, stateTimeloss?: number })[]} */
-		const fns = [
+		const stepFunctions = [
 			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateMagician(a) }),
 			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateKnight(a, this.hammerThrow) }),
 			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateDragon(a) }),
@@ -596,7 +594,7 @@ export class BattleWindowsMWWManipulator {
 					let stateTimeloss = 0;
 					let statePenalty = 0;
 					if (dragonAction === DragonStar && !this.allowDragonStar) {
-						stateTimeloss = 22;
+						stateTimeloss = 22;	//ガードに対して22Fのタイムロス
 						statePenalty = stateTimeloss * this.timelossPenalty;
 					}
 					return { obs, dragonAction, statePenalty, stateTimeloss };
@@ -604,13 +602,9 @@ export class BattleWindowsMWWManipulator {
 				return { obs: null };
 			},
 		];
-		return fns.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean|undefined}*/forceHasSeenPowers) => {
-			const h = forceHasSeenPowers !== undefined ? forceHasSeenPowers : currentHasSeenPowers;
-			const result = fn(a, h);
+		return stepFunctions.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean}*/hasSeenPowers) => {
+			const result = fn(a, hasSeenPowers);
 			if (result.obs === null) return null;
-			if (forceHasSeenPowers === undefined && result.obs !== null) {
-				currentHasSeenPowers ||= result.obs !== NoPowersPair;
-			}
 			return {
 				obs: result.obs,
 				dragonAction: result.dragonAction,
@@ -689,7 +683,7 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulateFrom(turnIndex, state, best={penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={penalty: 0, failScore: 0}) {
 		let result = null;
-		const isLastTurn = turnIndex === 3;
+		const isLastTurn = turnIndex === BATTLE_WINDOWS_MWW_TURNS - 1;
 		for(const {action, byStateId} of this.turns[turnIndex]){
 			let penalty = current.penalty + action.penalty;
 
@@ -821,9 +815,9 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulate(stars) {
 		const indices = KssRng.findIndicesByStars(stars, this.minIndex, this.maxIndex);
-		const stateGroups = indices.map(index => ({
-			stateId: this.makeStateId(index),
-			score: this.rngIndexToScore(KssRng.calcIndex(index, -stars.length * StarDirectionAdvances)),
+		const stateGroups = indices.map(info => ({
+			stateId: this.makeStateId(info.endingIndex),
+			score: this.rngIndexToScore(info.startingIndex),
 			statePenalty: 0,
 		}));
 		return this.manipulateFrom(0, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null});
@@ -846,11 +840,11 @@ export class BattleWindowsMWWManipulator {
 		const result = {
 			// 進捗確認用
 			count: 0,
-			total: this.maxIndex - this.minIndex + 1,
+			total: this.rngIndexToOffset(this.maxIndex) + 1,
 
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
-			wrongCounts: [0, 0, 0, 0], // 敵i体目で調整が失敗した回数
+			incompleteSimCounts: Array(BATTLE_WINDOWS_MWW_TURNS).fill(0), // 敵i体目で調整が失敗した回数
 			successCount: 0,         // 最後まで成功した回数
 			successDeviationsSum: 0,         // 最後まで成功した乱数位置がどれだけ中央に近いか
 			unsolvableSuccessCount: 0, // 失敗が存在する星パターンにおける、成功回数
@@ -887,7 +881,7 @@ export class BattleWindowsMWWManipulator {
 			/** @type {number[]} */ _timelosses: [],
 
 			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [turnIndex][branchSize] */
-			turnBranchCounts: Array.from({ length: 4 }, () => []),
+			turnBranchCounts: Array.from({ length: BATTLE_WINDOWS_MWW_TURNS }, () => []),
 
 			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
 			simulationGroups: new Map(),
@@ -932,7 +926,7 @@ export class BattleWindowsMWWManipulator {
 				// 星パターンごとにグループを作成
 				simGroup = {
 					success: [],
-					fails: [[], [], [], []],
+					fails: Array.from({ length: BATTLE_WINDOWS_MWW_TURNS }, () => []),
 					hasFail: false,
 					manipulateResult,
 				};
@@ -947,8 +941,9 @@ export class BattleWindowsMWWManipulator {
 			let difficulty = 0;
 			let penalty = 0;
 			let timeloss = 0;
+			let hasSeenPowers = false;
 			const actions = [];
-			const sim = [];
+			const turnResults = [];
 			const steps = this.createSimulationSteps(r);
 			for(let turnIndex = 0, current = manipulateResult; turnIndex < steps.length; turnIndex++){
 				const step = steps[turnIndex];
@@ -959,9 +954,11 @@ export class BattleWindowsMWWManipulator {
 				const branchSize = current.branches ? current.branches.size : 0;
 				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
 
-				const stepResult = step(current.action);
+				const stepResult = step(current.action, hasSeenPowers);
 				if (stepResult === null) break;
-				sim.push(stepResult.obs);
+				turnResults.push(stepResult.obs);
+				
+				if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
 
 				// 難易度加算
 				difficulty += current.action.difficulty ?? 0;
@@ -975,9 +972,9 @@ export class BattleWindowsMWWManipulator {
 			}
 
 			// 行動の結果を確認
-			if (sim.length !== 4) {
-				result.wrongCounts[sim.length]++;
-				simGroup.fails[sim.length].push(i);
+			if (turnResults.length !== BATTLE_WINDOWS_MWW_TURNS) {
+				result.incompleteSimCounts[turnResults.length]++;
+				simGroup.fails[turnResults.length].push(i);
 
 				// これまでに記録されていた現在のパターンの成功回数を解決不能時の成功としてカウント
 				if (!simGroup.hasFail) {
@@ -987,7 +984,7 @@ export class BattleWindowsMWWManipulator {
 			} else {
 				simGroup.success.push(i);
 				result.successCount++;
-				result.successDeviationsSum += this.offsetToDeviation(result.count);
+				result.successDeviationsSum += this.offsetToDeviation(this.rngIndexToOffset(i));
 				if (simGroup.hasFail) result.unsolvableSuccessCount++;
 
 				// 各種指標（難易度、ペナルティ、タイムロス）の記録
