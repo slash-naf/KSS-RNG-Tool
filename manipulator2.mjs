@@ -104,7 +104,7 @@ let customState = {
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '2', branchReduction: 'high' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', branchReduction: 'high' },
 	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium' },
 };
 
@@ -711,12 +711,17 @@ function generateRouteSimulations(manipulateResult, starIndices, manipulator) {
 				sim.push({
 					pair: stepResult.obs,
 					powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
-					log: (logs[turnIndex] ?? []).join('<br>')
+					log: '',
 				});
 				if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
 
 				// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
 				current = (current.branches && current.branches.has(stepResult.obs) ? current.branches.get(stepResult.obs) : current.default) ?? null;
+			}
+
+			// すべてのターン実行後に各ターンのログ文字列を設定
+			for (let i = 0; i < sim.length; i++) {
+				sim[i].log = (logs[i] ?? []).join('<br>');
 			}
 
 			routeSims.push({

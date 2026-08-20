@@ -129,13 +129,6 @@ export class KssRng {
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
 	}
-	/** ハンマー投げをスイングと一緒にヒットさせる
-	 * @param {number} dashes */
-	hammerThrow(dashes) {
-		this.advance(dashes);
-		this.hammerHit();
-		this.hammerHit();
-	}
 
 	/** 一連の行動をする */
 	takeAction(/** @type {ActionTable} */{ dashes=0, slides=0, hammerFlips=0, stars=0, lateAdvances=0 }) {
@@ -258,7 +251,8 @@ export class KssRng {
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.hammerThrow(hammerThrow);
+
+		this.advance(hammerThrow);	//悪魔の騎士へのハンマー投げのダッシュ
 		return powers;
 	}
 
@@ -267,6 +261,9 @@ export class KssRng {
 	 * @returns {BattleWindowsPowersPair | null} 先制されたらnull
 	 */
 	simulateDragon(action) {
+		this.hammerHit();	//悪魔の騎士へのハンマー投げのスイングのヒット
+		this.hammerHit();	//悪魔の騎士へのハンマー投げのヒット
+
 		this.takeAction(action);
 		let powers;
 		if (action.fast) {
@@ -513,7 +510,11 @@ export class BattleWindowsMWWManipulator {
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
 		this.allowDragonStar = allowDragonStar;
-		this.hammerThrowList = Int8Array.from({length: parseInt(hammerThrow[hammerThrow.length - 1]) - parseInt(hammerThrow[0]) + 1}, (_, i) => i + parseInt(hammerThrow[0]));
+
+		this.hammerThrowMin = parseInt(hammerThrow[0]);
+		this.hammerThrowBuffer = parseInt(hammerThrow[hammerThrow.length - 1]) - this.hammerThrowMin;
+		this.hammerThrowList = Int8Array.from({length: this.hammerThrowBuffer + 1}, (_, i) => this.hammerThrowMin + i);
+
 		this.minIndex = /**@type {RngIndex}*/(minIndex);
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.middleOffset = this.rngIndexToOffset(this.maxIndex) / 2;
@@ -554,6 +555,7 @@ export class BattleWindowsMWWManipulator {
 		const steps = this.createSimulationSteps(r);
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
 		this.turns = steps.map((step, turnIndex) => this.actionsListByTurn[turnIndex].map(action => {
+			const advancesBuffer = turnIndex === TURN_KNIGHT ? this.hammerThrowBuffer : 0;
 			let nextMaxIndex = maxIndexByTurn;
 			const byStateId = new Int32Array((this.rngIndexToOffset(maxIndexByTurn) + 1) * 2);
 			let stateId = 0;
@@ -563,15 +565,16 @@ export class BattleWindowsMWWManipulator {
 					r.index = index;
 					const stepResult = step(action, hasSeenPowers, this.hammerThrowList[0]);
 					const endingIndex = r.getIndex();
-					byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, hasSeenPowers, stepResult);
+					byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, hasSeenPowers, stepResult, advancesBuffer);
 					stateId++;
 
 					//次のターンで到達可能な最も先の乱数位置を探す
-					if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
+					const cand = KssRng.calcIndex(endingIndex, advancesBuffer);
+					if(this.rngIndexToOffset(cand) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = cand;
 
 					//最後のターン以外はhasSeenPowersでstepResultが変わらない
 					if(turnIndex !== TURN_DRAGON_TURN2){
-						byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, true, stepResult);
+						byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, true, stepResult, advancesBuffer);
 						stateId++;
 						break;
 					}
@@ -624,28 +627,35 @@ export class BattleWindowsMWWManipulator {
 	 * @param {number} oldStateId
 	 * @param {RngIndex} index
 	 * @param {boolean} hasSeenPowers
+	 * @param {number} advancesBuffer
 	 * @param {SimulationStepResult | null} stepResult
 	*/
-	makeStateGroupUpdator(oldStateId, index, hasSeenPowers, stepResult) {
+	makeStateGroupUpdator(oldStateId, index, hasSeenPowers, stepResult, advancesBuffer) {
 		if (stepResult === null) return -1;
 		const stateId = (this.rngIndexToOffset(index) * 2) + ((hasSeenPowers || stepResult.obs !== NoPowersPair) ? 1 : 0);
 		let n = stepResult.stateTimeloss;
 		n = (n << 10) + stepResult.obs;
 		n = (n << 10) + (stateId - oldStateId);
+		n = (n << 2) + advancesBuffer;
 		return n;
 	}
 	/** 遷移後の状態と観測値を返す
 	 * @param {Readonly<StateGroup>} g
 	 * @param {Int32Array} byStateId
-	 * @returns {{obs: BattleWindowsPowersPair, stateGroup: StateGroup} | null}
+	 * @returns {{obs: BattleWindowsPowersPair, stateGroups: StateGroup[]} | null}
 	*/
 	applyStateGroupUpdator(g, byStateId) {
 		let n = byStateId[g.stateId];
 		if(n === -1) return null;
+		const advancesBuffer = n & (1 << 2) - 1; n >>>= 2;
 		const stateIdAdvances = n & (1 << 10) - 1; n >>>= 10;
 		const obs = /**@type {BattleWindowsPowersPair}*/(n & (1 << 10) - 1); n >>>= 10;
 		const timeloss = n;
-		return {obs, stateGroup: {stateId: g.stateId + stateIdAdvances, score: g.score, statePenalty: g.statePenalty + timeloss * this.timelossPenalty}};
+
+		const stateGroup = {stateId: g.stateId + stateIdAdvances, score: g.score / (advancesBuffer + 1), statePenalty: g.statePenalty + timeloss * this.timelossPenalty};
+		const stateGroups = [stateGroup];
+		for(let i=1; i <= advancesBuffer; i++) stateGroups.push({...stateGroup, stateId: stateGroup.stateId + i * 2});
+		return {obs, stateGroups};
 	}
 
 	/** minIndexからのオフセットを計算
@@ -731,7 +741,7 @@ export class BattleWindowsMWWManipulator {
 					for(const g of b.stateGroups){
 						const turnResult = this.applyStateGroupUpdator(g, byStateId);
 						if(turnResult){
-							stateGroups.push(turnResult.stateGroup);
+							stateGroups.push(...turnResult.stateGroups);
 						}else{
 							failed = true;
 							break;
@@ -754,7 +764,7 @@ export class BattleWindowsMWWManipulator {
 					if(turnResult){
 						let group = groups.get(turnResult.obs);
 						if(!group) groups.set(turnResult.obs, group = []);
-						group.push(turnResult.stateGroup);
+						group.push(...turnResult.stateGroups);
 					}else{
 						failScore += g.score;
 					}
