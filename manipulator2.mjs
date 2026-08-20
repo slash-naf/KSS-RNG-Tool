@@ -39,7 +39,7 @@ import {
  *   knight: DifficultyMode,
  *   dragon: DifficultyMode,
  *   allowDragonStar: boolean,
- *   hammerThrow: string,
+ *   hammerThrow: import('./rng2.mjs').HammerThrowOption,
  *   branchReduction: BranchReductionMode,
  * }} CustomState
  */
@@ -319,7 +319,7 @@ function getSettings() {
 		fastKnight: el.difficultyKnight.value === 'fast',
 		fastDragon: el.difficultyDragon.value === 'fast',
 		allowDragonStar: el.allowDragonStar.checked,
-		hammerThrow: parseInt(el.hammerThrow.value, 10),
+		hammerThrow: /** @type {import('./rng2.mjs').HammerThrowOption} */ (el.hammerThrow.value),
 		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
@@ -457,15 +457,21 @@ function formatPowers(p, style = '') {
 }
 
 /** 乱数インデックスを表示設定（Hex, Split等）に合わせて整形する
- * @param {number} index */
-function formatIndex(index) {
+ * @param {number} index
+ * @param {number} [hammerThrow] */
+function formatIndex(index, hammerThrow) {
 	const mode = /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value);
 	const value = RngCycle[index];
+	let str = '';
 	switch (mode) {
-		case 'hex': return `${index} (0x${value.toString(16)})`;
-		case 'split': return `${index} [${value & 0xFF}, ${value >>> 8}]`;
-		default: return String(index);
+		case 'hex': str = `${index} (0x${value.toString(16)})`; break;
+		case 'split': str = `${index} [${value & 0xFF}, ${value >>> 8}]`; break;
+		default: str = String(index); break;
 	}
+	if (hammerThrow !== undefined && el.hammerThrow.value.includes('-')) {
+		str += ` (${hammerThrow})`;
+	}
+	return str;
 }
 
 /** 行動テーブルの内容を翻訳テキストと画像を用いて説明文字列に変換する
@@ -627,7 +633,7 @@ function renderTimingTable(starIndices) {
 }
 
 /** @typedef {{ pair: BattleWindowsPowersPair, powersStartingIndex: RngIndex, log: string }} SimEntry */
-/** @typedef {{ startingIndex: RngIndex, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} RouteSimulation */
+/** @typedef {{ startingIndex: RngIndex, hammerThrow: number, sim: (SimEntry | undefined)[], dragonAction?: ID<DragonAction>, actions: ActionTable[] }} RouteSimulation */
 /** @typedef {{ simIndex: number, obs: BattleWindowsPowersPair, actions: (ActionTable|null)[], label: string }} BranchColumn */
 
 /**
@@ -643,78 +649,81 @@ function generateRouteSimulations(manipulateResult, starIndices, manipulator) {
 	const routeSims = [];
 	
 	for (const {startingIndex: sIndex, endingIndex: eIndex} of starIndices) {
-		/** @type {ID<DragonAction> | undefined} */
-		let dragonAction;
-		/** @type {RngIndex[]} */
-		const powersIndices = [];
-		/** @type {string[][]} */
-		const logs = [];
+		for (const hammerThrow of manipulator.hammerThrowList) {
+			/** @type {ID<DragonAction> | undefined} */
+			let dragonAction;
+			/** @type {RngIndex[]} */
+			const powersIndices = [];
+			/** @type {string[][]} */
+			const logs = [];
 
-		// 各シミュレーションのステップごとにプロキシを通して乱数遷移を記録する
-		const rng = new KssRng(eIndex).withProxy(({startingIndex, endingIndex, p, result, args}) => {
-			switch (p) {
-				case 'takeAction': {
-					if (logs.length !== BATTLE_WINDOWS_MWW_TURNS) logs.push([]);
-					if (endingIndex - startingIndex > 0) logs[logs.length - 1].push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
-					break;
+			// 各シミュレーションのステップごとにプロキシを通して乱数遷移を記録する
+			const rng = new KssRng(eIndex).withProxy(({startingIndex, endingIndex, p, result, args}) => {
+				switch (p) {
+					case 'takeAction': {
+						if (logs.length !== BATTLE_WINDOWS_MWW_TURNS) logs.push([]);
+						if (endingIndex - startingIndex > 0) logs[logs.length - 1].push(`${t('logAction')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+						break;
+					}
+					case 'magicianAttacksFirst':
+					case 'knightAttacksFirst':
+					case 'dragonAttacksFirst': {
+						const a = !/** @type {boolean} */ (result);
+						logs[logs.length - 1].push(`${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`);
+						break;
+					}
+					case 'checkHammerHardHit': {
+						const a = /** @type {boolean} */ (result);
+						logs[logs.length - 1].push(`${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`);
+						break;
+					}
+					case 'battleWindowsPowers': {
+						const a = /** @type {BattleWindowsPowersPair} */ (result);
+						logs[logs.length - 1].push(`${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
+						powersIndices.push(startingIndex);
+						break;
+					}
+					case 'dragonActs': {
+						const a = /** @type {ID<DragonAction>} */ (result);
+						logs[logs.length - 1].push(`${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`);
+						dragonAction = a;
+						break;
+					}
 				}
-				case 'magicianAttacksFirst':
-				case 'knightAttacksFirst':
-				case 'dragonAttacksFirst': {
-					const a = !/** @type {boolean} */ (result);
-					logs[logs.length - 1].push(`${boolMsg(a)}${t('logAttacksFirst')}: ${formatIndex(endingIndex)}`);
-					break;
-				}
-				case 'checkHammerHardHit': {
-					const a = /** @type {boolean} */ (result);
-					logs[logs.length - 1].push(`${boolMsg(a)}${t('logHardHit')}: ${formatIndex(endingIndex)}`);
-					break;
-				}
-				case 'battleWindowsPowers': {
-					const a = /** @type {BattleWindowsPowersPair} */ (result);
-					logs[logs.length - 1].push(`${formatPowers(a, 'height:16px;')}: ${formatIndex(startingIndex)}&rArr;${formatIndex(endingIndex)}`);
-					powersIndices.push(startingIndex);
-					break;
-				}
-				case 'dragonActs': {
-					const a = /** @type {ID<DragonAction>} */ (result);
-					logs[logs.length - 1].push(`${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`);
-					dragonAction = a;
-					break;
-				}
-			}
-		});
-
-		const steps = manipulator.createSimulationSteps(rng);
-		const actions = [];
-		const sim = [];
-		let current = manipulateResult;
-		let hasSeenPowers = false;
-
-		// 4ターン分の行動を評価し、実際に辿るルートを追跡する
-		for (let turnIndex = 0; turnIndex < steps.length; turnIndex++) {
-			if (!current) break; // 途中でルートが途切れた場合は終了
-			actions.push(current.action);
-			
-			const step = steps[turnIndex];
-			const stepResult = step(current.action, hasSeenPowers);
-			if (stepResult === null) break; // 攻撃の先制などにより失敗した場合
-
-			sim.push({
-				pair: stepResult.obs,
-				powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
-				log: (logs[turnIndex] ?? []).join('<br>')
 			});
-			if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
 
-			// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
-			current = (current.branches && current.branches.has(stepResult.obs) ? current.branches.get(stepResult.obs) : current.default) ?? null;
+			const steps = manipulator.createSimulationSteps(rng);
+			const actions = [];
+			const sim = [];
+			let current = manipulateResult;
+			let hasSeenPowers = false;
+
+			// 4ターン分の行動を評価し、実際に辿るルートを追跡する
+			for (let turnIndex = 0; turnIndex < steps.length; turnIndex++) {
+				if (!current) break; // 途中でルートが途切れた場合は終了
+				actions.push(current.action);
+				
+				const step = steps[turnIndex];
+				const stepResult = step(current.action, hasSeenPowers, hammerThrow);
+				if (stepResult === null) break; // 攻撃の先制などにより失敗した場合
+
+				sim.push({
+					pair: stepResult.obs,
+					powersStartingIndex: powersIndices[turnIndex] ?? /** @type {RngIndex} */ (0),
+					log: (logs[turnIndex] ?? []).join('<br>')
+				});
+				if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
+
+				// 次のターンのルートを決定する（分岐がある場合は該当する分岐を辿り、なければデフォルトルートへ）
+				current = (current.branches && current.branches.has(stepResult.obs) ? current.branches.get(stepResult.obs) : current.default) ?? null;
+			}
+
+			routeSims.push({
+				startingIndex: sIndex,
+				hammerThrow,
+				sim, dragonAction, actions,
+			});
 		}
-
-		routeSims.push({
-			startingIndex: sIndex,
-			sim, dragonAction, actions,
-		});
 	}
 	return routeSims;
 }
@@ -838,7 +847,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 	// 詳細モード時は各シミュレーションの乱数位置を列として追加
 	if (showColumns) {
 		for (const s of routeSims) {
-			headerHtml += `<th>${formatIndex(s.startingIndex)}</th>`;
+			headerHtml += `<th>${formatIndex(s.startingIndex, s.hammerThrow)}</th>`;
 		}
 	}
 	headerHtml += '</tr>';
@@ -1040,9 +1049,9 @@ function renderTestResult(result, testResultEl) {
 		for (const [starStr, g] of unsolvableEntries) {
 			html += '<tr>';
 			html += `<td>${starStr}</td>`;
-			html += `<td>${g.success.length > 0 ? g.success.map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+			html += `<td>${g.success.length > 0 ? g.success.map(v => formatIndex(v.index, v.hammerThrow)).join(', ') : '-'}</td>`;
 			for (let i = 0; i < BATTLE_WINDOWS_MWW_TURNS; i++) {
-				html += `<td>${g.fails[i].length > 0 ? g.fails[i].map(v => formatIndex(v)).join(', ') : '-'}</td>`;
+				html += `<td>${g.fails[i].length > 0 ? g.fails[i].map(v => formatIndex(v.index, v.hammerThrow)).join(', ') : '-'}</td>`;
 			}
 			html += '</tr>';
 		}

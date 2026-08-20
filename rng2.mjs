@@ -129,6 +129,14 @@ export class KssRng {
 		this.hammerHit();
 		this.advance(HammerFlipFinishAdvances);	//攻撃後の土煙
 	}
+	/** ハンマー投げをスイングと一緒にヒットさせる
+	 * @param {number} dashes */
+	hammerThrow(dashes) {
+		this.advance(dashes);
+		this.hammerHit();
+		this.hammerHit();
+	}
+
 	/** 一連の行動をする */
 	takeAction(/** @type {ActionTable} */{ dashes=0, slides=0, hammerFlips=0, stars=0, lateAdvances=0 }) {
 		this.advance(dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances) - lateAdvances);
@@ -250,9 +258,7 @@ export class KssRng {
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.advance(hammerThrow);    // ハンマー投げのダッシュ
-		this.hammerHit();    // ハンマー投げのスイングのヒット
-		this.hammerHit();    // ハンマー投げのヒット
+		this.hammerThrow(hammerThrow);
 		return powers;
 	}
 
@@ -470,6 +476,7 @@ export const BATTLE_WINDOWS_MWW_TURNS = 4;
 /**
  * @typedef {ActionTable & {penalty: number}} ActionTableEx
  * @typedef {{ action: ActionTableEx, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
+ * @typedef {'0' | '1' | '2' | '0-1' | '1-2' | '0-2'} HammerThrowOption
  */
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
@@ -480,7 +487,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
 	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃も成功として扱うか
-	 * @param {number} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
+	 * @param {HammerThrowOption} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
 	 * @param {'low' | 'medium' | 'high'} [options.branchReduction] 分岐削減の度合い
@@ -492,7 +499,7 @@ export class BattleWindowsMWWManipulator {
 		fastKnight = false,
 		fastDragon = false,
 		allowDragonStar = false,
-		hammerThrow = 1,
+		hammerThrow = '1',
 		minIndex = 2800,
 		maxIndex = 3376,
 		branchReduction = 'medium',
@@ -502,7 +509,7 @@ export class BattleWindowsMWWManipulator {
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
 		this.allowDragonStar = allowDragonStar;
-		this.hammerThrow = hammerThrow;
+		this.hammerThrowList = Int8Array.from({length: parseInt(hammerThrow[hammerThrow.length - 1]) - parseInt(hammerThrow[0]) + 1}, (_, i) => i + parseInt(hammerThrow[0]));
 		this.minIndex = /**@type {RngIndex}*/(minIndex);
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.middleOffset = this.rngIndexToOffset(this.maxIndex) / 2;
@@ -550,7 +557,7 @@ export class BattleWindowsMWWManipulator {
 				for(const hasSeenPowers of [false, true]){
 					//遷移後の状態を作成
 					r.index = index;
-					const stepResult = step(action, hasSeenPowers);
+					const stepResult = step(action, hasSeenPowers, this.hammerThrowList[0]);
 					const endingIndex = r.getIndex();
 					byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, hasSeenPowers, stepResult);
 					stateId++;
@@ -574,15 +581,15 @@ export class BattleWindowsMWWManipulator {
 	/** @typedef {{ obs: BattleWindowsPowersPair, dragonAction?: ID<DragonAction>, statePenalty: number, stateTimeloss: number }} SimulationStepResult */
 	/** ターンごとのシミュレーション用の関数を生成する
 	 * @param {KssRng} rng 
-	 * @returns {((a: ActionTable, hasSeenPowers: boolean) => SimulationStepResult | null)[]}
+	 * @returns {((a: ActionTable, hasSeenPowers: boolean, hammerThrow: number) => SimulationStepResult | null)[]}
 	 */
 	createSimulationSteps(rng) {
-		/** @type {((a: ActionTable, hasSeenPowers: boolean) => { obs: BattleWindowsPowersPair | null, dragonAction?: ID<DragonAction>, statePenalty?: number, stateTimeloss?: number })[]} */
+		/** @type {((a: ActionTable, hasSeenPowers: boolean, hammerThrow: number) => { obs: BattleWindowsPowersPair | null, dragonAction?: ID<DragonAction>, statePenalty?: number, stateTimeloss?: number })[]} */
 		const stepFunctions = [
-			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateMagician(a) }),
-			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateKnight(a, this.hammerThrow) }),
-			(/**@type {ActionTable}*/a) => ({ obs: rng.simulateDragon(a) }),
-			(/**@type {ActionTable}*/a, /** @type {boolean} */hasSeenPowers) => {
+			(a) => ({ obs: rng.simulateMagician(a) }),
+			(a, hasSeenPowers, hammerThrow) => ({ obs: rng.simulateKnight(a, hammerThrow) }),
+			(a) => ({ obs: rng.simulateDragon(a) }),
+			(a, hasSeenPowers) => {
 				const dragonAction = rng.simulateDragonAction(a);
 				if (dragonAction === DragonGuard || dragonAction === DragonStar) {
 					const obs = rng.simulateDragonPowers({}, !hasSeenPowers);
@@ -597,8 +604,8 @@ export class BattleWindowsMWWManipulator {
 				return { obs: null };
 			},
 		];
-		return stepFunctions.map(fn => (/**@type {ActionTable}*/a, /**@type {boolean}*/hasSeenPowers) => {
-			const result = fn(a, hasSeenPowers);
+		return stepFunctions.map(fn => (a, hasSeenPowers, hammerThrow) => {
+			const result = fn(a, hasSeenPowers, hammerThrow);
 			if (result.obs === null) return null;
 			return {
 				obs: result.obs,
@@ -855,7 +862,7 @@ export class BattleWindowsMWWManipulator {
 		const result = {
 			// 進捗確認用
 			count: 0,
-			total: this.rngIndexToOffset(this.maxIndex) + 1,
+			total: (this.rngIndexToOffset(this.maxIndex) + 1) * this.hammerThrowList.length,
 
 			magicianNGCount: 0,      // 魔法使いの条件に合う行動が見つからなかった回数
 			otherNGCount: 0,         // 行動の組み合わせが見つからなかった回数
@@ -898,7 +905,7 @@ export class BattleWindowsMWWManipulator {
 			/** @type {number[][]} 各ターンごとに、到達したノードが持っていた分岐数ごとの該当回数 [turnIndex][branchSize] */
 			turnBranchCounts: Array.from({ length: BATTLE_WINDOWS_MWW_TURNS }, () => []),
 
-			/** @type {Map<string, {success: number[], fails: RngIndex[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
+			/** @type {Map<string, {success: {index: RngIndex, hammerThrow: number}[], fails: {index: RngIndex, hammerThrow: number}[][], hasFail: boolean, manipulateResult: ManipulateResult}>} 星の方向パターンごとにグループ化した成功・失敗乱数位置の一覧 */
 			simulationGroups: new Map(),
 
 			/** @type {Map<ActionTable, number>} 魔法使いでの行動ごとの使用回数 */
@@ -918,128 +925,130 @@ export class BattleWindowsMWWManipulator {
 		});
 
 		for (const i of KssRng.range(this.minIndex, this.maxIndex)) {
-			// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
-			const r = debugCallback ? new KssRng(i).withProxy(debugCallback, ignore) : new KssRng(i);
-			// 星の方向の確認
-			const starDirectionList = [];
-			for (let j = 0; j < stars; j++) {
-				starDirectionList.push(r.starDirection());
-			}
-			const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
-
-			// 既に同じ星のパターンの結果がないか確認
-			let simGroup = result.simulationGroups.get(starStr);
-			// 乱数調整の行動探索
-			let manipulateResult;
-			if (simGroup) {
-				manipulateResult = simGroup.manipulateResult;
-			} else {
-				const t0 = performance.now();
-				manipulateResult = this.manipulate(starDirectionList);
-				const elapsed = performance.now() - t0;
-
-				// 星パターンごとにグループを作成
-				simGroup = {
-					success: [],
-					fails: Array.from({ length: BATTLE_WINDOWS_MWW_TURNS }, () => []),
-					hasFail: false,
-					manipulateResult,
-				};
-				result.simulationGroups.set(starStr, simGroup);
-
-				// 計算時間の記録
-				result.totalTime += elapsed;
-				if (elapsed > result.worstTime) result.worstTime = elapsed;
-			}
-
-			// ツリーを辿りながらシミュレーションを実行
-			let difficulty = 0;
-			let penalty = 0;
-			let timeloss = 0;
-			let hasSeenPowers = false;
-			const actions = [];
-			const turnResults = [];
-			const steps = this.createSimulationSteps(r);
-			for(let turnIndex = 0, current = manipulateResult; turnIndex < steps.length; turnIndex++){
-				const step = steps[turnIndex];
-				if (!current) break;
-				actions.push(current.action);
-
-				// 分岐の集計
-				const branchSize = current.branches ? current.branches.size : 0;
-				result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
-
-				const stepResult = step(current.action, hasSeenPowers);
-				if (stepResult === null) break;
-				turnResults.push(stepResult.obs);
-				
-				if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
-
-				// 難易度加算
-				difficulty += current.action.difficulty ?? 0;
-				penalty += current.action.penalty + branchSize * this.branchDifficulty + stepResult.statePenalty;
-				timeloss += (current.action.timeloss ?? 0) + stepResult.stateTimeloss;
-
-				if (stepResult.dragonAction === DragonGuard) result.dragonGuardCount++;
-				else if (stepResult.dragonAction === DragonStar) result.dragonStarCount++;
-
-				current = current.branches ? (current.branches.get(stepResult.obs) ?? current.default) : current.default;
-			}
-
-			// 行動の結果を確認
-			if (turnResults.length !== BATTLE_WINDOWS_MWW_TURNS) {
-				result.incompleteSimCounts[turnResults.length]++;
-				simGroup.fails[turnResults.length].push(i);
-
-				// これまでに記録されていた現在のパターンの成功回数を解決不能時の成功としてカウント
-				if (!simGroup.hasFail) {
-					simGroup.hasFail = true;
-					result.unsolvableSuccessCount += simGroup.success.length;
+			for (const hammerThrow of this.hammerThrowList) {
+				// debugCallback が指定されている場合のみ Proxy でメソッド呼び出しをフックする
+				const r = debugCallback ? new KssRng(i).withProxy(debugCallback, ignore) : new KssRng(i);
+				// 星の方向の確認
+				const starDirectionList = [];
+				for (let j = 0; j < stars; j++) {
+					starDirectionList.push(r.starDirection());
 				}
-			} else {
-				simGroup.success.push(i);
-				result.successCount++;
-				result.successDeviationsSum += this.offsetToDeviation(this.rngIndexToOffset(i));
-				if (simGroup.hasFail) result.unsolvableSuccessCount++;
+				const starStr = starDirectionList.map(v => StarDirectionChars[v]).join('');
 
-				// 各種指標（難易度、ペナルティ、タイムロス）の記録
-				result.totalDifficulty += difficulty;
-				if (difficulty > result.worstDifficulty) result.worstDifficulty = difficulty;
-				result._difficulties.push(difficulty);
+				// 既に同じ星のパターンの結果がないか確認
+				let simGroup = result.simulationGroups.get(starStr);
+				// 乱数調整の行動探索
+				let manipulateResult;
+				if (simGroup) {
+					manipulateResult = simGroup.manipulateResult;
+				} else {
+					const t0 = performance.now();
+					manipulateResult = this.manipulate(starDirectionList);
+					const elapsed = performance.now() - t0;
 
-				result.totalPenalty += penalty;
-				if (penalty > result.worstPenalty) result.worstPenalty = penalty;
-				result._penalties.push(penalty);
+					// 星パターンごとにグループを作成
+					simGroup = {
+						success: [],
+						fails: Array.from({ length: BATTLE_WINDOWS_MWW_TURNS }, () => []),
+						hasFail: false,
+						manipulateResult,
+					};
+					result.simulationGroups.set(starStr, simGroup);
 
-				result.totalTimeloss += timeloss;
-				if (timeloss > result.worstTimeloss) result.worstTimeloss = timeloss;
-				result._timelosses.push(timeloss);
+					// 計算時間の記録
+					result.totalTime += elapsed;
+					if (elapsed > result.worstTime) result.worstTime = elapsed;
+				}
 
-				// 成功した行動の使用回数を集計する
-				result.magicianCountList.set(actions[0], (result.magicianCountList.get(actions[0]) ?? 0) + 1);
-				result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
-				result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
-				result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
+				// ツリーを辿りながらシミュレーションを実行
+				let difficulty = 0;
+				let penalty = 0;
+				let timeloss = 0;
+				let hasSeenPowers = false;
+				const actions = [];
+				const turnResults = [];
+				const steps = this.createSimulationSteps(r);
+				for(let turnIndex = 0, current = manipulateResult; turnIndex < steps.length; turnIndex++){
+					const step = steps[turnIndex];
+					if (!current) break;
+					actions.push(current.action);
+
+					// 分岐の集計
+					const branchSize = current.branches ? current.branches.size : 0;
+					result.turnBranchCounts[turnIndex][branchSize] = (result.turnBranchCounts[turnIndex][branchSize] ?? 0) + 1;
+
+					const stepResult = step(current.action, hasSeenPowers, hammerThrow);
+					if (stepResult === null) break;
+					turnResults.push(stepResult.obs);
+					
+					if (stepResult.obs !== NoPowersPair) hasSeenPowers = true;
+
+					// 難易度加算
+					difficulty += current.action.difficulty ?? 0;
+					penalty += current.action.penalty + branchSize * this.branchDifficulty + stepResult.statePenalty;
+					timeloss += (current.action.timeloss ?? 0) + stepResult.stateTimeloss;
+
+					if (stepResult.dragonAction === DragonGuard) result.dragonGuardCount++;
+					else if (stepResult.dragonAction === DragonStar) result.dragonStarCount++;
+
+					current = current.branches ? (current.branches.get(stepResult.obs) ?? current.default) : current.default;
+				}
+
+				// 行動の結果を確認
+				if (turnResults.length !== BATTLE_WINDOWS_MWW_TURNS) {
+					result.incompleteSimCounts[turnResults.length]++;
+					simGroup.fails[turnResults.length].push({ index: i, hammerThrow });
+
+					// これまでに記録されていた現在のパターンの成功回数を解決不能時の成功としてカウント
+					if (!simGroup.hasFail) {
+						simGroup.hasFail = true;
+						result.unsolvableSuccessCount += simGroup.success.length;
+					}
+				} else {
+					simGroup.success.push({ index: i, hammerThrow });
+					result.successCount++;
+					result.successDeviationsSum += this.offsetToDeviation(this.rngIndexToOffset(i));
+					if (simGroup.hasFail) result.unsolvableSuccessCount++;
+
+					// 各種指標（難易度、ペナルティ、タイムロス）の記録
+					result.totalDifficulty += difficulty;
+					if (difficulty > result.worstDifficulty) result.worstDifficulty = difficulty;
+					result._difficulties.push(difficulty);
+
+					result.totalPenalty += penalty;
+					if (penalty > result.worstPenalty) result.worstPenalty = penalty;
+					result._penalties.push(penalty);
+
+					result.totalTimeloss += timeloss;
+					if (timeloss > result.worstTimeloss) result.worstTimeloss = timeloss;
+					result._timelosses.push(timeloss);
+
+					// 成功した行動の使用回数を集計する
+					result.magicianCountList.set(actions[0], (result.magicianCountList.get(actions[0]) ?? 0) + 1);
+					result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
+					result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
+					result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
+				}
+
+				result.count++;
+				if (result.count === result.total) {
+					// 全てのイテレーションが完了したタイミングで、平均値と中央値を一括計算
+					const c = result.successCount || 1; // ゼロ除算回避
+
+					// 難易度の集計
+					result.averageDifficulty = result.totalDifficulty / c;
+					result.medianDifficulty = calcMedian(result._difficulties);
+
+					// ペナルティの集計
+					result.averagePenalty = result.totalPenalty / c;
+					result.medianPenalty = calcMedian(result._penalties);
+
+					// タイムロスの集計
+					result.averageTimeloss = result.totalTimeloss / c;
+					result.medianTimeloss = calcMedian(result._timelosses);
+				}
+				yield result;
 			}
-
-			result.count++;
-			if (result.count === result.total) {
-				// 全てのイテレーションが完了したタイミングで、平均値と中央値を一括計算
-				const c = result.successCount || 1; // ゼロ除算回避
-
-				// 難易度の集計
-				result.averageDifficulty = result.totalDifficulty / c;
-				result.medianDifficulty = calcMedian(result._difficulties);
-
-				// ペナルティの集計
-				result.averagePenalty = result.totalPenalty / c;
-				result.medianPenalty = calcMedian(result._penalties);
-
-				// タイムロスの集計
-				result.averageTimeloss = result.totalTimeloss / c;
-				result.medianTimeloss = calcMedian(result._timelosses);
-			}
-			yield result;
 		}
 	}
 	/** testGeneratorを最後まで回し、最終結果を返す
