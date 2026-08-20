@@ -470,8 +470,12 @@ const MagicianPrioritiesTable = {
 	].map(e => ({...e, timeloss: e.timeloss ?? 36})),
 };
 
-// バトルウィンドウズ戦のターン数
+// バトルウィンドウズ戦のターン数と各ターンインデックス
 export const BATTLE_WINDOWS_MWW_TURNS = 4;
+export const TURN_MAGICIAN = 0;
+export const TURN_KNIGHT = 1;
+export const TURN_DRAGON = 2;
+export const TURN_DRAGON_TURN2 = 3;
 
 /**
  * @typedef {ActionTable & {penalty: number}} ActionTableEx
@@ -566,7 +570,7 @@ export class BattleWindowsMWWManipulator {
 					if(this.rngIndexToOffset(endingIndex) > this.rngIndexToOffset(nextMaxIndex)) nextMaxIndex = endingIndex;
 
 					//最後のターン以外はhasSeenPowersでstepResultが変わらない
-					if(turnIndex !== BATTLE_WINDOWS_MWW_TURNS - 1){
+					if(turnIndex !== TURN_DRAGON_TURN2){
 						byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, true, stepResult);
 						stateId++;
 						break;
@@ -706,7 +710,7 @@ export class BattleWindowsMWWManipulator {
 	 */
 	manipulateFrom(turnIndex, state, best={penalty: Infinity, failScore: Infinity, resolvedBranchGroups: null}, current={penalty: 0, failScore: 0}) {
 		let result = null;
-		const isLastTurn = turnIndex === BATTLE_WINDOWS_MWW_TURNS - 1;
+		const isLastTurn = turnIndex === TURN_DRAGON_TURN2;
 		for(const {action, byStateId} of this.turns[turnIndex]){
 			let penalty = current.penalty + action.penalty;
 
@@ -842,7 +846,7 @@ export class BattleWindowsMWWManipulator {
 			score: this.rngIndexToScore(info.startingIndex),
 			statePenalty: 0,
 		}));
-		return this.manipulateFrom(0, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null});
+		return this.manipulateFrom(TURN_MAGICIAN, {stateGroups, activeBranchGroups: null, resolvedBranchGroups: null});
 	}
 
 	/** テスト用関数：設定された乱数範囲に対してシミュレーションを行い結果を集計する
@@ -1024,10 +1028,10 @@ export class BattleWindowsMWWManipulator {
 					result._timelosses.push(timeloss);
 
 					// 成功した行動の使用回数を集計する
-					result.magicianCountList.set(actions[0], (result.magicianCountList.get(actions[0]) ?? 0) + 1);
-					result.knightCountList.set(actions[1], (result.knightCountList.get(actions[1]) ?? 0) + 1);
-					result.dragonCountList.set(actions[2], (result.dragonCountList.get(actions[2]) ?? 0) + 1);
-					result.dragonTurn2CountList.set(actions[3], (result.dragonTurn2CountList.get(actions[3]) ?? 0) + 1);
+					result.magicianCountList.set(actions[TURN_MAGICIAN], (result.magicianCountList.get(actions[TURN_MAGICIAN]) ?? 0) + 1);
+					result.knightCountList.set(actions[TURN_KNIGHT], (result.knightCountList.get(actions[TURN_KNIGHT]) ?? 0) + 1);
+					result.dragonCountList.set(actions[TURN_DRAGON], (result.dragonCountList.get(actions[TURN_DRAGON]) ?? 0) + 1);
+					result.dragonTurn2CountList.set(actions[TURN_DRAGON_TURN2], (result.dragonTurn2CountList.get(actions[TURN_DRAGON_TURN2]) ?? 0) + 1);
 				}
 
 				result.count++;

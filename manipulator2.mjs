@@ -12,6 +12,7 @@ import {
 	FastMagicianList,
 	RngCycle, NoPowersPair,
 	BATTLE_WINDOWS_MWW_TURNS,
+	TURN_MAGICIAN, TURN_KNIGHT, TURN_DRAGON, TURN_DRAGON_TURN2,
 } from './rng2.mjs';
 
 /** @typedef {import('./rng2.mjs').RngIndex} RngIndex */
@@ -897,7 +898,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 						html += formatPowers(p.pair);
 
 						// Fastモードでの操作ミス時（ハードヒット判定がコピーの元判定の後になった場合）のコピーの元を表示
-						if (showFailPowers && ((i === 1 && settings.fastKnight) || (i === 2 && settings.fastDragon))) {
+						if (showFailPowers && ((i === TURN_KNIGHT && settings.fastKnight) || (i === TURN_DRAGON && settings.fastDragon))) {
 							// 本来より1つ前のインデックスからコピーの元判定が始まる
 							const failRng = new KssRng(p.powersStartingIndex);
 							failRng.advance(-1);
@@ -906,7 +907,7 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 						}
 
 						// レッドドラゴン2ターン目の場合はレッドドラゴンの行動画像も表示
-						if (i === BATTLE_WINDOWS_MWW_TURNS - 1 && s.dragonAction !== undefined) {
+						if (i === TURN_DRAGON_TURN2 && s.dragonAction !== undefined) {
 							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
 						}
 					}
