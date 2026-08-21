@@ -3,7 +3,7 @@
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @template T @typedef {T extends Function | number | string | boolean | bigint | symbol | null | undefined ? T : T extends Array<infer U> ? ReadonlyArray<DeepReadonly<U>> : { readonly [K in keyof T]: DeepReadonly<T[K]> }} DeepReadonly */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, cont: ActionTable}, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -281,19 +281,32 @@ export class KssRng {
 			powers = this.battleWindowsPowers();
 			this.hammerFlipChargeAndHit();
 		}
-		this.hammerFlipChargeAndHit();	// 2発目の鬼殺し火炎ハンマー
 		return powers;
 	}
 
 	/** レッドドラゴンの行動のシミュレーション
 	 * @param {ActionTable} action
+	 * @param {number} [hammerThrow] ハンマー投げのダッシュによる乱数消費数（コピーの元の乱数調整をする場合）
 	 * @returns {ID<DragonAction>} レッドドラゴンの行動
 	 */
-	simulateDragonAction(action) {
+	simulateDragonAction(action, hammerThrow) {
+		if(hammerThrow === undefined){
+			this.hammerFlipChargeAndHit();	//レッドドラゴン1ターン目の2発目の鬼殺し火炎ハンマー（通常ルート）
+		}else{
+			this.advance(hammerThrow);
+			this.hammerHit();
+			this.hammerHit();
+		}
+
 		this.takeAction(action);
 		return this.dragonActs();
 	}
-
+	/** レッドドラゴンの星攻撃を画面橋で受けた時の乱数消費
+	 * @param {boolean} left
+	*/
+	receiveDragonStar(left) {
+		//todo
+	}
 	/** レッドドラゴンが行動した後のコピーの元のシミュレーション
 	 * @param {ActionTable} action
 	 * @param {boolean} noPowersFor3
@@ -364,7 +377,7 @@ export class KssRng {
 	}
 }
 
-/** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonTurn2: ActionTable[] }} ActionsDifficultyTable */
+/** @typedef {{ knight: ActionTable[], dragon: ActionTable[], dragonTurn2: ActionTable[], dragonTurn2ForPowerManip: ActionTable[] }} ActionsDifficultyTable */
 /** BattleWindowsMWWManipulatorのactionsDifficultyTableのデフォルト値 @type {ActionsDifficultyTable} */
 const DefaultActionsDifficultyTable = {
 	knight: [
@@ -414,6 +427,9 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 450, dashes: 1 },
 		{ difficulty: 501, dashes: 1, slides: 1 },
 		{ difficulty: 502, dashes: 1, hammerFlips: 1 },
+	],
+	dragonTurn2ForPowerManip: [
+		//todo
 	],
 };
 
@@ -493,6 +509,8 @@ export class BattleWindowsMWWManipulator {
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
 	 * @param {'low' | 'medium' | 'high'} [options.branchReduction] 分岐削減の度合い
 	 * @param {number} [options.maxStarsCount]
+	 * @param {PowerName | null} [options.targetPowerName]
+	 * @param {number} [options.hammerThrowForDragon]
 	 */
 	constructor({
 		actionsDifficultyTable = DefaultActionsDifficultyTable,
@@ -505,6 +523,8 @@ export class BattleWindowsMWWManipulator {
 		maxIndex = 3376,
 		branchReduction = 'medium',
 		maxStarsCount = 6,
+		targetPowerName = null,
+		hammerThrowForDragon = 1,
 	} = {}) {
 		this.magicianDifficulty = magicianDifficulty;
 		this.fastKnight = fastKnight;
@@ -519,6 +539,9 @@ export class BattleWindowsMWWManipulator {
 		this.maxIndex = /**@type {RngIndex}*/(maxIndex);
 		this.middleOffset = this.rngIndexToOffset(this.maxIndex) / 2;
 		this.maxStarsCount = maxStarsCount;
+
+		this.targetPower = targetPowerName === null ? null : parseBattleWindowsPower(targetPowerName);
+		this.hammerThrowForDragon = hammerThrowForDragon;
 
 		//分岐削減の度合いに応じて、分岐とタイムロスのペナルティを設定
 		switch(branchReduction){
@@ -547,7 +570,7 @@ export class BattleWindowsMWWManipulator {
 			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })).sort((a, b) => a.penalty - b.penalty),
 			actionsDifficultyTable.knight.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
 			actionsDifficultyTable.dragon.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
-			actionsDifficultyTable.dragonTurn2.map(e => ({ ...e, penalty: e.difficulty ?? 0})).sort((a, b) => a.penalty - b.penalty),
+			(this.targetPower === null ? actionsDifficultyTable.dragonTurn2 : actionsDifficultyTable.dragonTurn2ForPowerManip).map(e => ({ ...e, penalty: e.difficulty ?? 0})).sort((a, b) => a.penalty - b.penalty),
 		];
 
 		// 各状態からの遷移を作成
@@ -555,7 +578,8 @@ export class BattleWindowsMWWManipulator {
 		const steps = this.createSimulationSteps(r);
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
 		this.turns = steps.map((step, turnIndex) => this.actionsListByTurn[turnIndex].map(action => {
-			const advancesBuffer = turnIndex === TURN_KNIGHT ? this.hammerThrowBuffer : 0;
+			const hammerThrow = [0, this.hammerThrowMin, 0, this.hammerThrowForDragon][turnIndex];
+			const advancesBuffer = [0, this.hammerThrowBuffer, 0, 0][turnIndex];
 			let nextMaxIndex = maxIndexByTurn;
 			const byStateId = new Int32Array((this.rngIndexToOffset(maxIndexByTurn) + 1) * 2);
 			let stateId = 0;
@@ -563,7 +587,7 @@ export class BattleWindowsMWWManipulator {
 				for(const hasSeenPowers of [false, true]){
 					//遷移後の状態を作成
 					r.index = index;
-					const stepResult = step(action, hasSeenPowers, this.hammerThrowList[0]);
+					const stepResult = step(action, hasSeenPowers, hammerThrow);
 					const endingIndex = r.getIndex();
 					byStateId[stateId] = this.makeStateGroupUpdator(stateId, endingIndex, hasSeenPowers, stepResult, advancesBuffer);
 					stateId++;
@@ -596,17 +620,33 @@ export class BattleWindowsMWWManipulator {
 			(a) => ({ obs: rng.simulateMagician(a) }),
 			(a, hasSeenPowers, hammerThrow) => ({ obs: rng.simulateKnight(a, hammerThrow) }),
 			(a) => ({ obs: rng.simulateDragon(a) }),
-			(a, hasSeenPowers) => {
-				const dragonAction = rng.simulateDragonAction(a);
-				if (dragonAction === DragonGuard || dragonAction === DragonStar) {
-					const obs = rng.simulateDragonPowers({}, !hasSeenPowers);
-					let stateTimeloss = 0;
-					let statePenalty = 0;
-					if (dragonAction === DragonStar && !this.allowDragonStar) {
-						stateTimeloss = 22;	//ガードに対して22Fのタイムロス
-						statePenalty = stateTimeloss * this.timelossPenalty;
+			(a, hasSeenPowers, hammerThrow) => {
+				if (this.targetPower === null) {
+					//通常ルート
+					const dragonAction = rng.simulateDragonAction(a);
+					if (dragonAction === DragonGuard || dragonAction === DragonStar) {
+						const obs = rng.simulateDragonPowers({}, !hasSeenPowers);
+						let stateTimeloss = 0;
+						let statePenalty = 0;
+						if (dragonAction === DragonStar && !this.allowDragonStar) {
+							stateTimeloss = 22;	//ガードに対して22Fのタイムロス
+							statePenalty = stateTimeloss * this.timelossPenalty;
+						}
+						return { obs, dragonAction, statePenalty, stateTimeloss };
 					}
-					return { obs, dragonAction, statePenalty, stateTimeloss };
+				} else {
+					//コピーの元の調整
+					const dragonAction = rng.simulateDragonAction(a, hammerThrow);
+					if (dragonAction === DragonStar) {
+						const left = a.dragonPowerManip?.left ?? false;
+						rng.receiveDragonStar(left);
+						const cont = a.dragonPowerManip?.cont ?? {};
+						const obs = rng.simulateDragonPowers(cont, !hasSeenPowers);
+						const actualPower = left ? getLeftPower(obs) : getRightPower(obs);
+						if (actualPower === this.targetPower) {
+							return { obs, dragonAction };
+						}
+					}
 				}
 				return { obs: null };
 			},
