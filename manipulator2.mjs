@@ -686,7 +686,9 @@ function generateRouteSimulations(manipulateResult, starIndices, manipulator) {
 					}
 					case 'dragonActs': {
 						const a = /** @type {ID<DragonAction>} */ (result);
-						logs[logs.length - 1].push(`${img(Assets.dragonActions[a], DragonActionNames[a], 'height:1em;')}: ${formatIndex(endingIndex)}`);
+						const name = DragonActionNames[a];
+						const icon = Assets.dragonActions[a] ? img(Assets.dragonActions[a], name, 'height:1em;') : name;
+						logs[logs.length - 1].push(`${icon}: ${formatIndex(endingIndex)}`);
 						dragonAction = a;
 						break;
 					}

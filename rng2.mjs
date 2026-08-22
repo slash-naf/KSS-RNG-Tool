@@ -24,13 +24,16 @@ for(let i=0, s=INITIAL_SEED; i < CYCLE_LEN; i++) {
 /** 星の方向を表す文字（randi(8)に対応） */
 export const StarDirectionChars =  "↑↗→↘↓↙←↖";
 
-/** @typedef {'Star' | 'Guard' | 'Other'} DragonAction レッドドラゴンの行動 */
+/** @typedef {'Star' | 'Guard' | 'Scratch' | 'Fire' | 'Wind'} DragonAction レッドドラゴンの行動 */
 /** @type {DragonAction[]}  レッドドラゴンの行動テーブル（randi(10)に対応）*/
-export const DragonActionNames = ["Star", "Other", "Other", "Star", "Other", "Other", "Guard", "Other", "Other", "Guard"];
+export const DragonActionNames = ["Star", "Scratch", "Fire", "Star", "Wind", "Scratch", "Guard", "Wind", "Fire", "Guard"];
 const parseDragonAction = (/**@type {DragonAction}*/v) => /**@type {ID<DragonAction>}*/(DragonActionNames.indexOf(v));
 export const DragonActionMap = Uint8Array.from(DragonActionNames, v => parseDragonAction(v));
 export const DragonStar = parseDragonAction('Star');
 export const DragonGuard = parseDragonAction('Guard');
+export const DragonScratch = parseDragonAction('Scratch');
+export const DragonFire = parseDragonAction('Fire');
+export const DragonWind = parseDragonAction('Wind');
 
 /** @typedef {'Fighter' | 'Plasma' | 'Hammer' | 'Beam' | 'Bomb' | 'Sword' | 'Stone' | 'Cutter' | 'Wheel' | 'Jet' | 'Ice' | 'Parasol' | 'Fire' | 'Suplex' | 'Ninja' | 'Yo-yo' | 'Mirror' | 'Wing' | 'None'} PowerName コピーの元の名前 */
 /** @type {PowerName[]} コピーの元の名前テーブル（12個×2プール） */
@@ -109,6 +112,21 @@ export class KssRng {
 		this.advance(1);
 		return this.randi(8);
 	}
+
+	/** コピー能力のドロップ判定 */
+	dropCopyLarge() {
+		return this.randi(3) === 0;
+	}
+	dropCopyStrong() {
+		return this.randi(8) === 0;
+	}
+	dropCopyMedium() {
+		return this.randi(12) === 0;
+	}
+	dropCopyWeak() {
+		return this.randi(24) === 0;
+	}
+
 	/** ハンマーのヒット（ハードヒット判定 + ハードヒット時の乱数消費） */
 	hammerHit() {
 		const hardHit = this.checkHammerHardHit();
