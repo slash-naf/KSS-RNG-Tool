@@ -877,11 +877,7 @@ export class BattleWindowsMWWManipulator {
 				best.resolvedBranchGroups = nextState.resolvedBranchGroups;
 			}else if(this.branchDifficulty === 0 && nextState.resolvedBranchGroups){
 				//分岐削減度外視（low）で分岐作成済みの場合
-				const branches = new Map();
-				for(const b of nextState.resolvedBranchGroups){
-					branches.set(b.obs, b.cont);
-				}
-				result = {action, branches, default: null};
+				result = {action, branchGroups: nextState.resolvedBranchGroups, default: null};
 				best.penalty = averagePenalty;
 				best.failScore = failScore;
 				best.resolvedBranchGroups = nextState.resolvedBranchGroups;
@@ -890,18 +886,21 @@ export class BattleWindowsMWWManipulator {
 				const cont = this.manipulateFrom(turnIndex + 1, nextState, best, {penalty, failScore});
 				if(cont){
 					//分岐が作られたターンでbranchesに登録する
-					const branches = new Map();
-					if(!state.activeBranchGroups && best.resolvedBranchGroups && nextState.activeBranchGroups){
-						for(const b of best.resolvedBranchGroups){
-							branches.set(b.obs, b.cont);
-						}
+					if(!state.activeBranchGroups && nextState.activeBranchGroups){
+						result = {action, branchGroups: best.resolvedBranchGroups, default: cont};
+					}else{
+						result = {action, default: cont};
 					}
-					result = {action, branches, default: cont};
 				}
 			}
 		}
 
-		return result;
+		//結果の変換
+		if(!result) return null;
+		if(!result.branchGroups) return {action: result.action, default: result.default};
+		const branches = new Map();
+		for(const b of result.branchGroups) branches.set(b.obs, b.cont);
+		return {action: result.action, branches, default: result.default};
 	}
 	/** 星の向きを基に乱数調整のための行動を探す
 	 * @param {number[]} stars バトルウィンドウズ戦開始時に出した星の向き
