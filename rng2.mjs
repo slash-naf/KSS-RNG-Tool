@@ -3,7 +3,7 @@
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @template T @typedef {T extends Function | number | string | boolean | bigint | symbol | null | undefined ? T : T extends Array<infer U> ? ReadonlyArray<DeepReadonly<U>> : { readonly [K in keyof T]: DeepReadonly<T[K]> }} DeepReadonly */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, cont: ActionTable}, name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, center: boolean, cont: ActionTable}, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -305,7 +305,7 @@ export class KssRng {
 	/** レッドドラゴンの行動のシミュレーション
 	 * @param {ActionTable} action
 	 * @param {number} [hammerThrow] ハンマー投げのダッシュによる乱数消費数（コピーの元の乱数調整をする場合）
-	 * @returns {ID<DragonAction>} レッドドラゴンの行動
+	 * @returns {ID<DragonAction> | null} レッドドラゴンの行動
 	 */
 	simulateDragonAction(action, hammerThrow) {
 		if(hammerThrow === undefined){
@@ -317,21 +317,47 @@ export class KssRng {
 		}
 
 		this.takeAction(action);
-		return this.dragonActs();
-	}
-	/** レッドドラゴンの星攻撃を画面橋で受けた時の乱数消費
-	 * @param {boolean} left
-	*/
-	receiveDragonStar(left) {
-		//todo
+		const dragonAction = this.dragonActs();
+		if(action.dragonPowerManip){
+			const {left, center} = action.dragonPowerManip;
+			switch(dragonAction){
+			case DragonStar:
+				if(center) return null;	//星攻撃の場合は真ん中に行けない
+				if(left){
+					return null;	//todo
+				}else{
+					return null;	//todo
+				}
+				break;
+			case DragonFire:
+				const fireType = this.randi(3) === 1;	//1のときは多段、それ以外の時は乱れ打ち
+				if(center) break;	//真ん中に行く場合は攻撃を受けないから乱数は進まない
+				if(fireType){
+					if(left){
+						return null;	//todo
+					}else{
+						return null;	//todo
+					}
+				}else{
+					if(left){
+						return null;	//todo
+					}else{
+						return null;	//todo
+					}
+				}
+				break;
+			default:
+				return null;	//コピーの元の調整で星攻撃と炎攻撃以外は使わない
+			}
+			this.takeAction(action.dragonPowerManip.cont);
+		}
+		return dragonAction;
 	}
 	/** レッドドラゴンが行動した後のコピーの元のシミュレーション
-	 * @param {ActionTable} action
 	 * @param {boolean} noPowersFor3
 	 * @returns {BattleWindowsPowersPair}
 	*/
-	simulateDragonPowers(action, noPowersFor3){
-		this.takeAction(action);
+	simulateDragonPowers(noPowersFor3){
 		return this.battleWindowsPowers(noPowersFor3);
 	}
 
@@ -521,7 +547,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {MagicianDifficulty} [options.magicianDifficulty] 魔法使いの難易度
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
-	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃も成功として扱うか
+	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃のタイムロスを考慮するか
 	 * @param {HammerThrowOption} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
@@ -643,26 +669,26 @@ export class BattleWindowsMWWManipulator {
 					//通常ルート
 					const dragonAction = rng.simulateDragonAction(a);
 					if (dragonAction === DragonGuard || dragonAction === DragonStar) {
-						const obs = rng.simulateDragonPowers({}, !hasSeenPowers);
 						let stateTimeloss = 0;
-						let statePenalty = 0;
-						if (dragonAction === DragonStar && !this.allowDragonStar) {
-							stateTimeloss = 22;	//ガードに対して22Fのタイムロス
-							statePenalty = stateTimeloss * this.timelossPenalty;
-						}
+						if (dragonAction === DragonStar && !this.allowDragonStar) stateTimeloss = 22;	//ガードに対して22Fのタイムロス
+						const statePenalty = stateTimeloss * this.timelossPenalty;
+
+						const obs = rng.simulateDragonPowers(!hasSeenPowers);
 						return { obs, dragonAction, statePenalty, stateTimeloss };
 					}
 				} else {
 					//コピーの元の調整
 					const dragonAction = rng.simulateDragonAction(a, hammerThrow);
-					if (dragonAction === DragonStar) {
-						const left = a.dragonPowerManip?.left ?? false;
-						rng.receiveDragonStar(left);
-						const cont = a.dragonPowerManip?.cont ?? {};
-						const obs = rng.simulateDragonPowers(cont, !hasSeenPowers);
+					if (dragonAction !== null) {
+						const { left, center } = a.dragonPowerManip ?? { left: false, center: false };
+						let stateTimeloss = 0;
+						//if (dragonAction === DragonFire) stateTimeloss = center ? 36 : 42;	//炎攻撃は星攻撃より42f長く、ジェットダッシュの長さ考慮したらたぶん36fくらい
+						const statePenalty = stateTimeloss * this.timelossPenalty;
+
+						const obs = rng.simulateDragonPowers(!hasSeenPowers);
 						const actualPower = left ? getLeftPower(obs) : getRightPower(obs);
 						if (actualPower === this.targetPower) {
-							return { obs, dragonAction };
+							return { obs, dragonAction, statePenalty, stateTimeloss };
 						}
 					}
 				}
