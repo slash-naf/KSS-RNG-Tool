@@ -40,7 +40,7 @@ import {
  *   knight: DifficultyMode,
  *   dragon: DifficultyMode,
  *   hammerThrow: import('./rng2.mjs').HammerThrowOption,
- *   hammerThrowForDragon: number,
+ *   hammerThrowForDragon: string,
  *   branchReduction: BranchReductionMode,
  *   targetPower: import('./rng2.mjs').PowerName | 'disabled',
  * }} CustomState
@@ -81,7 +81,7 @@ const DEFAULT_SETTINGS = {
 	knight: 'easy',
 	dragon: 'easy',
 	hammerThrow: '1',
-	hammerThrowForDragon: 1,
+	hammerThrowForDragon: '1',
 	branchReduction: 'medium',
 	noNumpad: false,
 	displayMode: 'actionOnly',
@@ -107,9 +107,9 @@ let customState = {
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', hammerThrow: '1-2', hammerThrowForDragon: 1, branchReduction: 'high', targetPower: 'disabled' },
-	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: 1, branchReduction: 'medium', targetPower: 'disabled' },
-	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: 1, branchReduction: 'medium', targetPower: 'Wheel' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', hammerThrow: '1-2', hammerThrowForDragon: '1', branchReduction: 'high', targetPower: 'disabled' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'disabled' },
+	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'Wheel' },
 };
 
 /** 画像アセットのパス定義 */
@@ -324,7 +324,7 @@ const el = {
 	branchReduction: $('branch-reduction', HTMLSelectElement),
 	targetPower: $('target-power', HTMLSelectElement),
 	hammerThrowDragon: $('hammer-throw-dragon', HTMLSelectElement),
-	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') || document.body),
+	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') ?? document.body),
 };
 
 /** プリセットによって上書き・ロックの対象となるUI要素のマップ */
@@ -345,9 +345,13 @@ const presetTargetElements = {
 
 /** 現在のUI項目からシミュレーターに渡すための設定オブジェクトを生成する */
 function getSettings() {
+	const minVal = parseInt(el.min.value, 10);
+	const maxVal = parseInt(el.max.value, 10);
+	const hammerThrowDragonVal = parseInt(el.hammerThrowDragon.value, 10);
+
 	return {
-		minIndex: parseInt(el.min.value, 10) || 2800,
-		maxIndex: parseInt(el.max.value, 10) || 3376,
+		minIndex: Number.isNaN(minVal) ? 2800 : minVal,
+		maxIndex: Number.isNaN(maxVal) ? 3376 : maxVal,
 		magicianDifficulty: /** @type {MagicianDifficulty} */ (el.difficultyMagician.value),
 		fastKnight: el.difficultyKnight.value === 'fast',
 		fastDragon: el.difficultyDragon.value === 'fast',
@@ -355,7 +359,7 @@ function getSettings() {
 		hammerThrow: /** @type {import('./rng2.mjs').HammerThrowOption} */ (el.hammerThrow.value),
 		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
 		targetPowerName: /** @type {import('./rng2.mjs').PowerName | null} */ (el.targetPower.value === 'disabled' ? null : el.targetPower.value),
-		hammerThrowForDragon: parseInt(el.hammerThrowDragon.value, 10) || 1,
+		hammerThrowForDragon: Number.isNaN(hammerThrowDragonVal) ? 1 : hammerThrowDragonVal,
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
@@ -448,7 +452,7 @@ function loadSettings() {
 			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
 			if (s.branchReduction) customState.branchReduction = s.branchReduction;
 			if (s.targetPower !== undefined) customState.targetPower = s.targetPower;
-			if (s.hammerThrowForDragon !== undefined) customState.hammerThrowForDragon = s.hammerThrowForDragon;
+			if (s.hammerThrowForDragon !== undefined) customState.hammerThrowForDragon = String(s.hammerThrowForDragon);
 
 			// --- 他の基本設定を復元 ---
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
@@ -1051,7 +1055,8 @@ function displayResult() {
 
 /** 指定された星の数で発生しうる全パターンを分析する */
 async function runTest() {
-	const starsCount = parseInt(el.testStars.value, 10) || 3;
+	const starsCountVal = parseInt(el.testStars.value, 10);
+	const starsCount = Number.isNaN(starsCountVal) ? 3 : starsCountVal;
 	const settings = getSettings();
 
 	// UIを実行中状態に更新
@@ -1150,7 +1155,7 @@ function renderTestResult(result, testResultEl) {
 			html += '<tr>';
 			html += `<td>${branchIndexToEnemy(i)}</td>`;
 			for (let j = 1; j <= maxBranchSize; j++) {
-				html += `<td>${counts[j] || 0}</td>`;
+				html += `<td>${counts[j] ?? 0}</td>`;
 			}
 			html += '</tr>';
 		}
@@ -1215,7 +1220,7 @@ window.addEventListener('keydown', (e) => {
 
 	let numpadKey = null;
 	if (noNumpad) {
-		numpadKey = NoNumpadMap[key.toLowerCase()] || null;
+		numpadKey = NoNumpadMap[key.toLowerCase()] ?? null;
 	} else {
 		const n = parseInt(key, 10);
 		if (!Number.isNaN(n) && n !== 0 && n !== 5) {

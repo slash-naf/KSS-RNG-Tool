@@ -193,8 +193,8 @@ async function main() {
 	if (fs.existsSync(RESULT_FILE)) {
 		const oldTestResults = JSON.parse(fs.readFileSync(RESULT_FILE, 'utf8'));
 		for (let i = 0; i < newTestResults.length; i++) {
-			const oldResult = oldTestResults[i] || {};
-			const newResult = newTestResults[i] || {};
+			const oldResult = oldTestResults[i] ?? {};
+			const newResult = newTestResults[i] ?? {};
 			const allKeys = new Set([...Object.keys(oldResult), ...Object.keys(newResult)]);
 			const diffs = [];
 			for (const key of allKeys) {

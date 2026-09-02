@@ -728,7 +728,7 @@ export class BattleWindowsMWWManipulator {
 					if (dragonAction !== null) {
 						const { left, center } = a.dragonPowerManip ?? { left: false, center: false };
 						let stateTimeloss = 0;
-						//if (dragonAction === DragonFire) stateTimeloss = center ? 36 : 42;	//炎攻撃は星攻撃より42f長く、ジェットダッシュの長さ考慮したらたぶん36fくらい
+						if (dragonAction === DragonFire) stateTimeloss = center ? 36 : 42;	//炎攻撃は星攻撃より42f長く、ジェットダッシュの長さ考慮したらたぶん36fくらい
 						const statePenalty = stateTimeloss * this.timelossPenalty;
 
 						const obs = rng.simulateDragonPowers(!hasSeenPowers);
