@@ -41,6 +41,7 @@ import {
  *   dragon: DifficultyMode,
  *   allowDragonStar: boolean,
  *   hammerThrow: import('./rng2.mjs').HammerThrowOption,
+ *   hammerThrowForDragon: number,
  *   branchReduction: BranchReductionMode,
  *   targetPower: import('./rng2.mjs').PowerName | 'disabled',
  * }} CustomState
@@ -81,6 +82,7 @@ const DEFAULT_SETTINGS = {
 	knight: 'easy',
 	dragon: 'easy',
 	hammerThrow: '1',
+	hammerThrowForDragon: 1,
 	branchReduction: 'medium',
 	noNumpad: false,
 	displayMode: 'actionOnly',
@@ -100,6 +102,7 @@ let customState = {
 	dragon: DEFAULT_SETTINGS.dragon,
 	allowDragonStar: DEFAULT_SETTINGS.allowDragonStar,
 	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
+	hammerThrowForDragon: DEFAULT_SETTINGS.hammerThrowForDragon,
 	branchReduction: DEFAULT_SETTINGS.branchReduction,
 	targetPower: DEFAULT_SETTINGS.targetPower,
 };
@@ -107,9 +110,9 @@ let customState = {
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', branchReduction: 'high', targetPower: 'disabled' },
-	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium', targetPower: 'disabled' },
-	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium', targetPower: 'Wheel' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', hammerThrowForDragon: 1, branchReduction: 'high', targetPower: 'disabled' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', hammerThrowForDragon: 1, branchReduction: 'medium', targetPower: 'disabled' },
+	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', hammerThrowForDragon: 1, branchReduction: 'medium', targetPower: 'Wheel' },
 };
 
 /** 画像アセットのパス定義 */
@@ -325,6 +328,7 @@ const el = {
 	hammerThrow: $('hammer-throw', HTMLSelectElement),
 	branchReduction: $('branch-reduction', HTMLSelectElement),
 	targetPower: $('target-power', HTMLSelectElement),
+	hammerThrowDragon: $('hammer-throw-dragon', HTMLSelectElement),
 	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') || document.body),
 };
 
@@ -338,6 +342,7 @@ const presetTargetElements = {
 	dragon: el.difficultyDragon,
 	allowDragonStar: el.allowDragonStar,
 	hammerThrow: el.hammerThrow,
+	hammerThrowForDragon: el.hammerThrowDragon,
 	branchReduction: el.branchReduction,
 	targetPower: el.targetPower,
 };
@@ -356,6 +361,7 @@ function getSettings() {
 		hammerThrow: /** @type {import('./rng2.mjs').HammerThrowOption} */ (el.hammerThrow.value),
 		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
 		targetPowerName: /** @type {import('./rng2.mjs').PowerName | null} */ (el.targetPower.value === 'disabled' ? null : el.targetPower.value),
+		hammerThrowForDragon: parseInt(el.hammerThrowDragon.value, 10) || 1,
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
@@ -449,6 +455,7 @@ function loadSettings() {
 			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
 			if (s.branchReduction) customState.branchReduction = s.branchReduction;
 			if (s.targetPower !== undefined) customState.targetPower = s.targetPower;
+			if (s.hammerThrowForDragon !== undefined) customState.hammerThrowForDragon = s.hammerThrowForDragon;
 
 			// --- 他の基本設定を復元 ---
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
@@ -991,6 +998,7 @@ function getManipulator(settings) {
 		fastDragon: settings.fastDragon,
 		allowDragonStar: settings.allowDragonStar,
 		hammerThrow: settings.hammerThrow,
+		hammerThrowForDragon: settings.hammerThrowForDragon,
 		branchReduction: settings.branchReduction,
 		targetPowerName: settings.targetPowerName,
 	};
