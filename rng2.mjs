@@ -657,11 +657,11 @@ export class BattleWindowsMWWManipulator {
 		// 各ターンの難易度低い順行動リストを作成（枝刈りのためpenalty昇順でソート）
 		/**@type {ActionTableEx[][]}*/
 		this.actionsListByTurn = [
-			MagicianPrioritiesTable[this.magicianDifficulty].map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })).sort((a, b) => a.penalty - b.penalty),
-			actionsDifficultyTable.knight.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastKnight ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
-			actionsDifficultyTable.dragon.map(e => ({ ...e, penalty: e.difficulty ?? 0, fast: this.fastDragon ? 1 : undefined })).sort((a, b) => a.penalty - b.penalty),
-			(this.targetPower === null ? actionsDifficultyTable.dragonTurn2 : actionsDifficultyTable.dragonTurn2ForPowerManip).map(e => ({ ...e, penalty: e.difficulty ?? 0})).sort((a, b) => a.penalty - b.penalty),
-		];
+			MagicianPrioritiesTable[this.magicianDifficulty],
+			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight ? 1 : undefined })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon ? 1 : undefined })),
+			this.targetPower === null ? actionsDifficultyTable.dragonTurn2 : actionsDifficultyTable.dragonTurn2ForPowerManip,
+		].map(list => list.map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })).sort((a, b) => a.penalty - b.penalty));
 
 		// 各状態からの遷移を作成
 		const r = new KssRng(/**@type {RngIndex}*/(0));
@@ -1017,6 +1017,7 @@ export class BattleWindowsMWWManipulator {
 			//レッドドラゴンの行動のカウント
 			dragonGuardCount: 0,
 			dragonStarCount: 0,
+			dragonFireCount: 0,
 
 			// manipulate()の計算時間（ms）
 			totalTime: 0,
@@ -1133,6 +1134,7 @@ export class BattleWindowsMWWManipulator {
 
 					if (stepResult.dragonAction === DragonGuard) result.dragonGuardCount++;
 					else if (stepResult.dragonAction === DragonStar) result.dragonStarCount++;
+					else if (stepResult.dragonAction === DragonFire) result.dragonFireCount++;
 
 					current = current.branches ? (current.branches.get(stepResult.obs) ?? current.default) : current.default;
 				}

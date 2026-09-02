@@ -42,6 +42,7 @@ import {
  *   allowDragonStar: boolean,
  *   hammerThrow: import('./rng2.mjs').HammerThrowOption,
  *   branchReduction: BranchReductionMode,
+ *   targetPower: import('./rng2.mjs').PowerName | 'disabled',
  * }} CustomState
  */
 
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS = {
 	detailMode: 'none',
 	indexDisplayMode: 'indexOnly',
 	allowDragonStar: false,
+	targetPower: 'disabled',
 };
 
 /** ユーザーが「Custom」モードで編集・維持する独自設定のスロット */
@@ -99,13 +101,14 @@ let customState = {
 	allowDragonStar: DEFAULT_SETTINGS.allowDragonStar,
 	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
 	branchReduction: DEFAULT_SETTINGS.branchReduction,
+	targetPower: DEFAULT_SETTINGS.targetPower,
 };
 
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', branchReduction: 'high' },
-	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', branchReduction: 'high', targetPower: 'disabled' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium', targetPower: 'disabled' },
 };
 
 /** 画像アセットのパス定義 */
@@ -194,6 +197,27 @@ const L = {
 	dragonActualActions: { en: "Dragon's Action", ja: 'レッドドラゴンの行動' },
 	dragonGuard: { en: 'Guard', ja: 'ガード' },
 	dragonStarAction: { en: 'Star', ja: '星攻撃' },
+	dragonFireAction: { en: 'Fire', ja: '炎攻撃' },
+	targetPower: { en: 'Copy Essence:', ja: 'コピーの元調整:' },
+	targetPowerDisabled: { en: 'Disabled', ja: '無効' },
+	powerFighter: { en: 'Fighter', ja: 'ファイター' },
+	powerPlasma: { en: 'Plasma', ja: 'プラズマ' },
+	powerHammer: { en: 'Hammer', ja: 'ハンマー' },
+	powerBeam: { en: 'Beam', ja: 'ビーム' },
+	powerBomb: { en: 'Bomb', ja: 'ボム' },
+	powerSword: { en: 'Sword', ja: 'ソード' },
+	powerStone: { en: 'Stone', ja: 'ストーン' },
+	powerCutter: { en: 'Cutter', ja: 'カッター' },
+	powerWheel: { en: 'Wheel', ja: 'ホイール' },
+	powerJet: { en: 'Jet', ja: 'ジェット' },
+	powerIce: { en: 'Ice', ja: 'アイス' },
+	powerParasol: { en: 'Parasol', ja: 'パラソル' },
+	powerFire: { en: 'Fire', ja: 'ファイア' },
+	powerSuplex: { en: 'Suplex', ja: 'スープレックス' },
+	powerNinja: { en: 'Ninja', ja: 'ニンジャ' },
+	powerYoYo: { en: 'Yo-yo', ja: 'ヨーヨー' },
+	powerMirror: { en: 'Mirror', ja: 'ミラー' },
+	powerWing: { en: 'Wing', ja: 'ウイング' },
 	thTiming: { en: 'Timing', ja: 'タイミング' },
 	thSmoke: { en: 'Smoke', ja: '煙' },
 	thAttacksFirst: { en: '1st Attack', ja: '先制' },
@@ -298,6 +322,7 @@ const el = {
 	testStars: $('test-stars', HTMLInputElement),
 	hammerThrow: $('hammer-throw', HTMLSelectElement),
 	branchReduction: $('branch-reduction', HTMLSelectElement),
+	targetPower: $('target-power', HTMLSelectElement),
 	settingsArea: /** @type {HTMLElement} */ (document.querySelector('.settings-area') || document.body),
 };
 
@@ -312,6 +337,7 @@ const presetTargetElements = {
 	allowDragonStar: el.allowDragonStar,
 	hammerThrow: el.hammerThrow,
 	branchReduction: el.branchReduction,
+	targetPower: el.targetPower,
 };
 
 // --- 設定・ストレージ管理 ---
@@ -327,6 +353,7 @@ function getSettings() {
 		allowDragonStar: el.allowDragonStar.checked,
 		hammerThrow: /** @type {import('./rng2.mjs').HammerThrowOption} */ (el.hammerThrow.value),
 		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
+		targetPowerName: /** @type {import('./rng2.mjs').PowerName | null} */ (el.targetPower.value === 'disabled' ? null : el.targetPower.value),
 		displayMode: /** @type {DisplayMode} */ (el.displayMode.value),
 		detailMode: /** @type {DetailMode} */ (el.detailMode.value),
 		indexDisplayMode: /** @type {IndexDisplayMode} */ (el.indexDisplayMode.value),
@@ -419,6 +446,7 @@ function loadSettings() {
 			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
 			if (s.allowDragonStar !== undefined) customState.allowDragonStar = s.allowDragonStar;
 			if (s.branchReduction) customState.branchReduction = s.branchReduction;
+			if (s.targetPower !== undefined) customState.targetPower = s.targetPower;
 
 			// --- 他の基本設定を復元 ---
 			if (s.noNumpad !== undefined) el.noNumpad.checked = s.noNumpad;
@@ -885,7 +913,11 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 		let html = '';
 
 		// 敵の画像
-		html += `<td class="enemy-cell">${img(Assets.enemies[i])}</td>`;
+		if (i === TURN_DRAGON) {
+			html += `<td class="enemy-cell" rowspan="2">${img(Assets.enemies[i])}</td>`;
+		} else if (i !== TURN_DRAGON_TURN2) {
+			html += `<td class="enemy-cell">${img(Assets.enemies[i])}</td>`;
+		}
 
 		// メイン行動
 		const mainAction = mainActions[i];
@@ -928,11 +960,6 @@ function renderMainResultTable(manipulateResult, starIndices, settings, manipula
 							const failPowers = failRng.battleWindowsPowers();
 							html += `<span style="opacity: 0.5;">(${formatPowers(failPowers)})</span>`;
 						}
-
-						// レッドドラゴン2ターン目の場合はレッドドラゴンの行動画像も表示
-						if (i === TURN_DRAGON_TURN2 && s.dragonAction !== undefined) {
-							html += ' ' + img(Assets.dragonActions[s.dragonAction], DragonActionNames[s.dragonAction], 'height:1em;');
-						}
 					}
 				}
 				html += '</td>';
@@ -963,6 +990,7 @@ function getManipulator(settings) {
 		allowDragonStar: settings.allowDragonStar,
 		hammerThrow: settings.hammerThrow,
 		branchReduction: settings.branchReduction,
+		targetPowerName: settings.targetPowerName,
 	};
 	const str = JSON.stringify(logicSettings);
 	if (cachedManipulatorSettingsStr !== str || !cachedManipulator) {
@@ -1140,11 +1168,12 @@ function renderTestResult(result, testResultEl) {
 		return s;
 	};
 
-	/** レッドドラゴンの行動（ガード/星攻撃）の頻度統計テーブルを描画する */
+	/** レッドドラゴンの行動（ガード/星攻撃/炎攻撃）の頻度統計テーブルを描画する */
 	const renderDragonActualActionsTable = () => {
 		const entries = [
 			{ name: t('dragonGuard'), count: result.dragonGuardCount },
 			{ name: t('dragonStarAction'), count: result.dragonStarCount },
+			{ name: t('dragonFireAction'), count: result.dragonFireCount },
 		].filter(e => e.count > 0).sort((a, b) => b.count - a.count);
 
 		if (entries.length === 0) return '';
