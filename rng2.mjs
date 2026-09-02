@@ -473,7 +473,53 @@ const DefaultActionsDifficultyTable = {
 		{ difficulty: 502, dashes: 1, hammerFlips: 1 },
 	],
 	dragonTurn2ForPowerManip: [
-		//todo
+		//左右
+		...[
+			{ difficulty: 0 },
+			{ difficulty: 20, dashes: 2 },
+			{ difficulty: 21, dashes: 3 },
+			{ difficulty: 25, slides: 1 },
+			{ difficulty: 30, dashes: 4 },
+			{ difficulty: 550, dashes: 1 },
+		].flatMap(
+			e => [
+				{ difficulty: 0 },
+				{ difficulty: 50, dashes: 2 },
+				{ difficulty: 550, dashes: 1 },
+			].flatMap(
+				cont => [false, true].map(left => ({
+					...e,
+					difficulty: e.difficulty + cont.difficulty,
+					timeloss: left ? 15 : 0,
+					dragonPowerManip: {left, center: false, cont},
+				}))
+			)
+		),
+		//中央
+		...[
+			{ difficulty: 0 },
+		].flatMap(
+			e => [
+				{ difficulty: 0 },
+				{ difficulty: 10, stars: 1 },
+				{ difficulty: 11, slides: 1 },
+				{ difficulty: 12, dashes: 3 },
+				{ difficulty: 15, dashes: 2, stars: 1 },
+				{ difficulty: 16, dashes: 2, slides: 1 },
+				{ difficulty: 31, dashes: 3, stars: 1 },
+				{ difficulty: 32, dashes: 3, slides: 1 },
+				{ difficulty: 60, dashes: 2, stars: 1, slides: 1 },
+				{ difficulty: 450, dashes: 1 },
+				{ difficulty: 501, dashes: 1, slides: 1 },
+			].flatMap(
+				cont => [false, true].map(left => ({
+					...e,
+					difficulty: e.difficulty + cont.difficulty,
+					timeloss: left ? 10 : 0,
+					dragonPowerManip: {left, center: true, cont},
+				}))
+			)
+		),
 	],
 };
 
@@ -622,7 +668,7 @@ export class BattleWindowsMWWManipulator {
 		const steps = this.createSimulationSteps(r);
 		let maxIndexByTurn = KssRng.calcIndex(this.maxIndex, this.maxStarsCount * StarDirectionAdvances);
 		this.turns = steps.map((step, turnIndex) => this.actionsListByTurn[turnIndex].map(action => {
-			const hammerThrow = [0, this.hammerThrowMin, 0, this.hammerThrowForDragon][turnIndex];
+			const hammerThrow = [0, this.hammerThrowMin, 0, 0][turnIndex];
 			const advancesBuffer = [0, this.hammerThrowBuffer, 0, 0][turnIndex];
 			let nextMaxIndex = maxIndexByTurn;
 			const byStateId = new Int32Array((this.rngIndexToOffset(maxIndexByTurn) + 1) * 2);
@@ -664,7 +710,7 @@ export class BattleWindowsMWWManipulator {
 			(a) => ({ obs: rng.simulateMagician(a) }),
 			(a, hasSeenPowers, hammerThrow) => ({ obs: rng.simulateKnight(a, hammerThrow) }),
 			(a) => ({ obs: rng.simulateDragon(a) }),
-			(a, hasSeenPowers, hammerThrow) => {
+			(a, hasSeenPowers) => {
 				if (this.targetPower === null) {
 					//通常ルート
 					const dragonAction = rng.simulateDragonAction(a);
@@ -678,7 +724,7 @@ export class BattleWindowsMWWManipulator {
 					}
 				} else {
 					//コピーの元の調整
-					const dragonAction = rng.simulateDragonAction(a, hammerThrow);
+					const dragonAction = rng.simulateDragonAction(a, this.hammerThrowForDragon);
 					if (dragonAction !== null) {
 						const { left, center } = a.dragonPowerManip ?? { left: false, center: false };
 						let stateTimeloss = 0;

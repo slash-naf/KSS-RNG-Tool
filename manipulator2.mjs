@@ -210,6 +210,7 @@ const L = {
 	actionShortDash: { en: 'Short Dash', ja: '短ダッシュ' },
 	actionDash: { en: 'Dash', ja: 'ダッシュ' },
 	actionLongDash: { en: 'Long Dash', ja: '長ダッシュ' },
+	action2Dashes: { en: '2 Dashes', ja: '2ダッシュ' },
 	actionStar: { en: 'Star', ja: '星' },
 	action2Stars: { en: '2 Stars', ja: '2星' },
 	actionFlip: { en: 'Flip', ja: '鬼殺し' },
@@ -223,6 +224,10 @@ const L = {
 	logAction: { en: 'Action', ja: '行動' },
 	logAttacksFirst: { en: '1st Attack', ja: '先制' },
 	logHardHit: { en: 'Hard Hit Check', ja: 'ハードヒット判定' },
+	posLeft: { en: 'Left', ja: '左' },
+	posRight: { en: 'Right', ja: '右' },
+	posCenterLeft: { en: 'Center Left', ja: '中央左' },
+	posCenterRight: { en: 'Center Right', ja: '中央右' },
 };
 
 /** 現在選択されている言語コード */
@@ -475,9 +480,20 @@ function formatIndex(index, hammerThrow) {
 	return str;
 }
 
-/** 行動テーブルの内容を翻訳テキストと画像を用いて説明文字列に変換する
+/** 行動テーブルの内容を翻訳テキストを用いて説明文字列に変換する
  * @param {ActionTable} action */
 function msg(action) {
+	if (action.dragonPowerManip) {
+		const { left, center, cont } = action.dragonPowerManip;
+		const pos = t(center ? (left ? 'posCenterLeft' : 'posCenterRight') : (left ? 'posLeft' : 'posRight'));
+		const prevMsg = msgSimple(action);
+		const contMsg = msgSimple(cont);
+		return `${prevMsg} : ${pos} : ${contMsg}`;
+	}
+	return msgSimple(action);
+}
+/** @param {ActionTable} action */
+function msgSimple(action) {
 	const { dashes, slides, hammerFlips, stars, lateAdvances, name } = action;
 	const result = [];
 
@@ -486,7 +502,7 @@ function msg(action) {
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
-		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash')][dashes]);
+		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes')][dashes]);
 		if (stars) result.push([, t('actionStar'), t('action2Stars')][stars]);
 		if (hammerFlips) result.push([, t('actionFlip'), t('action2Flips')][hammerFlips]);
 		if (slides) result.push([, t('actionSlide'), t('action2Slides')][slides]);
