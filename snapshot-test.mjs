@@ -155,6 +155,18 @@ const settingsList = [
 		maxIndex: 3161,
 		branchReduction: 'medium',
 	},
+	// 14. Fastest（ホイール調整・branchReduction: medium）
+	{
+		magicianDifficulty: 'aggressiveFast',
+		fastKnight: true,
+		fastDragon: true,
+		allowDragonStar: false,
+		hammerThrow: '1',
+		minIndex: 2750,
+		maxIndex: 3161,
+		branchReduction: 'medium',
+		targetPowerName: 'Wheel',
+	},
 ];
 
 async function main() {

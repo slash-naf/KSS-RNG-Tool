@@ -18,7 +18,7 @@ import {
 /** @typedef {import('./rng2.mjs').RngIndex} RngIndex */
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @typedef {'en' | 'ja'} LangKey */
-/** @typedef {'easiest' | 'fastest' | 'custom'} PresetMode */
+/** @typedef {'easiest' | 'fastest' | 'fastestWheel' | 'custom'} PresetMode */
 /** @typedef {'withIndex' | 'actionOnly' | 'withSimulation'} DisplayMode */
 /** @typedef {'none' | 'withPowers' | 'withFailPowers' | 'withTransitions'} DetailMode */
 /** @typedef {'indexOnly' | 'hex' | 'split'} IndexDisplayMode */
@@ -109,6 +109,7 @@ let customState = {
 const PRESETS = {
 	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowDragonStar: true, hammerThrow: '1-2', branchReduction: 'high', targetPower: 'disabled' },
 	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium', targetPower: 'disabled' },
+	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowDragonStar: false, hammerThrow: '1', branchReduction: 'medium', targetPower: 'Wheel' },
 };
 
 /** 画像アセットのパス定義 */
@@ -132,6 +133,7 @@ const L = {
 	preset: { en: 'Preset:', ja: 'プリセット:' },
 	presetEasiest: { en: 'Easiest', ja: 'Easiest' },
 	presetFastest: { en: 'Fastest', ja: 'Fastest' },
+	presetFastestWheel: { en: 'Fastest (Wheel)', ja: 'Fastest (ホイール)' },
 	presetCustom: { en: 'Custom', ja: 'Custom' },
 	magician: { en: 'Magician:', ja: '魔法使い:' },
 	knight: { en: 'Knight:', ja: '悪魔の騎士:' },
