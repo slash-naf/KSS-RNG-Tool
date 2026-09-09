@@ -237,11 +237,13 @@ const L = {
 	actionLongDash: { en: 'Long Dash', ja: '長ダッシュ' },
 	action2Dashes: { en: '2 Dashes', ja: '2ダッシュ' },
 	actionStar: { en: 'Star', ja: '星' },
-	action2Stars: { en: '2 Stars', ja: '2星' },
+	actionStars: { en: ' Stars', ja: '星' },
 	actionFlip: { en: 'Flip', ja: '鬼殺し' },
-	action2Flips: { en: '2 Flips', ja: '2鬼殺し' },
+	actionFlips: { en: ' Flips', ja: '鬼殺し' },
 	actionSlide: { en: 'Slide', ja: 'スライディング' },
-	action2Slides: { en: '2 Slides', ja: '2スライディング' },
+	actionSlides: { en: ' Slides', ja: 'スライディング' },
+	actionInhale: { en: 'Inhale', ja: '吸い込み' },
+	actionInhales: { en: ' Inhales', ja: '吸い込み' },
 	enemyMagician: { en: 'Magician', ja: '魔法使い' },
 	enemyKnight: { en: 'Knight', ja: '悪魔の騎士' },
 	enemyDragon: { en: 'Dragon', ja: 'レッドドラゴン' },
@@ -515,7 +517,8 @@ function formatIndex(index, hammerThrow) {
 }
 
 /** 行動テーブルの内容を翻訳テキストを用いて説明文字列に変換する
- * @param {ActionTable} action */
+ * @param {ActionTable} action
+ * @returns {string} */
 function msg(action) {
 	if (action.dragonPowerManip) {
 		const { left, center, cont } = action.dragonPowerManip;
@@ -526,20 +529,40 @@ function msg(action) {
 	}
 	return msgSimple(action);
 }
-/** @param {ActionTable} action */
+/** 行動の回数に応じた説明文字列を取得する
+ * @param {number} count
+ * @param {keyof typeof L} single
+ * @param {keyof typeof L} plural
+ * @returns {string} */
+function formatActionCount(count, single, plural) {
+	return count === 1 ? t(single) : `${count}${t(plural)}`;
+}
+/**
+ * @param {ActionTable} action
+ * @returns {string} */
 function msgSimple(action) {
-	const { dashes, slides, hammerFlips, stars, lateAdvances, name } = action;
+	const { dashes, slides, hammerFlips, stars, lateAdvances, name, inhales } = action;
 	const result = [];
 
 	if (name) {
-		result.push(name);
+		return name;
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
 		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes')][dashes]);
-		if (stars) result.push([, t('actionStar'), t('action2Stars')][stars]);
-		if (hammerFlips) result.push([, t('actionFlip'), t('action2Flips')][hammerFlips]);
-		if (slides) result.push([, t('actionSlide'), t('action2Slides')][slides]);
+		if (stars) result.push(formatActionCount(stars, 'actionStar', 'actionStars'));
+		if (hammerFlips) result.push(formatActionCount(hammerFlips, 'actionFlip', 'actionFlips'));
+		if (slides) result.push(formatActionCount(slides, 'actionSlide', 'actionSlides'));
+	}
+
+	if (inhales) {
+		for (const item of inhales) {
+			if (typeof item === 'number') {
+				result.push(formatActionCount(item, 'actionInhale', 'actionInhales'));
+			} else if (item) {
+				result.push(msg(item));
+			}
+		}
 	}
 	return result.length ? result.join(' & ') : t('actionWait');
 }
