@@ -59,7 +59,7 @@ export const HammerFlipFinishAdvances = 2;	// 鬼殺し火炎ハンマー後の�
 export const HammerFlipAdvances = HammerFlipChargeAdvances + HammerFlipFinishAdvances;	// 鬼殺し火炎ハンマーの素振り
 export const HammerHardHitAdvances = 9;	// ハンマーのハードヒットによる消費
 
-/** 吸い込みの星エフェクトの寿命テーブル */
+/** 吸い込みの粒子の寿命テーブル */
 export const InhaleLifetime = new Int8Array([5, 9, 11, 13, 14, 16, 17, 17, 17, 17, 16, 14, 13, 11, 9, 5]);
 
 /** 乱数位置を保持し、消費と参照を管理するクラス */
@@ -116,18 +116,18 @@ export class KssRng {
 		return this.randi(8);
 	}
 
-	/** 吸い込み */
+	/** Yを短く押して吸い込み */
 	inhale() {
 		const deletes = new Uint16Array(33);
-		const emptyCounts = new Uint8Array(33);
-		emptyCounts[2] = 4;
+		const spawnCounts = new Uint8Array(33);
+		spawnCounts[2] = 4;
 		let particles = 0;
 		for (let tick = 2; tick <= 32; tick++) {
 			// 寿命切れの粒子を先に全部空にする
 			particles &= ~deletes[tick];
 
 			// 空いた粒子を埋める
-			const count = emptyCounts[tick];
+			const count = spawnCounts[tick];
 			for (let i = 0; i < count; i++) {
 				let v;
 				do {
@@ -138,9 +138,9 @@ export class KssRng {
 				particles |= 1 << v;
 
 				// 粒子の寿命を設定
-				const deleteTick = tick + InhaleLifetime[v];
-				deletes[deleteTick] |= 1 << v;
-				emptyCounts[deleteTick]++;
+				const spawnTick = tick + InhaleLifetime[v];
+				deletes[spawnTick - 1] |= 1 << v;
+				spawnCounts[spawnTick]++;
 			}
 		}
 	}
