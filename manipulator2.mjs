@@ -549,10 +549,10 @@ function msgSimple(action) {
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
-		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes')][dashes]);
+		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes'), `${t('actionLongDash')} & ${t('actionDash')}`][dashes]);
 		if (stars) result.push(formatActionCount(stars, 'actionStar', 'actionStars'));
-		if (hammerFlips) result.push(formatActionCount(hammerFlips, 'actionFlip', 'actionFlips'));
 		if (slides) result.push(formatActionCount(slides, 'actionSlide', 'actionSlides'));
+		if (hammerFlips) result.push(formatActionCount(hammerFlips, 'actionFlip', 'actionFlips'));
 	}
 
 	if (inhales) {

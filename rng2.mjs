@@ -3,7 +3,7 @@
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @template T @typedef {T extends Function | number | string | boolean | bigint | symbol | null | undefined ? T : T extends Array<infer U> ? ReadonlyArray<DeepReadonly<U>> : { readonly [K in keyof T]: DeepReadonly<T[K]> }} DeepReadonly */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, hammerFlips?: number, slides?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, center: boolean, cont: ActionTable}, inhales?: readonly (ActionTable | number)[], name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, slides?: number, hammerFlips?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, center: boolean, cont: ActionTable}, inhales?: readonly (ActionTable | number)[], name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
