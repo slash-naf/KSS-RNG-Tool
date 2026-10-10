@@ -541,7 +541,7 @@ function formatActionCount(count, single, plural) {
  * @param {ActionTable} action
  * @returns {string} */
 function msgSimple(action) {
-	const { dashes, slides, hammerFlips, stars, lateAdvances, name, inhales } = action;
+	const { inhales, dashes, slides, hammerFlips, stars, lateAdvances, name, next } = action;
 	const result = [];
 
 	if (name) {
@@ -549,21 +549,15 @@ function msgSimple(action) {
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
+		if (inhales) result.push(formatActionCount(inhales, 'actionInhale', 'actionInhales'));
 		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes'), `${t('actionLongDash')} & ${t('actionDash')}`][dashes]);
 		if (stars) result.push(formatActionCount(stars, 'actionStar', 'actionStars'));
 		if (slides) result.push(formatActionCount(slides, 'actionSlide', 'actionSlides'));
 		if (hammerFlips) result.push(formatActionCount(hammerFlips, 'actionFlip', 'actionFlips'));
 	}
 
-	if (inhales) {
-		for (const item of inhales) {
-			if (typeof item === 'number') {
-				result.push(formatActionCount(item, 'actionInhale', 'actionInhales'));
-			} else if (item) {
-				result.push(msg(item));
-			}
-		}
-	}
+	if (next) result.push(msgSimple(next));
+
 	return result.length ? result.join(' & ') : t('actionWait');
 }
 

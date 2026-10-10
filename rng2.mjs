@@ -3,7 +3,7 @@
 /** @template T @typedef {number & {__brand: T}} ID */
 /** @template T @typedef {T extends Function | number | string | boolean | bigint | symbol | null | undefined ? T : T extends Array<infer U> ? ReadonlyArray<DeepReadonly<U>> : { readonly [K in keyof T]: DeepReadonly<T[K]> }} DeepReadonly */
 /** @typedef {ID<'RngIndex'>} RngIndex 乱数位置 */
-/** @typedef {{ difficulty?: number, timeloss?: number, dashes?: number, stars?: number, slides?: number, hammerFlips?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, center: boolean, cont: ActionTable}, inhales?: readonly (ActionTable | number)[], name?: string }} ActionTable 行動テーブル */
+/** @typedef {{ difficulty?: number, timeloss?: number, inhales?: number, dashes?: number, stars?: number, slides?: number, hammerFlips?: number, lateAdvances?: number, fast?: number, dragonPowerManip?: {left: boolean, center: boolean, cont: ActionTable}, next?: ActionTable, name?: string }} ActionTable 行動テーブル */
 
 export const INITIAL_SEED = 0x7777	// ゲーム起動時の乱数
 export const CYCLE_LEN = 65534	// 乱数変数が16bitであるなか、65534回で乱数列が1周する。つまり2つを除いた全ての乱数を通る。
@@ -184,19 +184,10 @@ export class KssRng {
 	 * @param {ActionTable} action 行動テーブル
 	 */
 	takeAction(action) {
-		const { dashes=0, slides=0, hammerFlips=0, stars=0, lateAdvances=0, inhales } = action;
+		const { inhales=0, dashes=0, slides=0, hammerFlips=0, stars=0, lateAdvances=0, next } = action;
+		for (let i=0; i < inhales; i++) this.inhale();
 		this.advance(dashes + (slides * SlideAdvances) + (hammerFlips * HammerFlipAdvances) + (stars * StarDirectionAdvances) - lateAdvances);
-		if(inhales){
-			for(const item of inhales){
-				if(typeof item === 'number'){
-					for(let i=0; i < item; i++){
-						this.inhale();
-					}
-				}else{
-					this.takeAction(item);
-				}
-			}
-		}
+		if (next) this.takeAction(next);
 	}
 
 	// --- バトルウィンドウズ ---
