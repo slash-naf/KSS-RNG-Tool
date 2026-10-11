@@ -57,6 +57,106 @@ export const DefaultActionsDifficultyTable = {
 		{ difficulty: 100, dashes: 1 },
 		{ difficulty: 110, timeloss: 20, dashes: 1, slides: 2 },
 		{ difficulty: 120, timeloss: 30, dashes: 1, slides: 1, next: { dashes: 2, slides: 1 } },
+
+
+
+		{ difficulty: 1, inhales: 1 },
+		{ difficulty: 110, inhales: 1, dashes: 1 },
+		{ difficulty: 1, inhales: 1, stars: 1 },
+		{ difficulty: 20, inhales: 1, dashes: 3 },
+		{ difficulty: 3, inhales: 1, stars: 2 },
+		{ difficulty: 25, inhales: 1, stars: 1, dashes: 3 },
+		{ difficulty: 20, inhales: 1, slides: 1 },
+		{ difficulty: 125, inhales: 1, dashes: 1, slides: 1 },
+		{ difficulty: 25, inhales: 1, stars: 1, slides: 1 },
+		{ difficulty: 130, inhales: 1, stars: 1, dashes: 1, slides: 1 },
+		{ difficulty: 25, inhales: 1, stars: 1, dashes: 2, slides: 1 },
+
+		{ difficulty: 110, dashes: 1, next: { inhales: 1 } },
+		{ difficulty: 200, dashes: 1, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 111, dashes: 1, next: { inhales: 1, stars: 1 } },
+		{ difficulty: 130, dashes: 1, next: { inhales: 1, dashes: 3 } },
+		{ difficulty: 120, dashes: 1, next: { inhales: 1, stars: 2 } },
+		{ difficulty: 140, dashes: 1, next: { inhales: 1, stars: 1, dashes: 3 } },
+		{ difficulty: 130, dashes: 1, next: { inhales: 1, slides: 1 } },
+		{ difficulty: 225, dashes: 1, next: { inhales: 1, dashes: 1, slides: 1 } },
+		{ difficulty: 140, dashes: 1, next: { inhales: 1, stars: 1, slides: 1 } },
+
+		{ difficulty: 2, dashes: 2, next: { inhales: 1 } },
+		{ difficulty: 112, dashes: 2, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 3, dashes: 2, next: { inhales: 1, stars: 1 } },
+		{ difficulty: 25, dashes: 2, next: { inhales: 1, dashes: 3 } },
+		{ difficulty: 12, dashes: 2, next: { inhales: 1, stars: 1, dashes: 2 } },
+		{ difficulty: 30, dashes: 2, next: { inhales: 1, stars: 1, dashes: 3 } },
+		{ difficulty: 25, dashes: 2, next: { inhales: 1, slides: 1 } },
+		{ difficulty: 125, dashes: 2, next: { inhales: 1, dashes: 1, slides: 1 } },
+		{ difficulty: 30, dashes: 2, next: { inhales: 1, stars: 1, slides: 1 } },
+
+		{ difficulty: 15, dashes: 3, next: { inhales: 1 } },
+		{ difficulty: 135, dashes: 3, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 20, dashes: 3, next: { inhales: 1, stars: 1 } },
+		{ difficulty: 150, dashes: 3, next: { inhales: 1, stars: 1, dashes: 1 } },
+
+		{ difficulty: 15, dashes: 4, next: { inhales: 1 } },
+		{ difficulty: 135, dashes: 4, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 20, dashes: 4, next: { inhales: 1, stars: 1 } },
+		{ difficulty: 150, dashes: 4, next: { inhales: 1, stars: 1, dashes: 1 } },
+
+		{ difficulty: 30, dashes: 5, next: { inhales: 1 } },
+		{ difficulty: 150, dashes: 5, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 40, dashes: 5, next: { inhales: 1, stars: 1 } },
+
+		{ difficulty: 20, slides: 1, next: { inhales: 1 } },
+		{ difficulty: 150, slides: 1, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 25, slides: 1, next: { inhales: 1, stars: 1 } },
+
+		{ difficulty: 130, dashes: 1, slides: 1, next: { inhales: 1 } },
+
+		{ difficulty: 30, dashes: 2, slides: 1, next: { inhales: 1 } },
+
+
+
+		{ difficulty: 3, inhales: 2 },
+		{ difficulty: 115, inhales: 2, dashes: 1 },
+		{ difficulty: 5, inhales: 2, stars: 1 },
+		{ difficulty: 125, inhales: 2, stars: 1, dashes: 1 },
+		{ difficulty: 20, inhales: 2, stars: 1, dashes: 2 },
+
+		{ difficulty: 110, dashes: 1, next: { inhales: 2 } },
+		{ difficulty: 220, dashes: 1, next: { inhales: 2, dashes: 1 } },
+		{ difficulty: 110, dashes: 1, next: { inhales: 2, stars: 1 } },
+		{ difficulty: 250, dashes: 1, next: { inhales: 2, stars: 1, dashes: 1 } },
+		{ difficulty: 130, dashes: 1, next: { inhales: 2, stars: 1, dashes: 2 } },
+
+		{ difficulty: 12, dashes: 2, next: { inhales: 2 } },
+		{ difficulty: 130, dashes: 2, next: { inhales: 2, dashes: 1 } },
+		{ difficulty: 12, dashes: 2, next: { inhales: 2, stars: 1 } },
+		{ difficulty: 150, dashes: 2, next: { inhales: 2, stars: 1, dashes: 1 } },
+		{ difficulty: 30, dashes: 2, next: { inhales: 2, stars: 1, dashes: 2 } },
+
+		{ difficulty: 105, inhales: 1, dashes: 1, next: { inhales: 1 } },
+		{ difficulty: 210, inhales: 1, dashes: 1, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 115, inhales: 1, dashes: 1, next: { inhales: 1, dashes: 2 } },
+		{ difficulty: 210, dashes: 1, next: { inhales: 1, dashes: 1, next: { inhales: 1 } } },
+		{ difficulty: 115, dashes: 2, next: { inhales: 1, dashes: 1, next: { inhales: 1 } } },
+
+		{ difficulty: 5, inhales: 1, stars: 1, next: { inhales: 1 } },
+		{ difficulty: 115, inhales: 1, stars: 1, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 10, inhales: 1, stars: 1, next: { inhales: 1, stars: 1 } },
+		{ difficulty: 115, dashes: 1, next: { inhales: 1, dashes: 2, next: { inhales: 1 } } },
+		{ difficulty: 10, dashes: 2, next: { inhales: 1, dashes: 2, next: { inhales: 1 } } },
+
+		{ difficulty: 115, inhales: 1, stars: 1, dashes: 1, next: { inhales: 1 } },
+		{ difficulty: 230, inhales: 1, stars: 1, dashes: 1, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 125, inhales: 1, stars: 1, dashes: 1, next: { inhales: 1, dashes: 2 } },
+
+		{ difficulty: 10, inhales: 1, stars: 1, dashes: 2, next: { inhales: 1 } },
+		{ difficulty: 115, inhales: 1, stars: 1, dashes: 2, next: { inhales: 1, dashes: 1 } },
+		{ difficulty: 20, inhales: 1, stars: 1, dashes: 2, next: { inhales: 1, dashes: 2 } },
+
+
+
+		{ difficulty: 10, timeloss: 16, inhales: 3 },
 	],
 	dragonTurn2: [
 		{ difficulty: 0 },
