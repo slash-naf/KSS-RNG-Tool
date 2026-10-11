@@ -524,6 +524,14 @@ export const TURN_DRAGON_TURN2 = 3;
  * @typedef {{ action: ActionTableEx, branches?: Map<BattleWindowsPowersPair, ManipulateResult>, default: ManipulateResult } | null} ManipulateResult
  * @typedef {'0' | '1' | '2' | '0-1' | '1-2' | '0-2'} HammerThrowOption
  */
+
+/** 行動（またはnextで連なる行動）が吸い込みを含むか
+ * @param {ActionTable} action
+ * @returns {boolean} */
+function actionUsesInhale(action) {
+	if ((action.inhales ?? 0) > 0) return true;
+	return action.next ? actionUsesInhale(action.next) : false;
+}
 /** 銀河に願いをのバトルウィンドウズの乱数調整 */
 export class BattleWindowsMWWManipulator {
 	/**
@@ -533,6 +541,7 @@ export class BattleWindowsMWWManipulator {
 	 * @param {boolean} [options.fastKnight] 悪魔の騎士をFastモードで倒すか
 	 * @param {boolean} [options.fastDragon] レッドドラゴンをFastモードで倒すか
 	 * @param {boolean} [options.allowDragonStar] レッドドラゴンの星攻撃のタイムロスを考慮するか
+	 * @param {boolean} [options.allowInhale] 吸い込みを含む行動を使うか
 	 * @param {HammerThrowOption} [options.hammerThrow] ハンマー投げのダッシュによる乱数消費数
 	 * @param {number} [options.minIndex] 探索する乱数の開始位置
 	 * @param {number} [options.maxIndex] 探索する乱数の終了位置
@@ -547,6 +556,7 @@ export class BattleWindowsMWWManipulator {
 		fastKnight = false,
 		fastDragon = false,
 		allowDragonStar = false,
+		allowInhale = false,
 		hammerThrow = '1',
 		minIndex = 2800,
 		maxIndex = 3376,
@@ -559,6 +569,7 @@ export class BattleWindowsMWWManipulator {
 		this.fastKnight = fastKnight;
 		this.fastDragon = fastDragon;
 		this.allowDragonStar = allowDragonStar;
+		this.allowInhale = allowInhale;
 
 		this.hammerThrowMin = parseInt(hammerThrow[0]);
 		this.hammerThrowBuffer = parseInt(hammerThrow[hammerThrow.length - 1]) - this.hammerThrowMin;
@@ -598,7 +609,7 @@ export class BattleWindowsMWWManipulator {
 		this.actionsListByTurn = [
 			MagicianPrioritiesTable[this.magicianDifficulty],
 			actionsDifficultyTable.knight.map(e => ({ ...e, fast: this.fastKnight ? 1 : undefined })),
-			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon ? 1 : undefined })),
+			actionsDifficultyTable.dragon.map(e => ({ ...e, fast: this.fastDragon ? 1 : undefined })).filter(e => this.allowInhale || !actionUsesInhale(e)),
 			this.targetPower === null ? actionsDifficultyTable.dragonTurn2 : actionsDifficultyTable.dragonTurn2ForPowerManip,
 		].map(list => list.map(e => ({ ...e, penalty: (e.difficulty ?? 0) + (e.timeloss ?? 0) * this.timelossPenalty })).sort((a, b) => a.penalty - b.penalty));
 

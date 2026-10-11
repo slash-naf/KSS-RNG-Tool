@@ -39,6 +39,7 @@ import {
  *   magician: MagicianDifficulty,
  *   knight: DifficultyMode,
  *   dragon: DifficultyMode,
+ *   allowInhale: boolean,
  *   hammerThrow: import('./rng2.mjs').HammerThrowOption,
  *   hammerThrowForDragon: string,
  *   branchReduction: BranchReductionMode,
@@ -80,6 +81,7 @@ const DEFAULT_SETTINGS = {
 	magician: 'easy',
 	knight: 'easy',
 	dragon: 'easy',
+	allowInhale: false,
 	hammerThrow: '1',
 	hammerThrowForDragon: '1',
 	branchReduction: 'medium',
@@ -98,6 +100,7 @@ let customState = {
 	magician: DEFAULT_SETTINGS.magician,
 	knight: DEFAULT_SETTINGS.knight,
 	dragon: DEFAULT_SETTINGS.dragon,
+	allowInhale: DEFAULT_SETTINGS.allowInhale,
 	hammerThrow: DEFAULT_SETTINGS.hammerThrow,
 	hammerThrowForDragon: DEFAULT_SETTINGS.hammerThrowForDragon,
 	branchReduction: DEFAULT_SETTINGS.branchReduction,
@@ -107,9 +110,9 @@ let customState = {
 /** 各プリセットモードに対応する固定設定値 */
 /** @type {Record<Exclude<PresetMode, 'custom'>, CustomState>} */
 const PRESETS = {
-	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', hammerThrow: '1-2', hammerThrowForDragon: '1', branchReduction: 'high', targetPower: 'disabled' },
-	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'disabled' },
-	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'Wheel' },
+	easiest: { min: '2800', max: '3376', magician: 'easy', knight: 'easy', dragon: 'easy', allowInhale: true, hammerThrow: '1-2', hammerThrowForDragon: '1', branchReduction: 'high', targetPower: 'disabled' },
+	fastest: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowInhale: true, hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'disabled' },
+	fastestWheel: { min: '2750', max: '3161', magician: 'aggressiveFast', knight: 'fast', dragon: 'fast', allowInhale: true, hammerThrow: '1', hammerThrowForDragon: '1', branchReduction: 'medium', targetPower: 'Wheel' },
 };
 
 /** 画像アセットのパス定義 */
@@ -138,6 +141,7 @@ const L = {
 	magician: { en: 'Magician:', ja: '魔法使い:' },
 	knight: { en: 'Knight:', ja: '悪魔の騎士:' },
 	dragon: { en: 'Dragon:', ja: 'レッドドラゴン:' },
+	inhale: { en: 'Include Inhale', ja: '吸い込みあり' },
 	hammerThrow: { en: 'Hammer throw dash advances:', ja: 'ハンマー投げのダッシュ消費数:' },
 	branchReduction: { en: 'Branch reduction:', ja: '分岐削減:' },
 	branchReductionLow: { en: 'Low', ja: '低' },
@@ -314,6 +318,7 @@ const el = {
 	difficultyMagician: $('difficulty-magician', HTMLSelectElement),
 	difficultyKnight: $('difficulty-knight', HTMLSelectElement),
 	difficultyDragon: $('difficulty-dragon', HTMLSelectElement),
+	allowInhale: $('allow-inhale', HTMLInputElement),
 	displayMode: $('display-mode', HTMLSelectElement),
 	detailMode: $('detail-mode', HTMLSelectElement),
 	indexDisplayMode: $('index-display-mode', HTMLSelectElement),
@@ -338,6 +343,7 @@ const presetTargetElements = {
 	magician: el.difficultyMagician,
 	knight: el.difficultyKnight,
 	dragon: el.difficultyDragon,
+	allowInhale: el.allowInhale,
 	hammerThrow: el.hammerThrow,
 	hammerThrowForDragon: el.hammerThrowDragon,
 	branchReduction: el.branchReduction,
@@ -358,6 +364,7 @@ function getSettings() {
 		magicianDifficulty: /** @type {MagicianDifficulty} */ (el.difficultyMagician.value),
 		fastKnight: el.difficultyKnight.value === 'fast',
 		fastDragon: el.difficultyDragon.value === 'fast',
+		allowInhale: el.allowInhale.checked,
 		allowDragonStar: false,
 		hammerThrow: /** @type {import('./rng2.mjs').HammerThrowOption} */ (el.hammerThrow.value),
 		branchReduction: /** @type {BranchReductionMode} */ (el.branchReduction.value),
@@ -451,6 +458,8 @@ function loadSettings() {
 			const migrateDifficulty = (/**@type {string}*/val) => /**@type {DifficultyMode}*/ ({'true': 'easy', 'false': 'fast'}[val] ?? val);
 			if (s.knight) customState.knight = migrateDifficulty(s.knight);
 			if (s.dragon) customState.dragon = migrateDifficulty(s.dragon);
+
+			if (s.allowInhale !== undefined) customState.allowInhale = s.allowInhale;
 
 			if (s.hammerThrow !== undefined) customState.hammerThrow = s.hammerThrow;
 			if (s.branchReduction) customState.branchReduction = s.branchReduction;
@@ -1019,6 +1028,7 @@ function getManipulator(settings) {
 		fastKnight: settings.fastKnight,
 		fastDragon: settings.fastDragon,
 		allowDragonStar: settings.allowDragonStar,
+		allowInhale: settings.allowInhale,
 		hammerThrow: settings.hammerThrow,
 		hammerThrowForDragon: settings.hammerThrowForDragon,
 		branchReduction: settings.branchReduction,
