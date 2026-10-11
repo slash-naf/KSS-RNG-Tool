@@ -550,12 +550,14 @@ function msgSimple(action) {
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
+		const jumpInhale = inhales && stars;
 		if (inhales && stars) {
-			result.push(t("actionJumpInhale"));
 			inhales--;
 			stars--;
 		}
 		if (inhales) result.push(formatActionCount(inhales, 'actionInhale', 'actionInhales'));
+		if (jumpInhale) result.push(t("actionJumpInhale"));
+
 		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes'), `${t('actionLongDash')} & ${t('actionDash')}`][dashes]);
 		if (stars) result.push(formatActionCount(stars, 'actionStar', 'actionStars'));
 		if (slides) result.push(formatActionCount(slides, 'actionSlide', 'actionSlides'));
