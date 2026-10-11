@@ -1291,6 +1291,9 @@ el.settingsArea.addEventListener('change', (e) => {
 			displayResult();
 	}
 	saveSettings();
+
+	// getManipulatorのキャッシュ
+	getManipulator(getSettings());
 });
 
 /** 分析実行ボタンのイベント登録 */
@@ -1321,6 +1324,9 @@ switchLang(lang);
 
 // 星ボックスの初期状態を描画
 renderStarBoxes();
+
+// getManipulatorのキャッシュ
+getManipulator(getSettings());
 
 // ステータス欄を待機メッセージで初期化
 el.status.innerHTML = t('pressToStart');
