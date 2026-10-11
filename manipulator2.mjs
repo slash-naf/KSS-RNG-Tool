@@ -244,6 +244,7 @@ const L = {
 	actionSlides: { en: ' Slides', ja: 'スライディング' },
 	actionInhale: { en: 'Inhale', ja: '吸い込み' },
 	actionInhales: { en: ' Inhales', ja: '吸い込み' },
+	actionJumpInhale: { en: 'Jump Inhale', ja: 'ジャンプ吸い込み' },
 	enemyMagician: { en: 'Magician', ja: '魔法使い' },
 	enemyKnight: { en: 'Knight', ja: '悪魔の騎士' },
 	enemyDragon: { en: 'Dragon', ja: 'レッドドラゴン' },
@@ -541,7 +542,7 @@ function formatActionCount(count, single, plural) {
  * @param {ActionTable} action
  * @returns {string} */
 function msgSimple(action) {
-	const { inhales, dashes, slides, hammerFlips, stars, lateAdvances, name, next } = action;
+	let { inhales, dashes, slides, hammerFlips, stars, lateAdvances, name, next } = action;
 	const result = [];
 
 	if (name) {
@@ -549,6 +550,11 @@ function msgSimple(action) {
 	} else if (lateAdvances) {
 		if (slides) result.push([, t('actionOptimalSlide'), t('actionSubOptimalSlide')][lateAdvances]);
 	} else {
+		if (inhales && stars) {
+			result.push(t("actionJumpInhale"));
+			inhales--;
+			stars--;
+		}
 		if (inhales) result.push(formatActionCount(inhales, 'actionInhale', 'actionInhales'));
 		if (dashes) result.push([, t('actionShortDash'), t('actionDash'), t('actionLongDash'), t('action2Dashes'), `${t('actionLongDash')} & ${t('actionDash')}`][dashes]);
 		if (stars) result.push(formatActionCount(stars, 'actionStar', 'actionStars'));
